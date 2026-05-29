@@ -97,11 +97,12 @@ function CollectionsPage() {
                 </span>
               </div>
               {c.description && <p className="line-clamp-2 text-sm text-muted-foreground">{c.description}</p>}
-              {c.is_public && (
-                <button onClick={() => copyShareLink(c.share_slug)} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">
-                  <Share2 className="h-3 w-3" /> Copy share link
-                </button>
-              )}
+              <button
+                onClick={() => share(c)}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+              >
+                <Share2 className="h-3 w-3" /> {c.is_public ? "Copy share link" : "Share"}
+              </button>
             </div>
           ))}
         </div>
