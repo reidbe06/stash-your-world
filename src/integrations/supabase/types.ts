@@ -52,12 +52,15 @@ export type Database = {
       }
       items: {
         Row: {
+          ai_summary: string | null
+          category: string | null
           collection_id: string | null
           created_at: string
           description: string | null
           id: string
           image_url: string | null
           source: string | null
+          subcategory: string | null
           tags: string[]
           title: string
           type: string
@@ -66,12 +69,15 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          ai_summary?: string | null
+          category?: string | null
           collection_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
           image_url?: string | null
           source?: string | null
+          subcategory?: string | null
           tags?: string[]
           title: string
           type?: string
@@ -80,12 +86,15 @@ export type Database = {
           user_id: string
         }
         Update: {
+          ai_summary?: string | null
+          category?: string | null
           collection_id?: string | null
           created_at?: string
           description?: string | null
           id?: string
           image_url?: string | null
           source?: string | null
+          subcategory?: string | null
           tags?: string[]
           title?: string
           type?: string
