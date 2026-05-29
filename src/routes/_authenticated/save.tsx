@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Link2, UtensilsCrossed, Video, ShoppingBag, Shirt, Lightbulb, FileText, Bookmark } from "lucide-react";
+import { ArrowLeft, Link2, UtensilsCrossed, Video, ShoppingBag, Shirt, Lightbulb, FileText, Bookmark, ImageIcon } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -22,6 +22,7 @@ export const Route = createFileRoute("/_authenticated/save")({
 const schema = z.object({
   title: z.string().trim().min(1, "Title required").max(200),
   url: z.string().trim().max(2000).optional().or(z.literal("")),
+  image_url: z.string().trim().max(2000).optional().or(z.literal("")),
   description: z.string().max(1000).optional(),
   type: z.string().max(40),
   tags: z.string().max(300).optional(),
