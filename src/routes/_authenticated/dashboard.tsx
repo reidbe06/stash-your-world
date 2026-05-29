@@ -1,11 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, Bookmark, Shirt, Home as HomeIcon, Sparkles, Dumbbell, Plane, Laptop, UtensilsCrossed } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { SaveItemDialog } from "@/components/SaveItemDialog";
 import type { Item } from "@/components/ItemCard";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -36,7 +35,7 @@ const CATEGORIES: Category[] = [
 function Library() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [saveOpen, setSaveOpen] = useState(false);
+
 
   const { data: items } = useQuery({
     queryKey: ["items", user?.id],
@@ -90,14 +89,13 @@ function Library() {
         ))}
       </div>
 
-      <button
-        onClick={() => setSaveOpen(true)}
-        className="w-full rounded-full bg-brand-gradient py-3.5 text-sm font-semibold text-primary-foreground shadow-brand"
+      <Link
+        to="/save"
+        className="block w-full rounded-full bg-brand-gradient py-3.5 text-center text-sm font-semibold text-primary-foreground shadow-brand"
       >
         + Save New
-      </button>
+      </Link>
 
-      <SaveItemDialog open={saveOpen} onOpenChange={setSaveOpen} />
     </div>
   );
 }

@@ -1,11 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Plus, Share2, Globe, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ItemCard, type Item } from "@/components/ItemCard";
-import { SaveItemDialog } from "@/components/SaveItemDialog";
 
 export const Route = createFileRoute("/_authenticated/collections/$id")({
   component: CollectionDetail,
@@ -13,7 +11,7 @@ export const Route = createFileRoute("/_authenticated/collections/$id")({
 
 function CollectionDetail() {
   const { id } = Route.useParams();
-  const [saveOpen, setSaveOpen] = useState(false);
+
 
   const { data: collection } = useQuery({
     queryKey: ["collection", id],
@@ -62,9 +60,9 @@ function CollectionDetail() {
               <Share2 className="h-4 w-4" /> Share
             </button>
           )}
-          <button onClick={() => setSaveOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-primary-foreground shadow-brand">
+          <Link to="/save" search={{ collection: id } as never} className="inline-flex items-center gap-1.5 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-primary-foreground shadow-brand">
             <Plus className="h-4 w-4" /> Add
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -75,8 +73,6 @@ function CollectionDetail() {
       ) : (
         <p className="py-12 text-center text-sm text-muted-foreground">No items in this collection yet.</p>
       )}
-
-      <SaveItemDialog open={saveOpen} onOpenChange={setSaveOpen} defaultCollection={id} />
     </div>
   );
 }
