@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Item } from "@/components/ItemCard";
 import { Input } from "@/components/ui/input";
+import { semanticSearchItems, backfillUserEmbeddings } from "@/lib/semantic-search.functions";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
