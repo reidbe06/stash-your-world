@@ -53,7 +53,7 @@ function CollectionsPage() {
     setOpen(false);
   };
 
-  const share = async (c: { id: string; share_slug: string; is_public: boolean }) => {
+  const share = async (c: { id: string; share_slug: string | null; is_public: boolean }) => {
     let slug = c.share_slug;
     if (!c.is_public) {
       const { data: updated, error } = await supabase
