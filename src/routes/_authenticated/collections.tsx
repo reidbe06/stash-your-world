@@ -55,7 +55,7 @@ function CollectionsPage() {
 
   const share = async (c: { id: string; share_slug: string | null; is_public: boolean }) => {
     let slug = c.share_slug;
-    if (!c.is_public) {
+    if (!c.is_public || !slug) {
       const { data: updated, error } = await supabase
         .from("collections")
         .update({ is_public: true })
@@ -66,6 +66,7 @@ function CollectionsPage() {
       slug = updated.share_slug;
       qc.invalidateQueries({ queryKey: ["collections"] });
     }
+    if (!slug) return toast.error("Couldn't create share link");
     const link = `${window.location.origin}/share/${slug}`;
     try { await navigator.clipboard.writeText(link); } catch {}
     toast.success(c.is_public ? "Share link copied!" : "Made public — link copied!");
