@@ -70,11 +70,15 @@ function CollectionDetail() {
           {collection?.description && <p className="mt-1 text-muted-foreground">{collection.description}</p>}
         </div>
         <div className="flex gap-2">
-          {collection?.is_public && (
-            <button onClick={share} className="inline-flex items-center gap-1.5 rounded-full border bg-card px-4 py-2 text-sm font-semibold shadow-card">
+          {collection && (
+            <button onClick={share} className="inline-flex items-center gap-1.5 rounded-full border bg-card px-4 py-2 text-sm font-semibold shadow-card hover:text-primary">
               <Share2 className="h-4 w-4" /> Share
             </button>
           )}
+          <Link to="/save" search={{ collection: id } as never} className="inline-flex items-center gap-1.5 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-primary-foreground shadow-brand">
+            <Plus className="h-4 w-4" /> Add
+          </Link>
+        </div>
           <Link to="/save" search={{ collection: id } as never} className="inline-flex items-center gap-1.5 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-primary-foreground shadow-brand">
             <Plus className="h-4 w-4" /> Add
           </Link>
