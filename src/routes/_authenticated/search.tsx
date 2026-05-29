@@ -88,7 +88,7 @@ function SearchPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items")
-        .select("*, collection:collections(id,name), embedding_updated_at")
+        .select("*, collection:collections(id,name)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as ItemWithCollection[];
