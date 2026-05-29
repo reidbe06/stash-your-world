@@ -207,7 +207,7 @@ function SavePage() {
       let source: string | null = null;
       try { source = new URL(form.url).hostname.replace(/^www\./, ""); } catch {}
       const fallbackTitle = source ?? "Saved link";
-      const { error } = await supabase.from("items").insert({
+      const { data: inserted, error } = await supabase.from("items").insert({
         user_id: user.id,
         title: form.title.trim() || fallbackTitle,
         url: form.url,
@@ -220,11 +220,16 @@ function SavePage() {
         category: form.category || null,
         subcategory: form.subcategory || null,
         ai_summary: form.ai_summary || null,
-      });
+      }).select("id").single();
       if (error) throw error;
       toast.success("Saved to STASHd!");
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["collection-items"] });
+      if (inserted?.id) {
+        embedItemFn({ data: { itemId: inserted.id } }).catch((err) =>
+          console.warn("Embedding failed", err),
+        );
+      }
       navigate({ to: "/dashboard" });
     } catch (err: any) {
       toast.error(err.message);
