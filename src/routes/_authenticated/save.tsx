@@ -47,6 +47,7 @@ function SavePage() {
   const [form, setForm] = useState({
     title: "",
     url: "",
+    image_url: "",
     description: "",
     type: "link",
     tags: "",
