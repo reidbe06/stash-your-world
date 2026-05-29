@@ -53,10 +53,22 @@ function CollectionsPage() {
     setOpen(false);
   };
 
-  const copyShareLink = (slug: string) => {
+  const share = async (c: { id: string; share_slug: string; is_public: boolean }) => {
+    let slug = c.share_slug;
+    if (!c.is_public) {
+      const { data: updated, error } = await supabase
+        .from("collections")
+        .update({ is_public: true })
+        .eq("id", c.id)
+        .select("share_slug")
+        .single();
+      if (error) return toast.error(error.message);
+      slug = updated.share_slug;
+      qc.invalidateQueries({ queryKey: ["collections"] });
+    }
     const link = `${window.location.origin}/share/${slug}`;
-    navigator.clipboard.writeText(link);
-    toast.success("Share link copied!");
+    try { await navigator.clipboard.writeText(link); } catch {}
+    toast.success(c.is_public ? "Share link copied!" : "Made public — link copied!");
   };
 
   return (
