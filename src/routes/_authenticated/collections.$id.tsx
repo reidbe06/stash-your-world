@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Plus, Share2, Globe, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,7 @@ export const Route = createFileRoute("/_authenticated/collections/$id")({
 
 function CollectionDetail() {
   const { id } = Route.useParams();
+  const qc = useQueryClient();
 
 
   const { data: collection } = useQuery({
@@ -31,10 +32,24 @@ function CollectionDetail() {
     },
   });
 
-  const share = () => {
-    if (!collection?.share_slug) return;
-    navigator.clipboard.writeText(`${window.location.origin}/share/${collection.share_slug}`);
-    toast.success("Share link copied!");
+  const share = async () => {
+    if (!collection) return;
+    let slug = collection.share_slug;
+    if (!collection.is_public || !slug) {
+      const { data, error } = await supabase
+        .from("collections")
+        .update({ is_public: true })
+        .eq("id", collection.id)
+        .select("share_slug")
+        .single();
+      if (error) return toast.error(error.message);
+      slug = data.share_slug;
+      qc.invalidateQueries({ queryKey: ["collection", id] });
+      qc.invalidateQueries({ queryKey: ["collections"] });
+    }
+    if (!slug) return toast.error("Couldn't create share link");
+    try { await navigator.clipboard.writeText(`${window.location.origin}/share/${slug}`); } catch {}
+    toast.success(collection.is_public ? "Share link copied!" : "Made public — link copied!");
   };
 
   return (
@@ -55,8 +70,8 @@ function CollectionDetail() {
           {collection?.description && <p className="mt-1 text-muted-foreground">{collection.description}</p>}
         </div>
         <div className="flex gap-2">
-          {collection?.is_public && (
-            <button onClick={share} className="inline-flex items-center gap-1.5 rounded-full border bg-card px-4 py-2 text-sm font-semibold shadow-card">
+          {collection && (
+            <button onClick={share} className="inline-flex items-center gap-1.5 rounded-full border bg-card px-4 py-2 text-sm font-semibold shadow-card hover:text-primary">
               <Share2 className="h-4 w-4" /> Share
             </button>
           )}

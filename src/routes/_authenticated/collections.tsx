@@ -53,10 +53,23 @@ function CollectionsPage() {
     setOpen(false);
   };
 
-  const copyShareLink = (slug: string) => {
+  const share = async (c: { id: string; share_slug: string | null; is_public: boolean }) => {
+    let slug = c.share_slug;
+    if (!c.is_public || !slug) {
+      const { data: updated, error } = await supabase
+        .from("collections")
+        .update({ is_public: true })
+        .eq("id", c.id)
+        .select("share_slug")
+        .single();
+      if (error) return toast.error(error.message);
+      slug = updated.share_slug;
+      qc.invalidateQueries({ queryKey: ["collections"] });
+    }
+    if (!slug) return toast.error("Couldn't create share link");
     const link = `${window.location.origin}/share/${slug}`;
-    navigator.clipboard.writeText(link);
-    toast.success("Share link copied!");
+    try { await navigator.clipboard.writeText(link); } catch {}
+    toast.success(c.is_public ? "Share link copied!" : "Made public — link copied!");
   };
 
   return (
@@ -85,11 +98,12 @@ function CollectionsPage() {
                 </span>
               </div>
               {c.description && <p className="line-clamp-2 text-sm text-muted-foreground">{c.description}</p>}
-              {c.is_public && (
-                <button onClick={() => copyShareLink(c.share_slug)} className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline">
-                  <Share2 className="h-3 w-3" /> Copy share link
-                </button>
-              )}
+              <button
+                onClick={() => share(c)}
+                className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+              >
+                <Share2 className="h-3 w-3" /> {c.is_public ? "Copy share link" : "Share"}
+              </button>
             </div>
           ))}
         </div>
