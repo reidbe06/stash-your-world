@@ -1,11 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Plus, Share2, Globe, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { ItemCard, type Item } from "@/components/ItemCard";
-import { SaveItemDialog } from "@/components/SaveItemDialog";
 
 export const Route = createFileRoute("/_authenticated/collections/$id")({
   component: CollectionDetail,
@@ -13,7 +11,7 @@ export const Route = createFileRoute("/_authenticated/collections/$id")({
 
 function CollectionDetail() {
   const { id } = Route.useParams();
-  const [saveOpen, setSaveOpen] = useState(false);
+
 
   const { data: collection } = useQuery({
     queryKey: ["collection", id],
