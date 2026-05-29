@@ -426,6 +426,12 @@ function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity
           <span className="absolute left-2 top-2 rounded-full bg-card/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
             {item.type}
           </span>
+          {typeof similarity === "number" && (
+            <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-brand">
+              <Sparkles className="h-2.5 w-2.5" />
+              {Math.round(similarity * 100)}% match
+            </span>
+          )}
         </div>
         <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{item.title}</h3>
         <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
