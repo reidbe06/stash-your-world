@@ -162,6 +162,32 @@ function SavePage() {
         </div>
 
         <div>
+          <Label htmlFor="image_url">Thumbnail image URL</Label>
+          <div className="mt-1.5 flex gap-3">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted text-muted-foreground">
+              {form.image_url ? (
+                <img
+                  src={form.image_url}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                />
+              ) : (
+                <ImageIcon className="h-6 w-6" />
+              )}
+            </div>
+            <Input
+              id="image_url"
+              type="url"
+              value={form.image_url}
+              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+              placeholder="https://…/photo.jpg"
+              maxLength={2000}
+            />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">Paste an image link to show a preview on your card.</p>
+
+        <div>
           <Label htmlFor="desc">Notes</Label>
           <Textarea
             id="desc"
