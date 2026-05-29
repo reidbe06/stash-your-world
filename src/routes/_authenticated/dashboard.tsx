@@ -1,11 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bell, Bookmark, Shirt, Home as HomeIcon, Sparkles, Dumbbell, Plane, Laptop, UtensilsCrossed } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
-import { SaveItemDialog } from "@/components/SaveItemDialog";
 import type { Item } from "@/components/ItemCard";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
