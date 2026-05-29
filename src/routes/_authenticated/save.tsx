@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Link2, UtensilsCrossed, Video, ShoppingBag, Shirt, Lightbulb, FileText, Bookmark } from "lucide-react";
+import { ArrowLeft, Link2, UtensilsCrossed, Video, ShoppingBag, Shirt, Lightbulb, FileText, Bookmark, ImageIcon } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -22,6 +22,7 @@ export const Route = createFileRoute("/_authenticated/save")({
 const schema = z.object({
   title: z.string().trim().min(1, "Title required").max(200),
   url: z.string().trim().max(2000).optional().or(z.literal("")),
+  image_url: z.string().trim().max(2000).optional().or(z.literal("")),
   description: z.string().max(1000).optional(),
   type: z.string().max(40),
   tags: z.string().max(300).optional(),
@@ -46,6 +47,7 @@ function SavePage() {
   const [form, setForm] = useState({
     title: "",
     url: "",
+    image_url: "",
     description: "",
     type: "link",
     tags: "",
@@ -79,6 +81,7 @@ function SavePage() {
         user_id: user.id,
         title: form.title.trim(),
         url: form.url || null,
+        image_url: form.image_url || null,
         description: form.description || null,
         type: form.type,
         tags,
@@ -156,6 +159,33 @@ function SavePage() {
             maxLength={200}
             className="mt-1.5"
           />
+        </div>
+
+        <div>
+          <Label htmlFor="image_url">Thumbnail image URL</Label>
+          <div className="mt-1.5 flex gap-3">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-muted text-muted-foreground">
+              {form.image_url ? (
+                <img
+                  src={form.image_url}
+                  alt=""
+                  className="h-full w-full object-cover"
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+                />
+              ) : (
+                <ImageIcon className="h-6 w-6" />
+              )}
+            </div>
+            <Input
+              id="image_url"
+              type="url"
+              value={form.image_url}
+              onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+              placeholder="https://…/photo.jpg"
+              maxLength={2000}
+            />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">Paste an image link to show a preview on your card.</p>
         </div>
 
         <div>
