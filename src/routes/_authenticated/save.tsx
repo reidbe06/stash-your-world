@@ -228,7 +228,7 @@ function SavePage() {
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["collection-items"] });
       if (inserted?.id) {
-        embedItemFn({ data: { itemId: inserted.id } }).catch((err) =>
+        embedItemFn({ data: { itemId: inserted.id } }).catch((err: unknown) =>
           console.warn("Embedding failed", err),
         );
       }
