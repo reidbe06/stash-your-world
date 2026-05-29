@@ -186,6 +186,7 @@ function SavePage() {
             />
           </div>
           <p className="mt-1 text-xs text-muted-foreground">Paste an image link to show a preview on your card.</p>
+        </div>
 
         <div>
           <Label htmlFor="desc">Notes</Label>
