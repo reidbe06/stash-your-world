@@ -57,6 +57,8 @@ export type Database = {
           collection_id: string | null
           created_at: string
           description: string | null
+          embedding: string | null
+          embedding_updated_at: string | null
           id: string
           image_url: string | null
           source: string | null
@@ -74,6 +76,8 @@ export type Database = {
           collection_id?: string | null
           created_at?: string
           description?: string | null
+          embedding?: string | null
+          embedding_updated_at?: string | null
           id?: string
           image_url?: string | null
           source?: string | null
@@ -91,6 +95,8 @@ export type Database = {
           collection_id?: string | null
           created_at?: string
           description?: string | null
+          embedding?: string | null
+          embedding_updated_at?: string | null
           id?: string
           image_url?: string | null
           source?: string | null
@@ -117,7 +123,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      search_items_semantic: {
+        Args: {
+          match_count?: number
+          min_similarity?: number
+          query_embedding: string
+        }
+        Returns: {
+          id: string
+          similarity: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
