@@ -80,8 +80,12 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
           {item.type}
         </span>
         {!readOnly && (
-          <button onClick={del} className="absolute right-3 top-3 rounded-full bg-card/90 p-1.5 text-muted-foreground opacity-0 backdrop-blur transition hover:text-destructive group-hover:opacity-100" aria-label="Delete">
-            <Trash2 className="h-3.5 w-3.5" />
+          <button
+            onClick={() => setOpen(true)}
+            className="absolute right-3 top-3 rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground"
+            aria-label="Delete saved item"
+          >
+            <Trash2 className="h-4 w-4" />
           </button>
         )}
       </div>
