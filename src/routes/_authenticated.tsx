@@ -78,7 +78,7 @@ function AuthedLayout() {
 
       {/* Desktop FAB */}
       <Link to="/save" className="fixed bottom-8 right-8 z-30 hidden items-center gap-2 rounded-full bg-brand-gradient px-6 py-3.5 text-sm font-semibold text-primary-foreground shadow-brand md:inline-flex">
-        <Plus className="h-4 w-4" /> Save new
+        <Plus className="h-4 w-4" /> Save an Item
       </Link>
     </div>
   );
