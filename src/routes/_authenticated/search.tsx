@@ -357,19 +357,33 @@ function SearchPage() {
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold tracking-tight">
-          {q ? "Results" : "Recent"}
+          {useSemanticRanking ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Smart results
+            </span>
+          ) : q ? "Results" : "Recent"}
           <span className="ml-2 text-sm font-medium text-muted-foreground">{results.length}</span>
         </h2>
+        {useSemanticRanking && aiQuery && (
+          <span className="text-xs text-muted-foreground">Ranked by relevance to "{aiQuery}"</span>
+        )}
       </div>
 
       {results.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {results.map((it) => <ResultCard key={it.id} item={it} />)}
+          {results.map((it) => <ResultCard key={it.id} item={it} similarity={(it as any)._sim} />)}
         </div>
       ) : (
         <div className="rounded-3xl border border-dashed bg-card/50 py-16 text-center">
           <p className="text-sm text-muted-foreground">
-            {q ? `No matches for "${q}".` : "Nothing matches these filters."}
+            {aiLoading
+              ? "Searching…"
+              : q
+                ? aiMode
+                  ? `No relevant matches for "${q}". Try rephrasing or turn AI search off.`
+                  : `No matches for "${q}".`
+                : "Nothing matches these filters."}
           </p>
         </div>
       )}
@@ -377,7 +391,7 @@ function SearchPage() {
   );
 }
 
-function ResultCard({ item }: { item: ItemWithCollection }) {
+function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity?: number }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
