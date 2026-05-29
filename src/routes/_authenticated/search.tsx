@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Item } from "@/components/ItemCard";
@@ -15,6 +16,16 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/search")({
@@ -277,30 +288,76 @@ function SearchPage() {
 }
 
 function ResultCard({ item }: { item: ItemWithCollection }) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const del = async () => {
+    setDeleting(true);
+    const { error } = await supabase.from("items").delete().eq("id", item.id);
+    setDeleting(false);
+    if (error) return toast.error(error.message);
+    setOpen(false);
+    toast.success("Saved item deleted");
+    qc.invalidateQueries({ queryKey: ["items"] });
+    qc.invalidateQueries({ queryKey: ["collection-items"] });
+  };
+
   return (
-    <a
-      href={item.url ?? "#"}
-      target={item.url ? "_blank" : undefined}
-      rel="noreferrer"
-      className="group block"
-    >
-      <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted shadow-card">
-        {item.image_url ? (
-          <img src={item.image_url} alt={item.title} className="h-full w-full object-cover transition group-hover:scale-105" loading="lazy" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-brand-gradient/10">
-            <Bookmark className="h-10 w-10 text-primary/40" />
-          </div>
-        )}
-        <span className="absolute left-2 top-2 rounded-full bg-card/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
-          {item.type}
-        </span>
-      </div>
-      <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{item.title}</h3>
-      <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-        {item.source ?? "Saved"} · {timeAgo(item.created_at)}
-        {item.collection?.name && ` · ${item.collection.name}`}
-      </p>
-    </a>
+    <div className="group relative">
+      <a
+        href={item.url ?? "#"}
+        target={item.url ? "_blank" : undefined}
+        rel="noreferrer"
+        className="block"
+      >
+        <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted shadow-card">
+          {item.image_url ? (
+            <img src={item.image_url} alt={item.title} className="h-full w-full object-cover transition group-hover:scale-105" loading="lazy" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-brand-gradient/10">
+              <Bookmark className="h-10 w-10 text-primary/40" />
+            </div>
+          )}
+          <span className="absolute left-2 top-2 rounded-full bg-card/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
+            {item.type}
+          </span>
+        </div>
+        <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{item.title}</h3>
+        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+          {item.source ?? "Saved"} · {timeAgo(item.created_at)}
+          {item.collection?.name && ` · ${item.collection.name}`}
+        </p>
+      </a>
+
+      <button
+        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
+        className="absolute right-2 top-2 rounded-full bg-card/95 p-1.5 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground"
+        aria-label="Delete saved item"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this saved item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{item.title}" will be permanently removed from your library and any collection it belongs to. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); del(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }
