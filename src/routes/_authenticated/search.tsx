@@ -74,6 +74,13 @@ function SearchPage() {
   const [collectionFilter, setCollectionFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("newest");
+  const [aiMode, setAiMode] = useState(true);
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiScores, setAiScores] = useState<Map<string, number> | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const runSemantic = useServerFn(semanticSearchItems);
+  const runBackfill = useServerFn(backfillUserEmbeddings);
 
   const { data: items } = useQuery({
     queryKey: ["items", user?.id, "with-collection"],
@@ -81,7 +88,7 @@ function SearchPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items")
-        .select("*, collection:collections(id,name)")
+        .select("*, collection:collections(id,name), embedding_updated_at")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as ItemWithCollection[];
@@ -98,22 +105,80 @@ function SearchPage() {
     },
   });
 
+  // One-time backfill so older items become searchable
+  const backfilledRef = useRef(false);
+  useEffect(() => {
+    if (!items || backfilledRef.current) return;
+    const missing = items.filter((it: any) => !it.embedding_updated_at);
+    if (missing.length === 0) return;
+    backfilledRef.current = true;
+    runBackfill({ data: { limit: 20 } }).catch((err: unknown) =>
+      console.warn("Backfill failed", err),
+    );
+  }, [items, runBackfill]);
+
+  // Debounced semantic search whenever the query changes (in AI mode)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const text = q.trim();
+    if (!aiMode || !text) {
+      setAiScores(null);
+      setAiQuery("");
+      setAiLoading(false);
+      return;
+    }
+    setAiLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const { matches } = await runSemantic({ data: { query: text, limit: 40 } });
+        const map = new Map<string, number>();
+        matches.forEach((m) => map.set(m.id, m.similarity));
+        setAiScores(map);
+        setAiQuery(text);
+      } catch (err: any) {
+        console.warn("Semantic search failed", err);
+        toast.error(err.message || "Semantic search failed");
+        setAiScores(null);
+      } finally {
+        setAiLoading(false);
+      }
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [q, aiMode, runSemantic]);
+
   const allTags = useMemo(() => {
     const set = new Set<string>();
     items?.forEach((it) => it.tags.forEach((t) => set.add(t)));
     return Array.from(set).sort().slice(0, 24);
   }, [items]);
 
+  const useSemanticRanking = aiMode && q.trim().length > 0 && aiScores !== null;
+
   const results = useMemo(() => {
-    if (!items) return [];
+    if (!items) return [] as (ItemWithCollection & { _sim?: number })[];
     const needle = q.trim().toLowerCase();
-    const filtered = items.filter((it) => {
+
+    const passesFilters = (it: ItemWithCollection) => {
       if (category !== "all" && it.type !== category) return false;
       if (collectionFilter !== "all") {
         if (collectionFilter === "none" && it.collection_id) return false;
         if (collectionFilter !== "none" && it.collection_id !== collectionFilter) return false;
       }
       if (tagFilter !== "all" && !it.tags.includes(tagFilter)) return false;
+      return true;
+    };
+
+    if (useSemanticRanking) {
+      const ranked = items
+        .filter(passesFilters)
+        .filter((it) => aiScores!.has(it.id))
+        .map((it) => ({ ...it, _sim: aiScores!.get(it.id)! }))
+        .sort((a, b) => (b._sim ?? 0) - (a._sim ?? 0));
+      return ranked;
+    }
+
+    const filtered = items.filter((it) => {
+      if (!passesFilters(it)) return false;
       if (!needle) return true;
       return (
         it.title.toLowerCase().includes(needle) ||
@@ -131,7 +196,9 @@ function SearchPage() {
     else if (sort === "category") sorted.sort((a, b) => a.type.localeCompare(b.type) || +new Date(b.created_at) - +new Date(a.created_at));
     else sorted.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
     return sorted;
-  }, [items, q, category, collectionFilter, tagFilter, sort]);
+  }, [items, q, category, collectionFilter, tagFilter, sort, useSemanticRanking, aiScores]);
+
+
 
   const activeFilters: { key: string; label: string; clear: () => void }[] = [];
   if (category !== "all") activeFilters.push({ key: "cat", label: `Category: ${category}`, clear: () => setCategory("all") });
