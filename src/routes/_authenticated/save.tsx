@@ -81,6 +81,7 @@ function SavePage() {
         user_id: user.id,
         title: form.title.trim(),
         url: form.url || null,
+        image_url: form.image_url || null,
         description: form.description || null,
         type: form.type,
         tags,
