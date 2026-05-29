@@ -1,33 +1,45 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search as SearchIcon, SlidersHorizontal, Bookmark } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Item } from "@/components/ItemCard";
 import { Input } from "@/components/ui/input";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/search")({
   head: () => ({ meta: [{ title: "Search — STASHd" }] }),
-  validateSearch: (s: Record<string, unknown>) => ({ type: (s.type as string) || "all" }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    type: (s.type as string) || "all",
+    q: (s.q as string) || "",
+  }),
   component: SearchPage,
 });
 
-const TABS = [
+type SortKey = "newest" | "oldest" | "category";
+
+const CATEGORY_CHIPS = [
   { key: "all", label: "All" },
+  { key: "link", label: "Links" },
   { key: "recipe", label: "Recipes" },
-  { key: "workouts", label: "Workouts" },
+  { key: "video", label: "Videos" },
   { key: "product", label: "Products" },
-  { key: "more", label: "More" },
+  { key: "fashion", label: "Fashion" },
+  { key: "idea", label: "Ideas" },
+  { key: "article", label: "Articles" },
 ];
 
-function matchesTab(it: Item, tab: string) {
-  if (tab === "all") return true;
-  if (tab === "workouts") return it.tags.some((t) => /workout|fitness|gym/i.test(t));
-  if (tab === "more") return !["recipe", "product"].includes(it.type);
-  return it.type === tab;
-}
+type ItemWithCollection = Item & { collection?: { id: string; name: string } | null };
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -41,82 +53,230 @@ function timeAgo(iso: string) {
 
 function SearchPage() {
   const { user } = useAuth();
-  const { type } = Route.useSearch();
-  const [q, setQ] = useState("");
-  const [tab, setTab] = useState(TABS.some((t) => t.key === type) ? type : "all");
+  const { type, q: initialQ } = Route.useSearch();
+  const [q, setQ] = useState(initialQ);
+  const [category, setCategory] = useState(
+    CATEGORY_CHIPS.some((c) => c.key === type) ? type : "all"
+  );
+  const [collectionFilter, setCollectionFilter] = useState<string>("all");
+  const [tagFilter, setTagFilter] = useState<string>("all");
+  const [sort, setSort] = useState<SortKey>("newest");
 
   const { data: items } = useQuery({
-    queryKey: ["items", user?.id],
+    queryKey: ["items", user?.id, "with-collection"],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("items").select("*").order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("items")
+        .select("*, collection:collections(id,name)")
+        .order("created_at", { ascending: false });
       if (error) throw error;
-      return data as Item[];
+      return data as ItemWithCollection[];
     },
   });
+
+  const { data: collections } = useQuery({
+    queryKey: ["collections", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("collections").select("id,name").order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    items?.forEach((it) => it.tags.forEach((t) => set.add(t)));
+    return Array.from(set).sort().slice(0, 24);
+  }, [items]);
 
   const results = useMemo(() => {
     if (!items) return [];
     const needle = q.trim().toLowerCase();
-    return items.filter((it) => {
-      if (!matchesTab(it, tab)) return false;
+    const filtered = items.filter((it) => {
+      if (category !== "all" && it.type !== category) return false;
+      if (collectionFilter !== "all") {
+        if (collectionFilter === "none" && it.collection_id) return false;
+        if (collectionFilter !== "none" && it.collection_id !== collectionFilter) return false;
+      }
+      if (tagFilter !== "all" && !it.tags.includes(tagFilter)) return false;
       if (!needle) return true;
       return (
         it.title.toLowerCase().includes(needle) ||
         (it.description ?? "").toLowerCase().includes(needle) ||
         (it.source ?? "").toLowerCase().includes(needle) ||
+        (it.url ?? "").toLowerCase().includes(needle) ||
+        (it.collection?.name ?? "").toLowerCase().includes(needle) ||
+        it.type.toLowerCase().includes(needle) ||
         it.tags.some((t) => t.toLowerCase().includes(needle))
       );
     });
-  }, [items, q, tab]);
+
+    const sorted = [...filtered];
+    if (sort === "oldest") sorted.sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at));
+    else if (sort === "category") sorted.sort((a, b) => a.type.localeCompare(b.type) || +new Date(b.created_at) - +new Date(a.created_at));
+    else sorted.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
+    return sorted;
+  }, [items, q, category, collectionFilter, tagFilter, sort]);
+
+  const activeFilters: { key: string; label: string; clear: () => void }[] = [];
+  if (category !== "all") activeFilters.push({ key: "cat", label: `Category: ${category}`, clear: () => setCategory("all") });
+  if (collectionFilter !== "all") {
+    const name = collectionFilter === "none" ? "No collection" : collections?.find((c) => c.id === collectionFilter)?.name ?? "Collection";
+    activeFilters.push({ key: "col", label: `In: ${name}`, clear: () => setCollectionFilter("all") });
+  }
+  if (tagFilter !== "all") activeFilters.push({ key: "tag", label: `#${tagFilter}`, clear: () => setTagFilter("all") });
+
+  const clearAll = () => {
+    setCategory("all");
+    setCollectionFilter("all");
+    setTagFilter("all");
+    setQ("");
+  };
+
+  const sortLabel = sort === "newest" ? "Newest" : sort === "oldest" ? "Oldest" : "Category";
 
   return (
     <div className="space-y-5">
+      <div>
+        <h1 className="text-3xl font-extrabold tracking-tight">Search</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Find anything you've stashed.</p>
+      </div>
+
       <div className="flex items-center gap-3">
         <div className="relative flex-1">
           <SearchIcon className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search your stash…"
-            className="h-11 rounded-full border-0 bg-muted pl-11 text-sm"
+            placeholder="Search title, notes, URL, tag, collection…"
+            className="h-11 rounded-full border-0 bg-muted pl-11 pr-10 text-sm"
           />
+          {q && (
+            <button
+              onClick={() => setQ("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
-        <button className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground" aria-label="Filters">
-          <SlidersHorizontal className="h-4 w-4" />
-        </button>
-      </div>
 
-      <div className="flex gap-5 overflow-x-auto border-b text-sm font-medium">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-muted px-4 text-sm font-semibold text-foreground hover:bg-accent">
+            <ArrowUpDown className="h-4 w-4" />
+            <span className="hidden sm:inline">{sortLabel}</span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+              <DropdownMenuRadioItem value="newest">Newest</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="oldest">Oldest</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="category">Category</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger
             className={cn(
-              "relative whitespace-nowrap pb-3 pt-1 transition",
-              tab === t.key ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              "flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:text-foreground",
+              activeFilters.length > 0 ? "bg-accent text-primary" : "bg-muted"
             )}
+            aria-label="Filters"
           >
-            {t.label}
-            {tab === t.key && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-brand-gradient" />}
-          </button>
-        ))}
+            <SlidersHorizontal className="h-4 w-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Collection</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={collectionFilter} onValueChange={setCollectionFilter}>
+              <DropdownMenuRadioItem value="all">All collections</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="none">No collection</DropdownMenuRadioItem>
+              {collections?.map((c) => (
+                <DropdownMenuRadioItem key={c.id} value={c.id}>{c.name}</DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+            {allTags.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Tag</DropdownMenuLabel>
+                <DropdownMenuRadioGroup value={tagFilter} onValueChange={setTagFilter}>
+                  <DropdownMenuRadioItem value="all">All tags</DropdownMenuRadioItem>
+                  {allTags.map((t) => (
+                    <DropdownMenuRadioItem key={t} value={t}>#{t}</DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      <h2 className="text-lg font-bold tracking-tight">Top Results</h2>
+      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <div className="flex gap-2 pb-1">
+          {CATEGORY_CHIPS.map((c) => {
+            const active = c.key === category;
+            return (
+              <button
+                key={c.key}
+                onClick={() => setCategory(c.key)}
+                className={cn(
+                  "shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-semibold transition",
+                  active
+                    ? "border-transparent bg-brand-gradient text-primary-foreground shadow-brand"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {c.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {activeFilters.map((f) => (
+            <button
+              key={f.key}
+              onClick={f.clear}
+              className="inline-flex items-center gap-1 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground"
+            >
+              {f.label}
+              <X className="h-3 w-3" />
+            </button>
+          ))}
+          <button onClick={clearAll} className="text-xs font-semibold text-primary hover:underline">
+            Clear all
+          </button>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold tracking-tight">
+          {q ? "Results" : "Recent"}
+          <span className="ml-2 text-sm font-medium text-muted-foreground">{results.length}</span>
+        </h2>
+      </div>
 
       {results.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {results.map((it) => <ResultCard key={it.id} item={it} />)}
         </div>
       ) : (
-        <p className="py-16 text-center text-sm text-muted-foreground">No matches yet.</p>
+        <div className="rounded-3xl border border-dashed bg-card/50 py-16 text-center">
+          <p className="text-sm text-muted-foreground">
+            {q ? `No matches for "${q}".` : "Nothing matches these filters."}
+          </p>
+        </div>
       )}
     </div>
   );
 }
 
-function ResultCard({ item }: { item: Item }) {
+function ResultCard({ item }: { item: ItemWithCollection }) {
   return (
     <a
       href={item.url ?? "#"}
@@ -132,13 +292,14 @@ function ResultCard({ item }: { item: Item }) {
             <Bookmark className="h-10 w-10 text-primary/40" />
           </div>
         )}
-        <span className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-card/95 text-primary shadow-sm backdrop-blur">
-          <Bookmark className="h-4 w-4 fill-current" />
+        <span className="absolute left-2 top-2 rounded-full bg-card/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
+          {item.type}
         </span>
       </div>
       <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{item.title}</h3>
-      <p className="mt-0.5 text-xs text-muted-foreground">
+      <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
         {item.source ?? "Saved"} · {timeAgo(item.created_at)}
+        {item.collection?.name && ` · ${item.collection.name}`}
       </p>
     </a>
   );
