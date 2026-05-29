@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2 } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Item } from "@/components/ItemCard";
 import { Input } from "@/components/ui/input";
+import { semanticSearchItems, backfillUserEmbeddings } from "@/lib/semantic-search.functions";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -72,6 +74,13 @@ function SearchPage() {
   const [collectionFilter, setCollectionFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("newest");
+  const [aiMode, setAiMode] = useState(true);
+  const [aiQuery, setAiQuery] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiScores, setAiScores] = useState<Map<string, number> | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const runSemantic = useServerFn(semanticSearchItems);
+  const runBackfill = useServerFn(backfillUserEmbeddings);
 
   const { data: items } = useQuery({
     queryKey: ["items", user?.id, "with-collection"],
@@ -96,22 +105,80 @@ function SearchPage() {
     },
   });
 
+  // One-time backfill so older items become searchable
+  const backfilledRef = useRef(false);
+  useEffect(() => {
+    if (!items || backfilledRef.current) return;
+    const missing = items.filter((it: any) => !it.embedding_updated_at);
+    if (missing.length === 0) return;
+    backfilledRef.current = true;
+    runBackfill({ data: { limit: 20 } }).catch((err: unknown) =>
+      console.warn("Backfill failed", err),
+    );
+  }, [items, runBackfill]);
+
+  // Debounced semantic search whenever the query changes (in AI mode)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const text = q.trim();
+    if (!aiMode || !text) {
+      setAiScores(null);
+      setAiQuery("");
+      setAiLoading(false);
+      return;
+    }
+    setAiLoading(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const { matches } = await runSemantic({ data: { query: text, limit: 40 } });
+        const map = new Map<string, number>();
+        matches.forEach((m) => map.set(m.id, m.similarity));
+        setAiScores(map);
+        setAiQuery(text);
+      } catch (err: any) {
+        console.warn("Semantic search failed", err);
+        toast.error(err.message || "Semantic search failed");
+        setAiScores(null);
+      } finally {
+        setAiLoading(false);
+      }
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [q, aiMode, runSemantic]);
+
   const allTags = useMemo(() => {
     const set = new Set<string>();
     items?.forEach((it) => it.tags.forEach((t) => set.add(t)));
     return Array.from(set).sort().slice(0, 24);
   }, [items]);
 
+  const useSemanticRanking = aiMode && q.trim().length > 0 && aiScores !== null;
+
   const results = useMemo(() => {
-    if (!items) return [];
+    if (!items) return [] as (ItemWithCollection & { _sim?: number })[];
     const needle = q.trim().toLowerCase();
-    const filtered = items.filter((it) => {
+
+    const passesFilters = (it: ItemWithCollection) => {
       if (category !== "all" && it.type !== category) return false;
       if (collectionFilter !== "all") {
         if (collectionFilter === "none" && it.collection_id) return false;
         if (collectionFilter !== "none" && it.collection_id !== collectionFilter) return false;
       }
       if (tagFilter !== "all" && !it.tags.includes(tagFilter)) return false;
+      return true;
+    };
+
+    if (useSemanticRanking) {
+      const ranked = items
+        .filter(passesFilters)
+        .filter((it) => aiScores!.has(it.id))
+        .map((it) => ({ ...it, _sim: aiScores!.get(it.id)! }))
+        .sort((a, b) => (b._sim ?? 0) - (a._sim ?? 0));
+      return ranked;
+    }
+
+    const filtered = items.filter((it) => {
+      if (!passesFilters(it)) return false;
       if (!needle) return true;
       return (
         it.title.toLowerCase().includes(needle) ||
@@ -129,7 +196,9 @@ function SearchPage() {
     else if (sort === "category") sorted.sort((a, b) => a.type.localeCompare(b.type) || +new Date(b.created_at) - +new Date(a.created_at));
     else sorted.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
     return sorted;
-  }, [items, q, category, collectionFilter, tagFilter, sort]);
+  }, [items, q, category, collectionFilter, tagFilter, sort, useSemanticRanking, aiScores]);
+
+
 
   const activeFilters: { key: string; label: string; clear: () => void }[] = [];
   if (category !== "all") activeFilters.push({ key: "cat", label: `Category: ${category}`, clear: () => setCategory("all") });
@@ -150,9 +219,27 @@ function SearchPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight">Search</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Find anything you've stashed.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight">Search</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {aiMode ? "Ask in plain English — AI finds what you mean." : "Find anything you've stashed."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAiMode((v) => !v)}
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition",
+            aiMode
+              ? "bg-brand-gradient text-primary-foreground shadow-brand"
+              : "border bg-card text-muted-foreground hover:text-foreground",
+          )}
+          aria-pressed={aiMode}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          AI search {aiMode ? "on" : "off"}
+        </button>
       </div>
 
       <div className="flex items-center gap-3">
@@ -161,10 +248,12 @@ function SearchPage() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search title, notes, URL, tag, collection…"
+            placeholder={aiMode ? "Try: chicken dinners, pink outfit, vacation ideas for Mexico…" : "Search title, notes, URL, tag, collection…"}
             className="h-11 rounded-full border-0 bg-muted pl-11 pr-10 text-sm"
           />
-          {q && (
+          {aiLoading ? (
+            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          ) : q ? (
             <button
               onClick={() => setQ("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground"
@@ -172,8 +261,9 @@ function SearchPage() {
             >
               <X className="h-4 w-4" />
             </button>
-          )}
+          ) : null}
         </div>
+
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-muted px-4 text-sm font-semibold text-foreground hover:bg-accent">
@@ -267,19 +357,33 @@ function SearchPage() {
 
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold tracking-tight">
-          {q ? "Results" : "Recent"}
+          {useSemanticRanking ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Sparkles className="h-4 w-4 text-primary" />
+              Smart results
+            </span>
+          ) : q ? "Results" : "Recent"}
           <span className="ml-2 text-sm font-medium text-muted-foreground">{results.length}</span>
         </h2>
+        {useSemanticRanking && aiQuery && (
+          <span className="text-xs text-muted-foreground">Ranked by relevance to "{aiQuery}"</span>
+        )}
       </div>
 
       {results.length > 0 ? (
         <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {results.map((it) => <ResultCard key={it.id} item={it} />)}
+          {results.map((it) => <ResultCard key={it.id} item={it} similarity={(it as any)._sim} />)}
         </div>
       ) : (
         <div className="rounded-3xl border border-dashed bg-card/50 py-16 text-center">
           <p className="text-sm text-muted-foreground">
-            {q ? `No matches for "${q}".` : "Nothing matches these filters."}
+            {aiLoading
+              ? "Searching…"
+              : q
+                ? aiMode
+                  ? `No relevant matches for "${q}". Try rephrasing or turn AI search off.`
+                  : `No matches for "${q}".`
+                : "Nothing matches these filters."}
           </p>
         </div>
       )}
@@ -287,7 +391,7 @@ function SearchPage() {
   );
 }
 
-function ResultCard({ item }: { item: ItemWithCollection }) {
+function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity?: number }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -322,6 +426,12 @@ function ResultCard({ item }: { item: ItemWithCollection }) {
           <span className="absolute left-2 top-2 rounded-full bg-card/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
             {item.type}
           </span>
+          {typeof similarity === "number" && (
+            <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-brand">
+              <Sparkles className="h-2.5 w-2.5" />
+              {Math.round(similarity * 100)}% match
+            </span>
+          )}
         </div>
         <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{item.title}</h3>
         <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
