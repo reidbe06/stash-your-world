@@ -62,9 +62,9 @@ function AuthedLayout() {
               </Link>
             );
           })}
-          <button onClick={() => setSaveOpen(true)} className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-primary-foreground shadow-brand" aria-label="Save new">
+          <Link to="/save" className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-primary-foreground shadow-brand" aria-label="Save new">
             <Plus className="h-6 w-6" />
-          </button>
+          </Link>
           {navItems.slice(2).map((n) => {
             const active = pathname.startsWith(n.to);
             return (
@@ -77,11 +77,9 @@ function AuthedLayout() {
       </nav>
 
       {/* Desktop FAB */}
-      <button onClick={() => setSaveOpen(true)} className="fixed bottom-8 right-8 z-30 hidden items-center gap-2 rounded-full bg-brand-gradient px-6 py-3.5 text-sm font-semibold text-primary-foreground shadow-brand md:inline-flex">
+      <Link to="/save" className="fixed bottom-8 right-8 z-30 hidden items-center gap-2 rounded-full bg-brand-gradient px-6 py-3.5 text-sm font-semibold text-primary-foreground shadow-brand md:inline-flex">
         <Plus className="h-4 w-4" /> Save new
-      </button>
-
-      <SaveItemDialog open={saveOpen} onOpenChange={setSaveOpen} />
+      </Link>
     </div>
   );
 }
