@@ -79,10 +79,6 @@ function CollectionDetail() {
             <Plus className="h-4 w-4" /> Add
           </Link>
         </div>
-          <Link to="/save" search={{ collection: id } as never} className="inline-flex items-center gap-1.5 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-primary-foreground shadow-brand">
-            <Plus className="h-4 w-4" /> Add
-          </Link>
-        </div>
       </div>
 
       {items && items.length > 0 ? (
