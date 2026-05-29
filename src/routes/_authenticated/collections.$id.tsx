@@ -60,9 +60,9 @@ function CollectionDetail() {
               <Share2 className="h-4 w-4" /> Share
             </button>
           )}
-          <button onClick={() => setSaveOpen(true)} className="inline-flex items-center gap-1.5 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-primary-foreground shadow-brand">
+          <Link to="/save" search={{ collection: id } as never} className="inline-flex items-center gap-1.5 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-primary-foreground shadow-brand">
             <Plus className="h-4 w-4" /> Add
-          </button>
+          </Link>
         </div>
       </div>
 
@@ -73,8 +73,6 @@ function CollectionDetail() {
       ) : (
         <p className="py-12 text-center text-sm text-muted-foreground">No items in this collection yet.</p>
       )}
-
-      <SaveItemDialog open={saveOpen} onOpenChange={setSaveOpen} defaultCollection={id} />
     </div>
   );
 }
