@@ -11,6 +11,7 @@ export const Route = createFileRoute("/_authenticated/collections/$id")({
 
 function CollectionDetail() {
   const { id } = Route.useParams();
+  const qc = useQueryClient();
 
 
   const { data: collection } = useQuery({
