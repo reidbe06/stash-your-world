@@ -92,7 +92,7 @@ function Library() {
         to="/save"
         className="block w-full rounded-full bg-brand-gradient py-3.5 text-center text-sm font-semibold text-primary-foreground shadow-brand"
       >
-        + Save New
+        + Save an Item
       </Link>
     </div>
   );

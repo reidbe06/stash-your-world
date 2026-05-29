@@ -80,7 +80,7 @@ function CollectionsPage() {
           <p className="mt-1 text-muted-foreground">Organize your saves into shareable folders.</p>
         </div>
         <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-full bg-brand-gradient px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-brand">
-          <Plus className="h-4 w-4" /> New
+          <Plus className="h-4 w-4" /> Create Collection
         </button>
       </div>
 
@@ -102,7 +102,7 @@ function CollectionsPage() {
                 onClick={() => share(c)}
                 className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
               >
-                <Share2 className="h-3 w-3" /> {c.is_public ? "Copy share link" : "Share"}
+                <Share2 className="h-3 w-3" /> {c.is_public ? "Copy share link" : "Share Collection"}
               </button>
             </div>
           ))}
@@ -133,7 +133,7 @@ function CollectionsPage() {
               </div>
               <Switch checked={form.is_public} onCheckedChange={(v) => setForm({ ...form, is_public: v })} />
             </div>
-            <button type="submit" className="w-full rounded-full bg-brand-gradient py-3 text-sm font-semibold text-primary-foreground shadow-brand">Create</button>
+            <button type="submit" className="w-full rounded-full bg-brand-gradient py-3 text-sm font-semibold text-primary-foreground shadow-brand">Create Collection</button>
           </form>
         </DialogContent>
       </Dialog>
