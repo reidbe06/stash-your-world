@@ -61,6 +61,7 @@ function SavePage() {
   const qc = useQueryClient();
   const fetchMeta = useServerFn(fetchUrlMetadata);
   const runCategorize = useServerFn(categorizeItem);
+  const embedItemFn = useServerFn(embedItem);
 
   const [form, setForm] = useState({
     title: "",
