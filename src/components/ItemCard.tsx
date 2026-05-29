@@ -1,7 +1,18 @@
+import { useState } from "react";
 import { Bookmark, ExternalLink, Folder, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export interface Item {
   id: string;
@@ -33,11 +44,19 @@ function timeAgo(iso: string): string {
 
 export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean }) {
   const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const del = async () => {
-    if (!confirm("Delete this save?")) return;
+    setDeleting(true);
     const { error } = await supabase.from("items").delete().eq("id", item.id);
-    if (error) return toast.error(error.message);
-    toast.success("Deleted");
+    setDeleting(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setOpen(false);
+    toast.success("Saved item deleted");
     qc.invalidateQueries({ queryKey: ["items"] });
     qc.invalidateQueries({ queryKey: ["collection-items"] });
   };
@@ -61,8 +80,12 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
           {item.type}
         </span>
         {!readOnly && (
-          <button onClick={del} className="absolute right-3 top-3 rounded-full bg-card/90 p-1.5 text-muted-foreground opacity-0 backdrop-blur transition hover:text-destructive group-hover:opacity-100" aria-label="Delete">
-            <Trash2 className="h-3.5 w-3.5" />
+          <button
+            onClick={() => setOpen(true)}
+            className="absolute right-3 top-3 rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground"
+            aria-label="Delete saved item"
+          >
+            <Trash2 className="h-4 w-4" />
           </button>
         )}
       </div>
@@ -108,6 +131,27 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
           )}
         </div>
       </div>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this saved item?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{item.title}" will be permanently removed from your library and any collection it belongs to. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); del(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </article>
   );
 }
