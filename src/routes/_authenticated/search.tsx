@@ -219,9 +219,27 @@ function SearchPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight">Search</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Find anything you've stashed.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-extrabold tracking-tight">Search</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {aiMode ? "Ask in plain English — AI finds what you mean." : "Find anything you've stashed."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAiMode((v) => !v)}
+          className={cn(
+            "inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition",
+            aiMode
+              ? "bg-brand-gradient text-primary-foreground shadow-brand"
+              : "border bg-card text-muted-foreground hover:text-foreground",
+          )}
+          aria-pressed={aiMode}
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          AI search {aiMode ? "on" : "off"}
+        </button>
       </div>
 
       <div className="flex items-center gap-3">
@@ -230,10 +248,12 @@ function SearchPage() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search title, notes, URL, tag, collection…"
+            placeholder={aiMode ? "Try: chicken dinners, pink outfit, vacation ideas for Mexico…" : "Search title, notes, URL, tag, collection…"}
             className="h-11 rounded-full border-0 bg-muted pl-11 pr-10 text-sm"
           />
-          {q && (
+          {aiLoading ? (
+            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+          ) : q ? (
             <button
               onClick={() => setQ("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:text-foreground"
@@ -241,8 +261,9 @@ function SearchPage() {
             >
               <X className="h-4 w-4" />
             </button>
-          )}
+          ) : null}
         </div>
+
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-muted px-4 text-sm font-semibold text-foreground hover:bg-accent">
