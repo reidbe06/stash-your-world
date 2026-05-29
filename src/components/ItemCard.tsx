@@ -1,7 +1,18 @@
+import { useState } from "react";
 import { Bookmark, ExternalLink, Folder, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export interface Item {
   id: string;
@@ -33,11 +44,19 @@ function timeAgo(iso: string): string {
 
 export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean }) {
   const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const del = async () => {
-    if (!confirm("Delete this save?")) return;
+    setDeleting(true);
     const { error } = await supabase.from("items").delete().eq("id", item.id);
-    if (error) return toast.error(error.message);
-    toast.success("Deleted");
+    setDeleting(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setOpen(false);
+    toast.success("Saved item deleted");
     qc.invalidateQueries({ queryKey: ["items"] });
     qc.invalidateQueries({ queryKey: ["collection-items"] });
   };
