@@ -71,16 +71,17 @@ export const askStashd = createServerFn({ method: "POST" })
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("LOVABLE_API_KEY not configured");
 
-    // 1) Semantic search restricted to this user
+    // 1) Semantic search restricted to this user (use the user-scoped client so RLS + auth.uid() apply)
+    const { supabase } = context;
     const vec = await embedQuery(data.question);
-    const { data: matches, error: rpcErr } = await supabaseAdmin.rpc(
-      "search_items_semantic" as any,
-      { query_embedding: vec as any, match_count: 20, min_similarity: 0.1 },
-    );
-    // Note: RPC uses auth.uid(); admin call returns no rows. Re-run scoped manually:
+    const { data: matches } = await supabase.rpc("search_items_semantic", {
+      query_embedding: vec as any,
+      match_count: 20,
+      min_similarity: 0.1,
+    });
     let matchIds: string[] = Array.isArray(matches) ? matches.map((m: any) => m.id) : [];
-    if (rpcErr || matchIds.length === 0) {
-      // Fallback: cosine search via direct query using admin client scoped to user.
+    if (matchIds.length === 0) {
+      // Fallback: cosine in JS over the user's items (handles missing/old embeddings)
       const { data: rows } = await supabaseAdmin
         .from("items")
         .select("id, embedding")
