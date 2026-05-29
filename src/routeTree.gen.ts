@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShareSlugRouteImport } from './routes/share.$slug'
 import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
+import { Route as AuthenticatedSaveRouteImport } from './routes/_authenticated/save'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
@@ -41,6 +42,11 @@ const ShareSlugRoute = ShareSlugRouteImport.update({
 const AuthenticatedSearchRoute = AuthenticatedSearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSaveRoute = AuthenticatedSaveRouteImport.update({
+  id: '/save',
+  path: '/save',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/save': typeof AuthenticatedSaveRoute
   '/search': typeof AuthenticatedSearchRoute
   '/share/$slug': typeof ShareSlugRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/profile': typeof AuthenticatedProfileRoute
+  '/save': typeof AuthenticatedSaveRoute
   '/search': typeof AuthenticatedSearchRoute
   '/share/$slug': typeof ShareSlugRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/_authenticated/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
+  '/_authenticated/save': typeof AuthenticatedSaveRoute
   '/_authenticated/search': typeof AuthenticatedSearchRoute
   '/share/$slug': typeof ShareSlugRoute
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/collections'
     | '/dashboard'
     | '/profile'
+    | '/save'
     | '/search'
     | '/share/$slug'
     | '/collections/$id'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/collections'
     | '/dashboard'
     | '/profile'
+    | '/save'
     | '/search'
     | '/share/$slug'
     | '/collections/$id'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/_authenticated/collections'
     | '/_authenticated/dashboard'
     | '/_authenticated/profile'
+    | '/_authenticated/save'
     | '/_authenticated/search'
     | '/share/$slug'
     | '/_authenticated/collections/$id'
@@ -174,6 +186,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof AuthenticatedSearchRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/save': {
+      id: '/_authenticated/save'
+      path: '/save'
+      fullPath: '/save'
+      preLoaderRoute: typeof AuthenticatedSaveRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/profile': {
@@ -225,6 +244,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCollectionsRoute: typeof AuthenticatedCollectionsRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
+  AuthenticatedSaveRoute: typeof AuthenticatedSaveRoute
   AuthenticatedSearchRoute: typeof AuthenticatedSearchRoute
 }
 
@@ -232,6 +252,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCollectionsRoute: AuthenticatedCollectionsRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
+  AuthenticatedSaveRoute: AuthenticatedSaveRoute,
   AuthenticatedSearchRoute: AuthenticatedSearchRoute,
 }
 
@@ -248,3 +269,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
