@@ -32,10 +32,24 @@ function CollectionDetail() {
     },
   });
 
-  const share = () => {
-    if (!collection?.share_slug) return;
-    navigator.clipboard.writeText(`${window.location.origin}/share/${collection.share_slug}`);
-    toast.success("Share link copied!");
+  const share = async () => {
+    if (!collection) return;
+    let slug = collection.share_slug;
+    if (!collection.is_public || !slug) {
+      const { data, error } = await supabase
+        .from("collections")
+        .update({ is_public: true })
+        .eq("id", collection.id)
+        .select("share_slug")
+        .single();
+      if (error) return toast.error(error.message);
+      slug = data.share_slug;
+      qc.invalidateQueries({ queryKey: ["collection", id] });
+      qc.invalidateQueries({ queryKey: ["collections"] });
+    }
+    if (!slug) return toast.error("Couldn't create share link");
+    try { await navigator.clipboard.writeText(`${window.location.origin}/share/${slug}`); } catch {}
+    toast.success(collection.is_public ? "Share link copied!" : "Made public — link copied!");
   };
 
   return (
