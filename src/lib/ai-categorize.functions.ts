@@ -19,10 +19,12 @@ export const CATEGORIES = [
 ] as const;
 
 export type AiCategorization = {
+  generated_title: string;
   category: string;
   subcategory: string;
   tags: string[];
   summary: string;
+  notes: string;
   suggested_collection: string;
   suggested_collections: string[];
 };
@@ -61,7 +63,9 @@ Always respond by calling the categorize_item tool. Be concise and specific.
 Categories must be exactly one of: ${CATEGORIES.join(", ")}.
 Subcategory should be specific (e.g. "Dinner > Chicken", "Women's Clothing > Casual", "Home Decor", "Strength Training").
 Tags: 3-6 lowercase short tags, no '#'.
+generated_title: a clean user-facing item title, max 90 chars. Prefer the actual product/post/article/recipe title; if metadata is missing, infer from the URL slug without saying "Auto-filled".
 Summary: one sentence, max 160 chars.
+notes: one useful concise note for the saved item, max 220 chars. Never return placeholder text.
 suggested_collection: the single best short title (2-4 words) for organizing this item.
 suggested_collections: 3 short collection names (2-4 words each) the user could file this under. Prefer reusing the user's existing collections when they fit; otherwise propose new ones. Examples — Recipes: "Dinner Ideas", "Healthy Meals", "Chicken Recipes". Fashion: "Summer Outfits", "Work Clothes", "Date Night Looks". Home: "Living Room Ideas", "Kitchen Remodel", "Organization". Order from best fit to alternative. The first entry should match suggested_collection.
 ${collectionsHint}`;
@@ -82,13 +86,15 @@ ${collectionsHint}`;
               type: "object",
               properties: {
                 category: { type: "string", enum: [...CATEGORIES] },
+                generated_title: { type: "string" },
                 subcategory: { type: "string" },
                 tags: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 8 },
                 summary: { type: "string" },
+                notes: { type: "string" },
                 suggested_collection: { type: "string" },
                 suggested_collections: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
               },
-              required: ["category", "subcategory", "tags", "summary", "suggested_collection", "suggested_collections"],
+              required: ["category", "generated_title", "subcategory", "tags", "summary", "notes", "suggested_collection", "suggested_collections"],
               additionalProperties: false,
             },
           },
@@ -140,12 +146,14 @@ ${collectionsHint}`;
     }
 
     return {
+      generated_title: (parsed.generated_title || parsed.summary || data.title || "Saved link").slice(0, 120),
       category,
       subcategory: (parsed.subcategory || "").slice(0, 200),
       tags: Array.isArray(parsed.tags)
         ? parsed.tags.map((t) => String(t).toLowerCase().replace(/^#/, "").trim()).filter(Boolean).slice(0, 8)
         : [],
       summary: (parsed.summary || "").slice(0, 240),
+      notes: (parsed.notes || parsed.summary || "").slice(0, 500),
       suggested_collection: suggestedCollection,
       suggested_collections: merged,
     };
