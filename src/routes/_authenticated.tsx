@@ -15,7 +15,6 @@ const navItems = [
   { to: "/search", icon: Search, label: "Search" },
   { to: "/ask", icon: Sparkles, label: "Ask" },
   { to: "/collections", icon: Library, label: "Collections" },
-  { to: "/profile", icon: UserIcon, label: "Profile" },
 ] as const;
 
 function AuthedLayout() {
