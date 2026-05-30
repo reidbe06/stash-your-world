@@ -115,6 +115,8 @@ export type IngestInput = {
   description?: string | null;
   image?: string | null;
   source?: string | null;
+  note?: string | null;
+  context_type?: string | null;
   collection_id?: string | null;
   share_source: ShareSource;
 };
@@ -133,6 +135,8 @@ export type IngestResult = {
   };
   suggested_collection: string | null;
   fetched_metadata: boolean;
+  ai_status: "organized" | "needs_info" | "uncategorized";
+  needs_info: boolean;
 };
 
 /**
