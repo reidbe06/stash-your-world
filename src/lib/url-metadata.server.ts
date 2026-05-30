@@ -332,10 +332,11 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
     }
   }
 
+  const fallbackImage = result.image || `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostSource)}&sz=128`;
   return {
     title: result.title || bestTitleFromUrl(target.toString()) || hostSource,
     description: result.description ? result.description.slice(0, 1000) : null,
-    image: result.image,
+    image: fallbackImage,
     source: result.source || hostSource,
     type: result.type || "link",
   };
