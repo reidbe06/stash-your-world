@@ -17,7 +17,7 @@ export type ShareSource = (typeof SHARE_SOURCES)[number];
 const CATEGORIES = [
   "Products", "Fashion", "Beauty", "Home", "Recipes", "Travel", "Fitness",
   "Parenting", "Business Ideas", "Shopping Deals", "Entertainment",
-  "Videos", "Education", "Uncategorized", "Other",
+  "Videos", "Education", "Uncategorized", "Needs Review", "Other",
 ] as const;
 
 export type SourcePlatform =
@@ -255,6 +255,11 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   const parsed = new URL(input.url);
   const platform = detectPlatform(input.url);
 
+  console.log(`[INGEST] ── START ──────────────────────────────────────`);
+  console.log(`[INGEST] URL:      ${input.url}`);
+  console.log(`[INGEST] Platform: ${platform}`);
+  console.log(`[INGEST] Source:   ${input.share_source}`);
+
   let processingStatus: ProcessingStatus = "pending";
 
   const incomingTitle = isMeaningfulMetadataValue(input.title, input.url) ? input.title!.trim() : null;
@@ -264,18 +269,21 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   const contextType = isMeaningfulMetadataValue(input.context_type) ? input.context_type!.trim() : "";
   const hasMeta = !!(incomingTitle && incomingDescription && incomingImage);
 
+  console.log(`[INGEST] Incoming: title=${JSON.stringify(incomingTitle)} desc=${JSON.stringify(incomingDescription?.slice(0,60))} image=${!!incomingImage}`);
+
   let meta: UrlMetadata | null = null;
   if (!hasMeta) {
-    try { meta = await fetchMetadata(input.url); } catch (err) { console.warn("Metadata fetch failed", err); }
+    try { meta = await fetchMetadata(input.url); } catch (err) { console.warn("[INGEST] Metadata fetch failed:", err); }
   }
+
+  console.log(`[INGEST] Fetched metadata: title=${JSON.stringify(meta?.title?.slice(0,60))} desc=${JSON.stringify(meta?.description?.slice(0,60))} image=${!!meta?.image}`);
+
   if (incomingTitle || incomingDescription || incomingImage || meta?.title || meta?.description) {
     processingStatus = "metadata_found";
   }
 
   const host = parsed.hostname.replace(/^www\./, "");
 
-  // For social video platforms, never show a mangled URL slug (e.g. "C8t J3o Psr QP").
-  // Use a clean human-readable fallback instead.
   const platformDefaultTitle: Record<string, string> = {
     instagram_reel: "Instagram Reel",
     instagram: "Instagram Post",
@@ -287,13 +295,9 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
 
   const platformDefault = platformDefaultTitle[platform] ?? null;
 
-  // Social video platforms (Instagram, TikTok) always have opaque IDs in their URL paths —
-  // never useful as a title. Skip bestTitleFromUrl for these and rely on platform default.
   const isSocialVideoWithOpaqueUrl = platform === "instagram_reel" || platform === "instagram" || platform === "tiktok";
   const urlDerivedTitle = isSocialVideoWithOpaqueUrl ? null : bestTitleFromUrl(input.url);
 
-  // Filter out meta titles that are generic/blocked platform names (fetchMetadata falls back
-  // to bestTitleFromUrl which returns the mangled Reel ID for Instagram)
   const usableMetaTitle = (meta?.title && meta.title !== urlDerivedTitle && !isSocialVideoWithOpaqueUrl)
     ? meta.title
     : null;
@@ -305,67 +309,122 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   const source = input.source || meta?.source || host;
   const creator = creatorFromUrl(input.url, platform);
 
-  // Transcript / caption extraction — runs in parallel with existing metadata path.
-  // fetchTranscript is best-effort: YouTube timedtext API, TikTok page scrape,
-  // Instagram via Firecrawl. Returns null if nothing useful can be extracted.
+  console.log(`[INGEST] Caption (from metadata): ${caption ? JSON.stringify(caption.slice(0, 120)) : "null"}`);
+
+  // Transcript / caption extraction
+  console.log(`[INGEST] Fetching transcript for platform=${platform}…`);
   const transcriptResult = await fetchTranscript(input.url, platform);
   const transcript: string | null = transcriptResult?.text ?? null;
-  if (transcript) processingStatus = "transcript_found";
+
+  console.log(`[INGEST] Transcript result: method=${transcriptResult?.method ?? "none"} length=${transcript?.length ?? 0}`);
+  if (transcript) {
+    console.log(`[INGEST] Transcript (first 200 chars): ${JSON.stringify(transcript.slice(0, 200))}`);
+    processingStatus = "transcript_found";
+  }
 
   // Existing collection names (for AI hint)
   const { data: cols } = await supabaseAdmin
     .from("collections").select("id,name").eq("user_id", input.userId);
   const existingNames = (cols ?? []).map((c) => c.name);
 
-  // "Needs user context" = video platform with no caption/transcript/note/hint
+  // "Needs user context" = video platform with no caption/transcript/note/hint.
+  // IMPORTANT: when opaqueVideo=true we must NOT call OpenAI — it will hallucinate
+  // generic output ("Instagram post", "Uncategorized") from an empty prompt.
   const opaqueVideo = isVideoPlatform(platform)
     && !incomingTitle && !caption && !transcript && !userNote && !contextType;
 
-  const ai = input.skip_ai ? null : await aiCategorize({
-    url: input.url, title, description, source,
-    platform, creator, caption, transcript,
-    notes: userNote,
-    contextType,
-    existingCollections: existingNames,
-  });
+  console.log(`[INGEST] opaqueVideo=${opaqueVideo} | caption=${!!caption} transcript=${!!transcript} note=${!!userNote} hint=${!!contextType}`);
 
-  const category = ai?.category && (CATEGORIES as readonly string[]).includes(ai.category) ? ai.category : "Uncategorized";
   const cleanArr = (v: any, max = 8, maxLen = 200): string[] =>
     Array.isArray(v)
       ? v.map((t: any) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, max)
          .map((s) => s.slice(0, maxLen))
       : [];
-  const tags: string[] = cleanArr(ai?.tags, 8, 60).map((t) => t.toLowerCase());
-  const keyTakeaways: string[] = cleanArr(ai?.key_takeaways, 6, 240);
-  const recipeIngredients: string[] = cleanArr(ai?.recipe_ingredients, 40, 200);
-  const recipeSteps: string[] = cleanArr(ai?.recipe_steps, 30, 600);
-  const productNames: string[] = cleanArr(ai?.product_names, 20, 200);
-  const travelDetails =
-    ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
-      ? ai.travel_details
+
+  let category: string;
+  let tags: string[];
+  let keyTakeaways: string[];
+  let recipeIngredients: string[];
+  let recipeSteps: string[];
+  let productNames: string[];
+  let travelDetails: any;
+  let confidence: number | null;
+  let subcategory: string | null;
+  let summary: string | null;
+  let suggestedCollection: string | null = null;
+
+  if (opaqueVideo) {
+    // No real content to analyse — skip AI entirely to avoid hallucinated generic output.
+    // Save a stub that tells the UI the item needs the user to add context.
+    console.log(`[INGEST] Skipping AI — no extractable content for ${platform}`);
+    category = "Needs Review";
+    tags = [platform.replace(/_/g, "-")];
+    keyTakeaways = [];
+    recipeIngredients = [];
+    recipeSteps = [];
+    productNames = [];
+    travelDetails = null;
+    confidence = null;
+    subcategory = null;
+    summary = `STASHd could not extract enough content from this ${platformDefault ?? "video"} to categorize it automatically.`;
+    processingStatus = "needs_user_context";
+  } else {
+    // We have at least some content — call OpenAI.
+    const aiInput = {
+      url: input.url, title, description, source,
+      platform, creator, caption, transcript,
+      notes: userNote,
+      contextType,
+      existingCollections: existingNames,
+    };
+    const aiPromptText = [
+      `URL: ${input.url}`,
+      `Platform: ${platform}`,
+      caption && `Caption: ${caption.slice(0, 300)}`,
+      transcript && `Transcript (first 300): ${transcript.slice(0, 300)}`,
+      userNote && `Note: ${userNote}`,
+      contextType && `Hint: ${contextType}`,
+    ].filter(Boolean).join("\n");
+    console.log(`[INGEST] Sending to OpenAI:\n${aiPromptText}`);
+
+    const ai = input.skip_ai ? null : await aiCategorize(aiInput);
+
+    console.log(`[INGEST] OpenAI response: category=${ai?.category} title=${JSON.stringify(ai?.generated_title)} confidence=${ai?.confidence_score}`);
+    console.log(`[INGEST] OpenAI summary: ${JSON.stringify(ai?.summary)}`);
+    console.log(`[INGEST] OpenAI tags: ${JSON.stringify(ai?.tags)}`);
+
+    category = ai?.category && (CATEGORIES as readonly string[]).includes(ai.category) ? ai.category : "Uncategorized";
+    tags = cleanArr(ai?.tags, 8, 60).map((t) => t.toLowerCase());
+    keyTakeaways = cleanArr(ai?.key_takeaways, 6, 240);
+    recipeIngredients = cleanArr(ai?.recipe_ingredients, 40, 200);
+    recipeSteps = cleanArr(ai?.recipe_steps, 30, 600);
+    productNames = cleanArr(ai?.product_names, 20, 200);
+    travelDetails =
+      ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
+        ? ai.travel_details
+        : null;
+    confidence = typeof ai?.confidence_score === "number"
+      ? Math.max(0, Math.min(1, ai.confidence_score))
       : null;
-  const confidence = typeof ai?.confidence_score === "number"
-    ? Math.max(0, Math.min(1, ai.confidence_score))
-    : null;
-  const subcategory = ai?.subcategory ? String(ai.subcategory).slice(0, 200) : null;
-  const summary = ai?.summary ? String(ai.summary).slice(0, 240) : null;
-  const aiNotes = ai?.notes ? String(ai.notes).trim() : "";
-  const aiTitle = ai?.generated_title ? String(ai.generated_title).trim() : "";
+    subcategory = ai?.subcategory ? String(ai.subcategory).slice(0, 200) : null;
+    summary = ai?.summary ? String(ai.summary).slice(0, 240) : null;
+    const aiNotes = ai?.notes ? String(ai.notes).trim() : "";
+    const aiTitle = ai?.generated_title ? String(ai.generated_title).trim() : "";
 
-  // Override title with AI's generated title if:
-  // - no user-provided title AND no real metadata title, OR
-  // - the current title is still just a platform default placeholder ("Instagram Reel", etc.)
-  const isPlatformDefaultTitle = Object.values(platformDefaultTitle).includes(title);
-  if (aiTitle && isMeaningfulMetadataValue(aiTitle, input.url)) {
-    if (!incomingTitle && (!meta?.title || isPlatformDefaultTitle)) {
-      title = aiTitle.slice(0, 500);
+    const isPlatformDefaultTitle = Object.values(platformDefaultTitle).includes(title);
+    if (aiTitle && isMeaningfulMetadataValue(aiTitle, input.url)) {
+      if (!incomingTitle && (!meta?.title || isPlatformDefaultTitle)) {
+        title = aiTitle.slice(0, 500);
+      }
     }
-  }
-  if (!description) description = userNote || aiNotes || summary || "";
-  if (!image && meta?.image) image = meta.image;
+    if (!description) description = userNote || aiNotes || summary || "";
+    if (!image && meta?.image) image = meta.image;
 
-  if (ai) processingStatus = "ai_processed";
-  if (opaqueVideo) processingStatus = "needs_user_context";
+    suggestedCollection = ai?.suggested_collection ? String(ai.suggested_collection).slice(0, 80) : null;
+    if (ai) processingStatus = "ai_processed";
+  }
+
+  console.log(`[INGEST] Final: title=${JSON.stringify(title)} category=${category} status=${processingStatus} image=${!!image}`);
 
   const insertPayload: Record<string, any> = {
     user_id: input.userId,
@@ -386,7 +445,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     creator_name: creator,
     original_caption: caption,
     transcript,
-    ai_category: ai ? category : null,
+    ai_category: opaqueVideo ? null : category,
     ai_subcategory: subcategory,
     ai_tags: tags,
     ai_key_takeaways: keyTakeaways,
@@ -435,14 +494,14 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   } catch (err) { console.warn("Embed failed", err); }
 
   const ai_status: "organized" | "needs_info" | "uncategorized" =
-    opaqueVideo ? "needs_info" : ai && category !== "Uncategorized" ? "organized" : "uncategorized";
+    opaqueVideo ? "needs_info" : category !== "Uncategorized" ? "organized" : "uncategorized";
 
   return {
     item: {
       ...(inserted as any),
       processing_status: processingStatus,
     },
-    suggested_collection: ai?.suggested_collection ? String(ai.suggested_collection).slice(0, 80) : null,
+    suggested_collection: suggestedCollection,
     fetched_metadata: !!meta,
     ai_status,
     needs_info: opaqueVideo,

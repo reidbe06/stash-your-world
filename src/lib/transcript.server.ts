@@ -482,12 +482,29 @@ async function fetchInstagramPageCaption(url: string): Promise<TranscriptResult 
 }
 
 async function fetchInstagramCaption(url: string): Promise<TranscriptResult | null> {
-  // Firecrawl is the only reliable path for Instagram (handles JS rendering + login walls)
-  const firecrawlResult = await fetchCaptionViaFirecrawl(url, "instagram");
-  if (firecrawlResult) return firecrawlResult;
+  const hasApiKey = !!process.env.FIRECRAWL_API_KEY;
+  console.log(`[transcript] Instagram: Firecrawl configured=${hasApiKey}`);
+
+  if (hasApiKey) {
+    const firecrawlResult = await fetchCaptionViaFirecrawl(url, "instagram");
+    if (firecrawlResult) {
+      console.log(`[transcript] Instagram: Firecrawl SUCCESS method=${firecrawlResult.method} len=${firecrawlResult.text.length}`);
+      console.log(`[transcript] Instagram text (first 200): ${JSON.stringify(firecrawlResult.text.slice(0, 200))}`);
+      return firecrawlResult;
+    }
+    console.log(`[transcript] Instagram: Firecrawl returned null (likely 403 — platform blocks free-plan scrapers)`);
+  }
 
   // Direct scrape fallback (usually truncated but better than nothing)
-  return fetchInstagramPageCaption(url);
+  console.log(`[transcript] Instagram: trying direct page scrape (og:description)…`);
+  const pageResult = await fetchInstagramPageCaption(url);
+  if (pageResult) {
+    console.log(`[transcript] Instagram: page scrape SUCCESS method=${pageResult.method} len=${pageResult.text.length}`);
+    console.log(`[transcript] Instagram text (first 200): ${JSON.stringify(pageResult.text.slice(0, 200))}`);
+  } else {
+    console.log(`[transcript] Instagram: page scrape returned null — no caption extractable`);
+  }
+  return pageResult;
 }
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
