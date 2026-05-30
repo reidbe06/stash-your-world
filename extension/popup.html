@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Save to STASHd</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header class="header">
+      <div class="brand">
+        <div class="logo"></div>
+        <div>
+          <div class="brand-name">STASHd</div>
+          <div class="brand-sub">Save anything beautifully</div>
+        </div>
+      </div>
+      <button id="settingsBtn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
+    </header>
+
+    <!-- LOGIN -->
+    <section id="loginView" class="view hidden">
+      <h1 class="view-title">Sign in</h1>
+      <p class="view-sub">Use your STASHd account to start saving from anywhere.</p>
+      <label class="field">
+        <span>Email</span>
+        <input id="email" type="email" autocomplete="email" placeholder="you@example.com" />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+      </label>
+      <button id="loginBtn" class="btn btn-primary">Sign in</button>
+      <p id="loginError" class="error hidden"></p>
+    </section>
+
+    <!-- SAVE -->
+    <section id="saveView" class="view hidden">
+      <div id="preview" class="preview">
+        <div id="previewImage" class="preview-image"></div>
+        <div class="preview-body">
+          <div id="previewSource" class="preview-source">—</div>
+          <div id="previewTitle" class="preview-title">Loading page…</div>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Title</span>
+        <input id="title" type="text" placeholder="Page title" />
+      </label>
+      <label class="field">
+        <span>Notes <em>(optional)</em></span>
+        <textarea id="notes" rows="2" placeholder="Add a note…"></textarea>
+      </label>
+      <label class="field">
+        <span>Collection</span>
+        <select id="collection">
+          <option value="">No collection</option>
+        </select>
+      </label>
+
+      <button id="saveBtn" class="btn btn-primary">Save to STASHd</button>
+      <button id="logoutBtn" class="btn btn-ghost">Sign out</button>
+      <p id="saveError" class="error hidden"></p>
+    </section>
+
+    <!-- SUCCESS -->
+    <section id="successView" class="view hidden">
+      <div class="success">
+        <div class="success-check">✓</div>
+        <h2>Saved to STASHd.</h2>
+        <p id="successMeta" class="success-meta"></p>
+        <div class="success-actions">
+          <button id="saveAnotherBtn" class="btn btn-primary">Save another</button>
+          <a id="openAppLink" class="btn btn-ghost" target="_blank" rel="noopener">Open STASHd</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section id="settingsView" class="view hidden">
+      <h1 class="view-title">Settings</h1>
+      <label class="field">
+        <span>STASHd app URL</span>
+        <input id="appUrl" type="url" placeholder="https://your-stashd.lovable.app" />
+      </label>
+      <button id="saveSettingsBtn" class="btn btn-primary">Save</button>
+      <button id="cancelSettingsBtn" class="btn btn-ghost">Cancel</button>
+    </section>
+
+    <section id="loadingView" class="view">
+      <div class="spinner"></div>
+    </section>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
