@@ -40,7 +40,10 @@ async function aiCategorize(input: {
       { role: "system", content: `You categorize saved web items for STASHd.
 Categories must be one of: ${CATEGORIES.join(", ")}.
 Subcategory specific (e.g. "Dinner > Chicken"). Tags: 3-6 lowercase short tags.
-Summary: one sentence, max 160 chars. suggested_collection: 2-4 words.
+generated_title: clean user-facing title (max 90 chars), inferred from the URL/content when metadata is missing. Never use placeholder text like "Auto-filled".
+Summary: one sentence, max 160 chars.
+notes: helpful concise note about the item (max 220 chars). Never placeholder text.
+suggested_collection: 2-4 words.
 ${collectionsHint}` },
       { role: "user", content: content || "No content. Use URL only." },
     ],
@@ -52,12 +55,14 @@ ${collectionsHint}` },
           type: "object",
           properties: {
             category: { type: "string", enum: [...CATEGORIES] },
+            generated_title: { type: "string" },
             subcategory: { type: "string" },
             tags: { type: "array", items: { type: "string" } },
             summary: { type: "string" },
+            notes: { type: "string" },
             suggested_collection: { type: "string" },
           },
-          required: ["category", "subcategory", "tags", "summary", "suggested_collection"],
+          required: ["category", "generated_title", "subcategory", "tags", "summary", "notes", "suggested_collection"],
         },
       },
     }],
@@ -139,9 +144,9 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   }
 
   const host = parsed.hostname.replace(/^www\./, "");
-  const title = (incomingTitle || meta?.title || bestTitleFromUrl(input.url) || host).slice(0, 500);
+  let title = (incomingTitle || meta?.title || bestTitleFromUrl(input.url) || host).slice(0, 500);
   let description = incomingDescription || meta?.description || "";
-  const image = incomingImage || meta?.image || null;
+  let image = incomingImage || meta?.image || null;
   const source = input.source || meta?.source || host;
 
   // Existing collection names (for AI hint)
@@ -160,7 +165,15 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     : [];
   const subcategory = ai?.subcategory ? String(ai.subcategory).slice(0, 200) : null;
   const summary = ai?.summary ? String(ai.summary).slice(0, 240) : null;
-  if (!description && summary) description = summary;
+  const aiNotes = ai?.notes ? String(ai.notes).trim() : "";
+  const aiTitle = ai?.generated_title ? String(ai.generated_title).trim() : "";
+
+  // If we never got a real page title (only host/slug), trust the AI title.
+  if (!incomingTitle && !meta?.title && aiTitle && isMeaningfulMetadataValue(aiTitle, input.url)) {
+    title = aiTitle.slice(0, 500);
+  }
+  if (!description) description = aiNotes || summary || "";
+  if (!image && meta?.image) image = meta.image;
 
   const { data: inserted, error: insErr } = await supabaseAdmin
     .from("items")
