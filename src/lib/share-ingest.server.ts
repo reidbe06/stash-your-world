@@ -144,9 +144,9 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   }
 
   const host = parsed.hostname.replace(/^www\./, "");
-  const title = (incomingTitle || meta?.title || bestTitleFromUrl(input.url) || host).slice(0, 500);
+  let title = (incomingTitle || meta?.title || bestTitleFromUrl(input.url) || host).slice(0, 500);
   let description = incomingDescription || meta?.description || "";
-  const image = incomingImage || meta?.image || null;
+  let image = incomingImage || meta?.image || null;
   const source = input.source || meta?.source || host;
 
   // Existing collection names (for AI hint)
@@ -165,7 +165,15 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     : [];
   const subcategory = ai?.subcategory ? String(ai.subcategory).slice(0, 200) : null;
   const summary = ai?.summary ? String(ai.summary).slice(0, 240) : null;
-  if (!description && summary) description = summary;
+  const aiNotes = ai?.notes ? String(ai.notes).trim() : "";
+  const aiTitle = ai?.generated_title ? String(ai.generated_title).trim() : "";
+
+  // If we never got a real page title (only host/slug), trust the AI title.
+  if (!incomingTitle && !meta?.title && aiTitle && isMeaningfulMetadataValue(aiTitle, input.url)) {
+    title = aiTitle.slice(0, 500);
+  }
+  if (!description) description = aiNotes || summary || "";
+  if (!image && meta?.image) image = meta.image;
 
   const { data: inserted, error: insErr } = await supabaseAdmin
     .from("items")
