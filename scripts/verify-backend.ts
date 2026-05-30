@@ -210,7 +210,9 @@ if (basicJson.item?.id) {
     .eq("id", basicJson.item.id)
     .single();
   if (embItem?.embedding) {
-    const vec = embItem.embedding as number[];
+    // pgvector returns as string over JSON; parse to get real dimension count
+    const raw = embItem.embedding;
+    const vec: number[] = typeof raw === "string" ? JSON.parse(raw) : raw;
     pass(`Embedding created: ${vec.length}-dim vector`);
     pass(`Updated at: ${embItem.embedding_updated_at}`);
   } else {
@@ -219,7 +221,7 @@ if (basicJson.item?.id) {
 }
 
 // ─── 9. Ask My STASHd (semantic search) ───────────────────────────────────
-section(9, "Ask My STASHd (semantic search via match_items)");
+section(9, "Ask My STASHd (semantic search via search_items_semantic)");
 // Embed the question
 const qRes = await fetch("https://api.openai.com/v1/embeddings", {
   method: "POST",
@@ -231,18 +233,22 @@ const qRes = await fetch("https://api.openai.com/v1/embeddings", {
 });
 if (qRes.ok) {
   const qj = await qRes.json();
-  const vec = qj.data?.[0]?.embedding;
+  const vec: number[] = qj.data?.[0]?.embedding;
   if (vec) {
-    const { data: matches, error: matchErr } = await admin.rpc("match_items", {
+    // Use the user-scoped client with auth token so RLS passes
+    const userClient = createClient(SUPABASE_URL, process.env.SUPABASE_PUBLISHABLE_KEY!, {
+      auth: { persistSession: false },
+      global: { headers: { Authorization: `Bearer ${ACCESS_TOKEN}` } },
+    });
+    const { data: matches, error: matchErr } = await userClient.rpc("search_items_semantic", {
       query_embedding: vec,
-      match_threshold: 0.0,
       match_count: 5,
-      p_user_id: TEST_USER_ID,
+      min_similarity: 0.0,
     });
     if (matchErr) {
-      fail(`match_items RPC error: ${matchErr.message}`);
+      fail(`search_items_semantic RPC error: ${matchErr.message}`);
     } else {
-      pass(`match_items RPC works — ${(matches ?? []).length} result(s) returned`);
+      pass(`search_items_semantic RPC works — ${(matches ?? []).length} result(s) returned`);
       for (const m of (matches ?? []).slice(0, 3)) {
         console.log(`    → "${m.title}" (similarity: ${m.similarity?.toFixed(3)})`);
       }
