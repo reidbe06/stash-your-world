@@ -18,5 +18,11 @@ export default defineConfig({
       port: 5000,
       allowedHosts: true,
     },
+    // Override any .env file values with the Replit secrets from process.env.
+    // This ensures the correct Supabase project is used in the browser bundle.
+    define: {
+      "import.meta.env.VITE_SUPABASE_URL": JSON.stringify(process.env.VITE_SUPABASE_URL),
+      "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(process.env.VITE_SUPABASE_PUBLISHABLE_KEY),
+    },
   },
 });
