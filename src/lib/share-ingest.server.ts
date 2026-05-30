@@ -252,7 +252,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     item: inserted as IngestResult["item"],
     suggested_collection: ai?.suggested_collection ? String(ai.suggested_collection).slice(0, 80) : null,
     fetched_metadata: !!meta,
-    ai_status: ai && category !== "Uncategorized" ? "organized" : socialVideoNeedsInfo ? "needs_info" : "uncategorized",
+    ai_status: socialVideoNeedsInfo ? "needs_info" : ai && category !== "Uncategorized" ? "organized" : "uncategorized",
     needs_info: socialVideoNeedsInfo,
   };
 }
