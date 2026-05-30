@@ -144,9 +144,11 @@ function SavePage() {
       });
       setForm((cur) => ({
         ...cur,
+        title: cur.title || ai.generated_title || "",
         category: cur.category || ai.category,
         subcategory: cur.subcategory || ai.subcategory,
         ai_summary: cur.ai_summary || ai.summary,
+        description: cur.description || ai.notes || ai.summary || "",
         suggested_collection: cur.suggested_collection || ai.suggested_collection,
         tags: cur.tags?.trim() ? cur.tags : ai.tags.join(", "),
       }));
