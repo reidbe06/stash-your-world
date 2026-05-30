@@ -276,6 +276,7 @@ function SavePage() {
       let source: string | null = null;
       try { source = new URL(form.url).hostname.replace(/^www\./, ""); } catch {}
       const fallbackTitle = source ?? "Saved link";
+      const finalCategory = form.category || "Uncategorized";
       const { data: inserted, error } = await supabase.from("items").insert({
         user_id: user.id,
         title: form.title.trim() || fallbackTitle,
@@ -286,11 +287,12 @@ function SavePage() {
         tags,
         source,
         collection_id: form.collection_id || null,
-        category: form.category || null,
+        category: finalCategory,
         subcategory: form.subcategory || null,
         ai_summary: form.ai_summary || null,
       }).select("id").single();
       if (error) throw error;
+      if (!form.category || finalCategory === "Uncategorized") setSaveStatus("uncategorized");
       toast.success("Saved to STASHd!");
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["collection-items"] });
@@ -304,6 +306,15 @@ function SavePage() {
       toast.error(err.message);
     } finally { setBusy(false); }
   };
+
+  const showHelpPrompt = isSocialVideoUrl(form.url) && (saveStatus === "needs_info" || !hasUsefulSocialMetadata(form));
+  const statusMessage = saveStatus === "organized"
+    ? "AI organized this save"
+    : saveStatus === "needs_info"
+      ? "AI needs more info"
+      : saveStatus === "uncategorized"
+        ? "Saved as Uncategorized"
+        : "";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -349,6 +360,61 @@ function SavePage() {
             )}
           </p>
         </div>
+
+        {statusMessage && (
+          <div className="flex items-center gap-2 rounded-2xl border bg-accent/40 px-4 py-3 text-sm font-semibold">
+            {saveStatus === "organized" ? <Sparkles className="h-4 w-4 text-primary" /> : <Wand2 className="h-4 w-4 text-muted-foreground" />}
+            {statusMessage}
+          </div>
+        )}
+
+        {showHelpPrompt && (
+          <div className="space-y-4 rounded-2xl border bg-card p-4 md:p-5">
+            <div>
+              <h2 className="text-base font-bold">Help STASHd understand this save</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{getPlatform(form.url) || "This"} did not provide enough details. Add a quick hint so AI can organize it.</p>
+            </div>
+            <div>
+              <Label>What is this?</Label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {HELP_OPTIONS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setHelp((cur) => ({ ...cur, contextType: option }))}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                      help.contextType === option ? "border-primary bg-accent text-primary" : "bg-card text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="help-note">Optional note</Label>
+              <Textarea
+                id="help-note"
+                value={help.note}
+                onChange={(e) => setHelp((cur) => ({ ...cur, note: e.target.value }))}
+                rows={3}
+                maxLength={500}
+                className="mt-1.5"
+                placeholder="What do you want to remember about this?"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => { lastAiKey.current = ""; runAi(); }}
+              disabled={categorizing}
+              className="inline-flex items-center gap-2 rounded-full bg-brand-gradient px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-brand disabled:opacity-60"
+            >
+              {categorizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              Organize with AI
+            </button>
+          </div>
+        )}
 
         {/* AI suggestions panel */}
         {(aiLoaded || categorizing) && (
