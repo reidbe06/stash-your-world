@@ -117,6 +117,7 @@ export type IngestInput = {
   source?: string | null;
   note?: string | null;
   context_type?: string | null;
+  skip_ai?: boolean | null;
   collection_id?: string | null;
   share_source: ShareSource;
 };
@@ -180,7 +181,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   const existingNames = (cols ?? []).map((c) => c.name);
 
   const socialVideoNeedsInfo = isSocialVideoUrl(input.url) && !incomingTitle && !meta?.description && !userNote && !contextType;
-  const ai = await aiCategorize({
+  const ai = input.skip_ai ? null : await aiCategorize({
     url: input.url, title, description, source,
     notes: userNote,
     contextType,
