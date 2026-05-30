@@ -122,7 +122,6 @@ export function AvatarUploader() {
         )}
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
-      <p className="text-[11px] text-muted-foreground">JPG, PNG, or WEBP · auto-resized to 512px</p>
     </div>
   );
 }
