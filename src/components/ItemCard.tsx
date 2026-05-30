@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bookmark, ExternalLink, Folder, Trash2 } from "lucide-react";
+import { Bookmark, ChevronDown, ChevronUp, ExternalLink, Folder, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +26,18 @@ export interface Item {
   created_at: string;
   collection_id?: string | null;
   collection?: { name: string } | null;
+  processing_status?: string | null;
+  ai_summary?: string | null;
+  ai_category?: string | null;
+  ai_subcategory?: string | null;
+  ai_tags?: string[];
+  ai_key_takeaways?: string[];
+  transcript?: string | null;
+  original_caption?: string | null;
+  recipe_ingredients?: string[];
+  recipe_steps?: string[];
+  product_names?: string[];
+  confidence_score?: number | null;
 }
 
 function timeAgo(iso: string): string {
@@ -40,6 +52,172 @@ function timeAgo(iso: string): string {
   const w = Math.floor(d / 7);
   if (w < 5) return `${w}w ago`;
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+type StatusConfig = {
+  label: string;
+  className: string;
+};
+
+const STATUS_MAP: Record<string, StatusConfig> = {
+  fully_organized:   { label: "Fully Organized",   className: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800" },
+  transcript_found:  { label: "Transcript Found",  className: "bg-sky-50 text-sky-700 border border-sky-200 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-800" },
+  caption_found:     { label: "Caption Found",     className: "bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/40 dark:text-violet-400 dark:border-violet-800" },
+  metadata_found:    { label: "Fully Organized",   className: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800" },
+  needs_user_context:{ label: "Needs More Context",className: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-600 dark:border-amber-800" },
+  pending:           { label: "Saved Only",        className: "bg-muted text-muted-foreground border border-border" },
+  error:             { label: "Processing Failed", className: "bg-destructive/10 text-destructive border border-destructive/20" },
+  failed:            { label: "Processing Failed", className: "bg-destructive/10 text-destructive border border-destructive/20" },
+};
+
+function getStatusConfig(status: string | null | undefined): StatusConfig | null {
+  if (!status) return null;
+  return STATUS_MAP[status] ?? null;
+}
+
+function StatusBadge({ status }: { status: string | null | undefined }) {
+  const cfg = getStatusConfig(status);
+  if (!cfg) return null;
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold leading-none ${cfg.className}`}>
+      {cfg.label}
+    </span>
+  );
+}
+
+function AIDetails({ item }: { item: Item }) {
+  const [open, setOpen] = useState(false);
+
+  const transcript = item.transcript || item.original_caption || null;
+  const hasContent =
+    item.ai_summary ||
+    transcript ||
+    item.ai_category ||
+    item.ai_subcategory ||
+    (item.ai_tags?.length) ||
+    (item.recipe_ingredients?.length) ||
+    (item.recipe_steps?.length) ||
+    (item.product_names?.length) ||
+    (item.ai_key_takeaways?.length) ||
+    item.confidence_score != null;
+
+  if (!hasContent) return null;
+
+  return (
+    <div className="border-t border-border">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-4 py-2 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+        aria-expanded={open}
+      >
+        <span>AI Details</span>
+        {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+      </button>
+
+      {open && (
+        <div className="flex flex-col gap-3 px-4 pb-4 text-xs">
+
+          {item.ai_summary && (
+            <div>
+              <p className="mb-0.5 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">Summary</p>
+              <p className="text-foreground leading-relaxed">{item.ai_summary}</p>
+            </div>
+          )}
+
+          {transcript && (
+            <div>
+              <p className="mb-0.5 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">
+                {item.transcript ? "Transcript" : "Caption"}
+              </p>
+              <p className="line-clamp-4 text-foreground leading-relaxed whitespace-pre-wrap">{transcript}</p>
+            </div>
+          )}
+
+          {(item.ai_category || item.ai_subcategory) && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {item.ai_category && (
+                <div>
+                  <p className="mb-0.5 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">Category</p>
+                  <p className="text-foreground">{item.ai_category}</p>
+                </div>
+              )}
+              {item.ai_subcategory && (
+                <div>
+                  <p className="mb-0.5 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">Subcategory</p>
+                  <p className="text-foreground">{item.ai_subcategory}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {item.ai_tags && item.ai_tags.length > 0 && (
+            <div>
+              <p className="mb-1 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">Tags</p>
+              <div className="flex flex-wrap gap-1">
+                {item.ai_tags.map((t) => (
+                  <span key={t} className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">#{t}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {item.recipe_ingredients && item.recipe_ingredients.length > 0 && (
+            <div>
+              <p className="mb-1 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">Ingredients</p>
+              <ul className="list-disc list-inside space-y-0.5 text-foreground">
+                {item.recipe_ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {item.recipe_steps && item.recipe_steps.length > 0 && (
+            <div>
+              <p className="mb-1 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">Steps</p>
+              <ol className="list-decimal list-inside space-y-0.5 text-foreground">
+                {item.recipe_steps.map((step, i) => <li key={i}>{step}</li>)}
+              </ol>
+            </div>
+          )}
+
+          {item.product_names && item.product_names.length > 0 && (
+            <div>
+              <p className="mb-1 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">Products</p>
+              <div className="flex flex-wrap gap-1">
+                {item.product_names.map((p) => (
+                  <span key={p} className="rounded bg-secondary px-2 py-0.5 text-[10px] text-secondary-foreground">{p}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {item.ai_key_takeaways && item.ai_key_takeaways.length > 0 && (
+            <div>
+              <p className="mb-1 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">Key Takeaways</p>
+              <ul className="list-disc list-inside space-y-0.5 text-foreground">
+                {item.ai_key_takeaways.map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
+            </div>
+          )}
+
+          {item.confidence_score != null && (
+            <div>
+              <p className="mb-0.5 font-semibold text-muted-foreground uppercase tracking-wide text-[10px]">Confidence</p>
+              <div className="flex items-center gap-2">
+                <div className="h-1.5 flex-1 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-primary transition-all"
+                    style={{ width: `${Math.round(item.confidence_score * 100)}%` }}
+                  />
+                </div>
+                <span className="shrink-0 text-muted-foreground">{Math.round(item.confidence_score * 100)}%</span>
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean }) {
@@ -89,6 +267,7 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
           </button>
         )}
       </div>
+
       <div className="flex flex-1 flex-col p-4">
         <h3 className="line-clamp-2 font-semibold leading-snug">{item.title}</h3>
 
@@ -105,6 +284,12 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
           )}
           <span className="shrink-0">{timeAgo(item.created_at)}</span>
         </div>
+
+        {item.processing_status && (
+          <div className="mt-2">
+            <StatusBadge status={item.processing_status} />
+          </div>
+        )}
 
         {item.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
@@ -131,6 +316,8 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
           )}
         </div>
       </div>
+
+      <AIDetails item={item} />
 
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
