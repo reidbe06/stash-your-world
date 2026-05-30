@@ -82,8 +82,7 @@ function hasUsefulSocialMetadata(f: { title: string; description: string; image_
   const title = f.title.trim().toLowerCase();
   return !!(
     f.description.trim().length >= 8 ||
-    (title.length >= 8 && platform && !title.includes(platform.toLowerCase())) ||
-    (f.image_url && !f.image_url.includes("google.com/s2/favicons"))
+    (title.length >= 8 && platform && !title.includes(platform.toLowerCase()))
   );
 }
 
