@@ -147,8 +147,20 @@ export const askStashd = createServerFn({ method: "POST" })
     }
 
     // 3) Build LLM context (numbered list so model can cite by index)
+    const isOpaqueSocial = (it: any) => {
+      const url = String(it.url || "").toLowerCase();
+      const social = /(tiktok\.com|instagram\.com|\/reel\/|\/reels\/)/.test(url);
+      const hasUserContext =
+        (it.description && String(it.description).trim().length > 0) ||
+        (it.category && it.category !== "Uncategorized") ||
+        (it.tags && it.tags.length > 0) ||
+        (it.ai_summary && String(it.ai_summary).trim().length > 0);
+      return social && !hasUserContext;
+    };
+
     const contextBlock = ordered
       .map((it, i) => {
+        const opaque = isOpaqueSocial(it);
         const parts = [
           `[${i + 1}] id=${it.id}`,
           it.title && `title: ${it.title}`,
@@ -162,12 +174,19 @@ export const askStashd = createServerFn({ method: "POST" })
           it.ai_summary && `summary: ${it.ai_summary}`,
           it.description && `notes: ${String(it.description).slice(0, 300)}`,
           it.url && `url: ${it.url}`,
+          opaque ? `NOTE: opaque social link — no readable content. Do NOT guess what it is about.` : null,
         ].filter(Boolean);
         return parts.join(" | ");
       })
       .join("\n");
 
-    const systemPrompt = `You are "Ask My STASHd", a friendly assistant that ONLY answers using the user's saved STASHd items provided below. Never invent items, links, or facts. Never use general internet knowledge. If the saved items don't answer the question, say so plainly and suggest what they could save next.
+    const systemPrompt = `You are "Ask My STASHd", a friendly assistant that ONLY answers using the user's saved STASHd items provided below. Never invent items, links, or facts. Never use general internet knowledge. You CANNOT open URLs or watch videos — only the fields shown below exist.
+
+Rules:
+- Use ONLY these fields per item: title, category/subcategory, collection, tags, source, type, ai_summary, notes (user description), url.
+- For items marked "NOTE: opaque social link" (TikTok / Instagram / Reels with no notes, tags, or non-Uncategorized category), do NOT guess the topic, recipe, product, or content. Treat them as unknown.
+- If the user asks about an opaque social item, or if relevant items lack the detail needed to answer, say exactly: "I saved this link, but I need a note or category to understand it better." Then briefly suggest they add a note, tag, or category to that item.
+- If saved items don't answer the question at all, say so plainly and suggest what they could save next.
 
 Always call the answer tool. In "answer", write a short, conversational reply (1-3 sentences) referencing relevant items naturally. In "item_ids", return the ids of the items most relevant to the answer (max 8, in order of relevance). In "collection_ids", return ids of collections worth surfacing (max 4). Do not include items unrelated to the question.
 
