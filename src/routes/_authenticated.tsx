@@ -45,9 +45,14 @@ function AuthedLayout() {
               );
             })}
           </div>
-          <button onClick={() => supabase.auth.signOut()} className="text-muted-foreground hover:text-foreground" aria-label="Sign out">
-            <LogOut className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <Link to="/profile" aria-label="Profile">
+              <UserAvatar url={profile?.avatar_url} email={user.email} size="sm" />
+            </Link>
+            <button onClick={() => supabase.auth.signOut()} className="text-muted-foreground hover:text-foreground" aria-label="Sign out">
+              <LogOut className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </header>
 
