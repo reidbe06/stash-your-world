@@ -63,56 +63,82 @@ export const fetchUrlMetadata = createServerFn({ method: "POST" })
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
+    const timer = setTimeout(() => controller.abort(), 10000);
+    const hostSource = target.hostname.replace(/^www\./, "");
+
+    // Known unfurler UA — Instagram, TikTok, Pinterest, X/Twitter, Facebook,
+    // LinkedIn, Reddit, YouTube etc. only serve full OG/Twitter meta tags to
+    // recognized link-preview bots. A generic browser or "STASHdBot" UA gets
+    // an empty SPA shell with no metadata. We try the unfurler UA first, then
+    // a real browser UA as a fallback for sites that block bots.
+    const UAS = [
+      "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    ];
 
     let html = "";
-    try {
-      const res = await fetch(target.toString(), {
-        signal: controller.signal,
-        redirect: "follow",
-        headers: {
-          "User-Agent":
-            "Mozilla/5.0 (compatible; STASHdBot/1.0; +https://stashd.app)",
-          Accept: "text/html,application/xhtml+xml",
-        },
-      });
-      if (!res.ok) {
-        return {
-          title: null,
-          description: null,
-          image: null,
-          source: target.hostname.replace(/^www\./, ""),
-          type: "link",
-        };
-      }
-      // Cap body to ~512KB to avoid huge pages
-      const reader = res.body?.getReader();
-      if (reader) {
-        const decoder = new TextDecoder();
-        let received = 0;
-        const max = 512 * 1024;
-        while (received < max) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          received += value.byteLength;
-          html += decoder.decode(value, { stream: true });
-          // Stop early once </head> is seen — metadata lives there
-          if (html.includes("</head>")) break;
+    for (const ua of UAS) {
+      try {
+        const res = await fetch(target.toString(), {
+          signal: controller.signal,
+          redirect: "follow",
+          headers: {
+            "User-Agent": ua,
+            Accept: "text/html,application/xhtml+xml",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+        });
+        if (!res.ok) continue;
+        const reader = res.body?.getReader();
+        let body = "";
+        if (reader) {
+          const decoder = new TextDecoder();
+          let received = 0;
+          const max = 1024 * 1024; // 1 MB
+          while (received < max) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            received += value.byteLength;
+            body += decoder.decode(value, { stream: true });
+            if (body.includes("</head>")) break;
+          }
+          try { await reader.cancel(); } catch {}
+        } else {
+          body = await res.text();
         }
-        try { await reader.cancel(); } catch {}
-      } else {
-        html = await res.text();
-      }
-    } catch (err) {
-      clearTimeout(timer);
-      return {
-        title: null,
-        description: null,
-        image: null,
-        source: target.hostname.replace(/^www\./, ""),
-        type: "link",
-      };
+        if (body && /<meta[^>]+(og:|twitter:)/i.test(body)) {
+          html = body;
+          break;
+        }
+        if (body && !html) html = body; // keep as fallback
+      } catch { /* try next UA */ }
     }
+
+    // oEmbed fallback for known apps that don't serve usable HTML metadata.
+    let oembed: { title: string | null; image: string | null; source: string | null } | null = null;
+    const h = target.hostname;
+    let oembedEndpoint: string | null = null;
+    if (/(^|\.)youtube\.com$/.test(h) || h === "youtu.be") {
+      oembedEndpoint = `https://www.youtube.com/oembed?format=json&url=${encodeURIComponent(target.toString())}`;
+    } else if (/(^|\.)vimeo\.com$/.test(h)) {
+      oembedEndpoint = `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(target.toString())}`;
+    } else if (/(^|\.)tiktok\.com$/.test(h)) {
+      oembedEndpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(target.toString())}`;
+    }
+    if (oembedEndpoint) {
+      try {
+        const r = await fetch(oembedEndpoint, { signal: controller.signal, headers: { "User-Agent": UAS[1] } });
+        if (r.ok) {
+          const j: any = await r.json();
+          oembed = {
+            title: j.title || null,
+            image: j.thumbnail_url || null,
+            source: j.provider_name || null,
+          };
+        }
+      } catch { /* ignore */ }
+    }
+
     clearTimeout(timer);
 
     const ogTitle = pickMeta(html, ["og:title", "twitter:title"]);
@@ -124,25 +150,24 @@ export const fetchUrlMetadata = createServerFn({ method: "POST" })
     ]);
     let image = pickMeta(html, [
       "og:image:secure_url",
+      "og:image:url",
       "og:image",
       "twitter:image",
       "twitter:image:src",
+      "thumbnail",
     ]);
     const ogType = pickMeta(html, ["og:type"]);
-    const siteName = pickMeta(html, ["og:site_name"]);
+    const siteName = pickMeta(html, ["og:site_name", "application-name"]);
 
-    // Resolve relative image URLs
     if (image) {
       try { image = new URL(image, target).toString(); } catch { image = null; }
     }
 
-    const source = siteName || target.hostname.replace(/^www\./, "");
-
     return {
-      title: ogTitle || docTitle,
+      title: ogTitle || docTitle || oembed?.title || null,
       description: description ? description.slice(0, 1000) : null,
-      image,
-      source,
+      image: image || oembed?.image || null,
+      source: siteName || oembed?.source || hostSource,
       type: inferType(target.toString(), ogType),
     };
   });
