@@ -227,34 +227,55 @@ async function tryFirecrawl(target: URL): Promise<Partial<UrlMetadata> | null> {
   const apiKey = process.env.FIRECRAWL_API_KEY;
   if (!apiKey) return null;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), 20000);
   try {
-    const res = await fetch("https://api.firecrawl.dev/v2/scrape", {
+    const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
       signal: controller.signal,
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         url: target.toString(),
-        formats: [{ type: "json", prompt: "Extract the saved item's exact page title, a direct thumbnail image URL, and a concise note/description. Return null for unknown fields." }, "html", "summary"],
+        formats: ["extract", "html"],
+        extract: {
+          prompt: "Extract the page title, a direct product or thumbnail image URL, and a concise description or note. Return null for any field you cannot find.",
+          schema: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              image_url: { type: "string" },
+              description: { type: "string" },
+            },
+          },
+        },
         onlyMainContent: false,
-        waitFor: 1200,
+        waitFor: 2000,
         location: { country: "US", languages: ["en"] },
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn("[Firecrawl metadata] HTTP", res.status, await res.text().catch(() => ""));
+      return null;
+    }
     const raw: any = await res.json();
     const doc = raw.data ?? raw;
-    const extracted = doc.json ?? {};
+    const extracted = doc.extract ?? {};
     const metadata = doc.metadata ?? {};
     const html = doc.html ?? "";
     return {
-      title: normalizeText(extracted.title || extracted.name || metadata.title),
-      description: normalizeText(extracted.notes || extracted.description || doc.summary || metadata.description),
-      image: extracted.image_url || extracted.image || extracted.thumbnail_url || metadata.ogImage || metadata.image || pickImageFromHtml(html, target),
-      source: normalizeText(metadata.siteName || metadata.sourceURL ? new URL(metadata.sourceURL || target.toString()).hostname.replace(/^www\./, "") : null),
+      title: normalizeText(extracted.title || metadata.title || metadata.ogTitle),
+      description: normalizeText(extracted.description || metadata.description || metadata.ogDescription),
+      image: extracted.image_url || metadata.ogImage || metadata.image || pickImageFromHtml(html, target) || null,
+      source: normalizeText(
+        metadata.siteName ||
+        (metadata.sourceURL ? new URL(metadata.sourceURL).hostname.replace(/^www\./, "") : null)
+      ),
     };
-  } catch { return null; }
-  finally { clearTimeout(timer); }
+  } catch (err) {
+    console.warn("[Firecrawl metadata] error:", err);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function absolutizeImage(image: string | null | undefined, target: URL): string | null {

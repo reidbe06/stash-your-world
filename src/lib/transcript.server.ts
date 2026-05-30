@@ -322,10 +322,10 @@ async function fetchCaptionViaFirecrawl(
   if (!apiKey) return null;
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 22_000);
+  const timer = setTimeout(() => controller.abort(), 25_000);
 
   try {
-    const res = await fetch("https://api.firecrawl.dev/v2/scrape", {
+    const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
       signal: controller.signal,
       headers: {
@@ -334,25 +334,25 @@ async function fetchCaptionViaFirecrawl(
       },
       body: JSON.stringify({
         url,
-        formats: [
-          {
-            type: "json",
-            prompt: FIRECRAWL_PROMPTS[platform],
-          },
-          "summary",
-        ],
+        formats: ["extract", "markdown"],
+        extract: {
+          prompt: FIRECRAWL_PROMPTS[platform],
+        },
         onlyMainContent: true,
-        waitFor: 2500,
+        waitFor: 3000,
         location: { country: "US", languages: ["en"] },
       }),
     });
     clearTimeout(timer);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[Firecrawl ${platform}] HTTP`, res.status, await res.text().catch(() => ""));
+      return null;
+    }
 
     const raw: any = await res.json();
     const doc = raw.data ?? raw;
-    const extracted: Record<string, any> = doc.json ?? {};
-    const summary: string = doc.summary ?? "";
+    const extracted: Record<string, any> = doc.extract ?? {};
+    const summary: string = doc.markdown ?? "";
 
     const parts: string[] = [];
 

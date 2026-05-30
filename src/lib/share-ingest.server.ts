@@ -273,7 +273,32 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   }
 
   const host = parsed.hostname.replace(/^www\./, "");
-  let title = (incomingTitle || meta?.title || bestTitleFromUrl(input.url) || host).slice(0, 500);
+
+  // For social video platforms, never show a mangled URL slug (e.g. "C8t J3o Psr QP").
+  // Use a clean human-readable fallback instead.
+  const platformDefaultTitle: Record<string, string> = {
+    instagram_reel: "Instagram Reel",
+    instagram: "Instagram Post",
+    tiktok: "TikTok Video",
+    youtube_short: "YouTube Short",
+    youtube: "YouTube Video",
+    vimeo: "Vimeo Video",
+  };
+
+  const platformDefault = platformDefaultTitle[platform] ?? null;
+
+  // Social video platforms (Instagram, TikTok) always have opaque IDs in their URL paths —
+  // never useful as a title. Skip bestTitleFromUrl for these and rely on platform default.
+  const isSocialVideoWithOpaqueUrl = platform === "instagram_reel" || platform === "instagram" || platform === "tiktok";
+  const urlDerivedTitle = isSocialVideoWithOpaqueUrl ? null : bestTitleFromUrl(input.url);
+
+  // Filter out meta titles that are generic/blocked platform names (fetchMetadata falls back
+  // to bestTitleFromUrl which returns the mangled Reel ID for Instagram)
+  const usableMetaTitle = (meta?.title && meta.title !== urlDerivedTitle && !isSocialVideoWithOpaqueUrl)
+    ? meta.title
+    : null;
+
+  let title = (incomingTitle || usableMetaTitle || urlDerivedTitle || platformDefault || bestTitleFromUrl(input.url) || host).slice(0, 500);
   const caption = incomingDescription || meta?.description || null;
   let description = caption || "";
   let image = incomingImage || meta?.image || null;
@@ -327,8 +352,14 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   const aiNotes = ai?.notes ? String(ai.notes).trim() : "";
   const aiTitle = ai?.generated_title ? String(ai.generated_title).trim() : "";
 
-  if (!incomingTitle && !meta?.title && aiTitle && isMeaningfulMetadataValue(aiTitle, input.url)) {
-    title = aiTitle.slice(0, 500);
+  // Override title with AI's generated title if:
+  // - no user-provided title AND no real metadata title, OR
+  // - the current title is still just a platform default placeholder ("Instagram Reel", etc.)
+  const isPlatformDefaultTitle = Object.values(platformDefaultTitle).includes(title);
+  if (aiTitle && isMeaningfulMetadataValue(aiTitle, input.url)) {
+    if (!incomingTitle && (!meta?.title || isPlatformDefaultTitle)) {
+      title = aiTitle.slice(0, 500);
+    }
   }
   if (!description) description = userNote || aiNotes || summary || "";
   if (!image && meta?.image) image = meta.image;
