@@ -308,7 +308,8 @@ function SavePage() {
     } finally { setBusy(false); }
   };
 
-  const showHelpPrompt = isSocialVideoUrl(form.url) && (saveStatus === "needs_info" || !hasUsefulSocialMetadata(form));
+  const hasHelp = !!help.contextType || !!help.note.trim();
+  const showHelpPrompt = isSocialVideoUrl(form.url) && !hasUsefulSocialMetadata(form) && saveStatus !== "organized" && (!hasHelp || saveStatus === "needs_info");
   const statusMessage = saveStatus === "organized"
     ? "AI organized this save"
     : saveStatus === "needs_info"
