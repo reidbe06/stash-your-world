@@ -24,6 +24,7 @@ export type AiCategorization = {
   tags: string[];
   summary: string;
   suggested_collection: string;
+  suggested_collections: string[];
 };
 
 const inputSchema = z.object({
