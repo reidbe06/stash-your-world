@@ -52,60 +52,102 @@ export type Database = {
       }
       items: {
         Row: {
+          ai_category: string | null
+          ai_key_takeaways: string[]
+          ai_subcategory: string | null
           ai_summary: string | null
+          ai_tags: string[]
           category: string | null
           collection_id: string | null
+          confidence_score: number | null
           created_at: string
+          creator_name: string | null
           description: string | null
           embedding: string | null
           embedding_updated_at: string | null
           id: string
           image_url: string | null
+          original_caption: string | null
+          processing_status: string
+          product_names: string[]
+          recipe_ingredients: string[]
+          recipe_steps: string[]
           share_source: string
           source: string | null
+          source_platform: string | null
           subcategory: string | null
           tags: string[]
           title: string
+          transcript: string | null
+          travel_details: Json | null
           type: string
           updated_at: string
           url: string | null
           user_id: string
         }
         Insert: {
+          ai_category?: string | null
+          ai_key_takeaways?: string[]
+          ai_subcategory?: string | null
           ai_summary?: string | null
+          ai_tags?: string[]
           category?: string | null
           collection_id?: string | null
+          confidence_score?: number | null
           created_at?: string
+          creator_name?: string | null
           description?: string | null
           embedding?: string | null
           embedding_updated_at?: string | null
           id?: string
           image_url?: string | null
+          original_caption?: string | null
+          processing_status?: string
+          product_names?: string[]
+          recipe_ingredients?: string[]
+          recipe_steps?: string[]
           share_source?: string
           source?: string | null
+          source_platform?: string | null
           subcategory?: string | null
           tags?: string[]
           title: string
+          transcript?: string | null
+          travel_details?: Json | null
           type?: string
           updated_at?: string
           url?: string | null
           user_id: string
         }
         Update: {
+          ai_category?: string | null
+          ai_key_takeaways?: string[]
+          ai_subcategory?: string | null
           ai_summary?: string | null
+          ai_tags?: string[]
           category?: string | null
           collection_id?: string | null
+          confidence_score?: number | null
           created_at?: string
+          creator_name?: string | null
           description?: string | null
           embedding?: string | null
           embedding_updated_at?: string | null
           id?: string
           image_url?: string | null
+          original_caption?: string | null
+          processing_status?: string
+          product_names?: string[]
+          recipe_ingredients?: string[]
+          recipe_steps?: string[]
           share_source?: string
           source?: string | null
+          source_platform?: string | null
           subcategory?: string | null
           tags?: string[]
           title?: string
+          transcript?: string | null
+          travel_details?: Json | null
           type?: string
           updated_at?: string
           url?: string | null
