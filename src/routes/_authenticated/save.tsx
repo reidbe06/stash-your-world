@@ -76,12 +76,34 @@ function isSocialVideoUrl(url: string): boolean {
   } catch { return false; }
 }
 
+// Returns true if the title appears to be derived from the URL slug
+// e.g. Instagram /reel/C8tJ3oPsrQP/ → title "C8t J3o Psr QP"
+function isUrlSlugTitle(title: string, url: string): boolean {
+  try {
+    const segments = new URL(url).pathname.split("/").filter(Boolean);
+    if (!segments.length) return false;
+    // Check the last two path segments
+    for (const seg of segments.slice(-2)) {
+      if (seg.length < 4) continue;
+      const normalizedSeg = seg.replace(/[-_]/g, "").toLowerCase();
+      const normalizedTitle = title.replace(/[\s\-_]/g, "").toLowerCase();
+      if (normalizedTitle === normalizedSeg || normalizedSeg.includes(normalizedTitle) || normalizedTitle.includes(normalizedSeg)) {
+        return true;
+      }
+    }
+  } catch {}
+  return false;
+}
+
 function hasUsefulSocialMetadata(f: { title: string; description: string; image_url: string; url: string }) {
   const platform = getPlatform(f.url).toLowerCase();
-  const title = f.title.trim().toLowerCase();
+  const title = f.title.trim();
+  // Slug-derived titles ("C8t J3o Psr QP") are not real content
+  if (isUrlSlugTitle(title, f.url)) return false;
+  const titleLower = title.toLowerCase();
   return !!(
     f.description.trim().length >= 8 ||
-    (title.length >= 8 && platform && !title.includes(platform.toLowerCase()))
+    (title.length >= 8 && platform && !titleLower.includes(platform.toLowerCase()))
   );
 }
 
@@ -182,12 +204,36 @@ function SavePage() {
     const f = { ...form, ...(override || {}) };
     const url = f.url.trim();
     if (!isValidUrl(url)) return;
+
+    // Opaque video: social platform with no extractable caption/description and no user note/hint.
+    // Firecrawl returns 403 for Instagram/TikTok — do NOT send empty content to OpenAI.
+    const isOpaque = isSocialVideoUrl(url)
+      && !hasUsefulSocialMetadata({ title: f.title, description: f.description, image_url: f.image_url, url })
+      && !help.contextType
+      && !help.note.trim();
+
+    if (isOpaque) {
+      console.log(`[SAVE] Skipping AI — opaque ${getPlatform(url)} video: no caption/transcript/note extracted. Setting Needs Review.`);
+      setForm((cur) => ({
+        ...cur,
+        category: "Needs Review",
+        type: cur.type === "link" ? "video" : cur.type,
+        ai_summary: "",
+      }));
+      setSaveStatus("needs_info");
+      setAiLoaded(false);
+      return;
+    }
+
     let source = "";
     try { source = new URL(url).hostname.replace(/^www\./, ""); } catch {}
     const key = JSON.stringify([url, f.title, f.description, help.contextType, help.note]);
     if (key === lastAiKey.current) return;
     lastAiKey.current = key;
     setCategorizing(true);
+
+    console.log(`[SAVE] Calling OpenAI: platform=${getPlatform(url)} title=${JSON.stringify(f.title)} desc=${JSON.stringify(f.description?.slice(0, 80))} note=${JSON.stringify(help.note)} hint=${JSON.stringify(help.contextType)}`);
+
     try {
       const ai = await runCategorize({
         data: {
@@ -200,20 +246,22 @@ function SavePage() {
           existingCollections: (collections || []).map((c) => c.name),
         },
       });
+
+      console.log(`[SAVE] OpenAI returned: category=${ai.category} title=${JSON.stringify(ai.generated_title)}`);
+
       setForm((cur) => ({
         ...cur,
         title: cur.title || ai.generated_title || "",
-        category: cur.category || ai.category,
+        category: ai.category,
         subcategory: cur.subcategory || ai.subcategory,
-        ai_summary: cur.ai_summary || ai.summary,
+        ai_summary: ai.summary || cur.ai_summary,
         description: cur.description || ai.notes || ai.summary || "",
         suggested_collection: cur.suggested_collection || ai.suggested_collection,
         tags: cur.tags?.trim() ? cur.tags : ai.tags.join(", "),
       }));
       setSuggestedCollections(ai.suggested_collections?.length ? ai.suggested_collections : (ai.suggested_collection ? [ai.suggested_collection] : []));
       setAiLoaded(true);
-      const needsHelp = isSocialVideoUrl(url) && !hasUsefulSocialMetadata(f) && !help.contextType && !help.note;
-      setSaveStatus(needsHelp ? "needs_info" : ai.category === "Uncategorized" ? "uncategorized" : "organized");
+      setSaveStatus(ai.category === "Uncategorized" ? "uncategorized" : "organized");
     } catch (err: any) {
       console.warn("AI categorize failed", err);
       setForm((cur) => ({ ...cur, category: cur.category || "Uncategorized" }));
@@ -284,6 +332,9 @@ function SavePage() {
       const fallbackTitle = source ?? "Saved link";
       const finalCategory = form.category || "Uncategorized";
       const finalDescription = form.description || help.note || null;
+      const processingStatus = aiLoaded ? "ai_processed" : saveStatus === "needs_info" ? "needs_user_context" : "pending";
+      console.log(`[SAVE] Submitting: category=${finalCategory} processing_status=${processingStatus} aiLoaded=${aiLoaded}`);
+
       const { data: inserted, error } = await supabase.from("items").insert({
         user_id: user.id,
         title: form.title.trim() || fallbackTitle,
@@ -297,6 +348,7 @@ function SavePage() {
         category: finalCategory,
         subcategory: form.subcategory || null,
         ai_summary: form.ai_summary || null,
+        processing_status: processingStatus,
       }).select("id").single();
       if (error) throw error;
       const finalStatusMessage = finalCategory === "Uncategorized" ? "Saved as Uncategorized" : "AI organized this save";
@@ -379,19 +431,24 @@ function SavePage() {
         )}
 
         {showHelpPrompt && (
-          <div className="space-y-4 rounded-2xl border bg-card p-4 md:p-5">
+          <div className="space-y-4 rounded-2xl border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20 p-4 md:p-5">
             <div>
-              <h2 className="text-base font-bold">Help STASHd understand this save</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{getPlatform(form.url) || "This"} did not provide enough details. Add a quick hint so AI can organize it.</p>
+              <h2 className="text-base font-bold">STASHd couldn't read this post</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                STASHd could not read enough content from this {getPlatform(form.url) || "post"}. Add a quick note so AI can organize it.
+              </p>
             </div>
             <div>
-              <Label>What is this?</Label>
+              <Label>What is this about?</Label>
               <div className="mt-2 flex flex-wrap gap-2">
                 {HELP_OPTIONS.map((option) => (
                   <button
                     key={option}
                     type="button"
-                    onClick={() => setHelp((cur) => ({ ...cur, contextType: option }))}
+                    onClick={() => {
+                      setHelp((cur) => ({ ...cur, contextType: option }));
+                      lastAiKey.current = "";
+                    }}
                     className={cn(
                       "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
                       help.contextType === option ? "border-primary bg-accent text-primary" : "bg-card text-muted-foreground hover:text-foreground",
@@ -403,21 +460,21 @@ function SavePage() {
               </div>
             </div>
             <div>
-              <Label htmlFor="help-note">Optional note</Label>
+              <Label htmlFor="help-note">Quick note <span className="font-normal text-muted-foreground">(e.g. "chicken pasta recipe", "summer outfit idea")</span></Label>
               <Textarea
                 id="help-note"
                 value={help.note}
                 onChange={(e) => setHelp((cur) => ({ ...cur, note: e.target.value }))}
-                rows={3}
+                rows={2}
                 maxLength={500}
                 className="mt-1.5"
-                placeholder="What do you want to remember about this?"
+                placeholder="Describe what this post is about…"
               />
             </div>
             <button
               type="button"
               onClick={() => { lastAiKey.current = ""; runAi(); }}
-              disabled={categorizing}
+              disabled={categorizing || (!help.note.trim() && !help.contextType)}
               className="inline-flex items-center gap-2 rounded-full bg-brand-gradient px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-brand disabled:opacity-60"
             >
               {categorizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}

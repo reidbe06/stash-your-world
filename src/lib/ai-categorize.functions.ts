@@ -15,6 +15,7 @@ export const CATEGORIES = [
   "Entertainment",
   "Videos",
   "Education",
+  "Needs Review",
   "Uncategorized",
   "Other",
 ] as const;
