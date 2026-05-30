@@ -52,7 +52,7 @@ function isSocialVideoUrl(url: string): boolean {
 function hasUsefulMetadata(meta?: { title?: string | null; description?: string | null; image?: string | null }, url?: string) {
   const title = (meta?.title || "").trim().toLowerCase();
   const platform = url ? new URL(url).hostname.replace(/^www\./, "").split(".")[0].toLowerCase() : "";
-  return !!((meta?.description || "").trim().length >= 8 || (title.length >= 8 && platform && !title.includes(platform)) || (meta?.image && !meta.image.includes("google.com/s2/favicons")));
+  return !!((meta?.description || "").trim().length >= 8 || (title.length >= 8 && platform && !title.includes(platform)));
 }
 
 function SharePage() {
