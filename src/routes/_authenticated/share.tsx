@@ -14,9 +14,11 @@
 import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
+import { useServerFn } from "@tanstack/react-start";
 import { Loader2, CheckCircle2, AlertTriangle, Sparkles, Clipboard } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchUrlMetadata } from "@/lib/url-metadata.functions";
 
 const searchSchema = z.object({
   url: z.string().optional(),
@@ -33,14 +35,33 @@ export const Route = createFileRoute("/_authenticated/share")({
 type Status =
   | { state: "idle" }
   | { state: "saving" }
+  | { state: "needs_info"; url: string; metadata?: { title?: string | null; description?: string | null; image?: string | null; source?: string | null } }
   | { state: "saved"; item: any; suggested?: string | null }
   | { state: "error"; message: string };
+
+const HELP_OPTIONS = ["Recipe", "Outfit", "Product", "Travel idea", "Home idea", "Workout", "Beauty", "Business idea", "Parenting", "Other"];
+
+function isSocialVideoUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    return host.includes("tiktok.com") || host.includes("instagram.com") || /\/(reel|reels)\//i.test(parsed.pathname);
+  } catch { return false; }
+}
+
+function hasUsefulMetadata(meta?: { title?: string | null; description?: string | null; image?: string | null }, url?: string) {
+  const title = (meta?.title || "").trim().toLowerCase();
+  const platform = url ? new URL(url).hostname.replace(/^www\./, "").split(".")[0].toLowerCase() : "";
+  return !!((meta?.description || "").trim().length >= 8 || (title.length >= 8 && platform && !title.includes(platform)) || (meta?.image && !meta.image.includes("google.com/s2/favicons")));
+}
 
 function SharePage() {
   const params = useSearch({ from: "/_authenticated/share" });
   const { user } = useAuth();
+  const fetchMeta = useServerFn(fetchUrlMetadata);
   const [status, setStatus] = useState<Status>({ state: "idle" });
   const [manualUrl, setManualUrl] = useState("");
+  const [help, setHelp] = useState({ contextType: "", note: "" });
 
   const incomingUrl = (() => {
     if (params.url) return params.url;
@@ -49,10 +70,18 @@ function SharePage() {
     return m ? m[0] : "";
   })();
 
-  async function save(url: string) {
+  async function save(url: string, options?: { contextType?: string; note?: string; metadata?: { title?: string | null; description?: string | null; image?: string | null; source?: string | null }; skipPrompt?: boolean }) {
     if (!url || !user) return;
     setStatus({ state: "saving" });
     try {
+      let metadata = options?.metadata;
+      if (isSocialVideoUrl(url) && !options?.skipPrompt) {
+        metadata = await fetchMeta({ data: { url } }).catch(() => null) || undefined;
+        if (!hasUsefulMetadata(metadata, url)) {
+          setStatus({ state: "needs_info", url, metadata });
+          return;
+        }
+      }
       const { data: sess } = await supabase.auth.getSession();
       const token = sess.session?.access_token;
       if (!token) throw new Error("Not signed in");
@@ -60,7 +89,14 @@ function SharePage() {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          url, title: params.title, text: params.text,
+          url,
+          title: metadata?.title || params.title,
+          text: params.text,
+          description: metadata?.description || undefined,
+          image: metadata?.image || undefined,
+          source: metadata?.source || undefined,
+          note: options?.note || undefined,
+          context_type: options?.contextType || undefined,
           share_source: "pwa_share",
         }),
       });
