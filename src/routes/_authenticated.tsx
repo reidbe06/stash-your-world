@@ -5,6 +5,8 @@ import { useAuth } from "@/lib/auth";
 import { Logo } from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { UserAvatar } from "@/components/UserAvatar";
+import { useProfile } from "@/hooks/useProfile";
 
 export const Route = createFileRoute("/_authenticated")({ component: AuthedLayout });
 
@@ -18,6 +20,7 @@ const navItems = [
 
 function AuthedLayout() {
   const { user, loading } = useAuth();
+  const { data: profile } = useProfile();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -42,9 +45,14 @@ function AuthedLayout() {
               );
             })}
           </div>
-          <button onClick={() => supabase.auth.signOut()} className="text-muted-foreground hover:text-foreground" aria-label="Sign out">
-            <LogOut className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <Link to="/profile" aria-label="Profile">
+              <UserAvatar url={profile?.avatar_url} email={user.email} size="sm" />
+            </Link>
+            <button onClick={() => supabase.auth.signOut()} className="text-muted-foreground hover:text-foreground" aria-label="Sign out">
+              <LogOut className="h-5 w-5" />
+            </button>
+          </div>
         </div>
       </header>
 

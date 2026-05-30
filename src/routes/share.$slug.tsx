@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ItemCard, type Item } from "@/components/ItemCard";
 import { Logo } from "@/components/Logo";
+import { UserAvatar } from "@/components/UserAvatar";
 
 export const Route = createFileRoute("/share/$slug")({
   head: () => ({ meta: [{ title: "Shared collection — STASHd" }] }),
@@ -18,7 +19,8 @@ function SharePage() {
       if (error) throw error;
       if (!c) return null;
       const { data: items } = await supabase.from("items").select("*").eq("collection_id", c.id).order("created_at", { ascending: false });
-      return { collection: c, items: (items ?? []) as Item[] };
+      const { data: owner } = await supabase.from("profiles").select("display_name, avatar_url").eq("user_id", c.user_id).maybeSingle();
+      return { collection: c, items: (items ?? []) as Item[], owner };
     },
   });
 
@@ -42,7 +44,12 @@ function SharePage() {
               <p className="text-sm text-primary">Shared collection</p>
               <h1 className="mt-1 text-4xl font-extrabold tracking-tight">{data.collection.name}</h1>
               {data.collection.description && <p className="mt-2 text-muted-foreground">{data.collection.description}</p>}
-              <p className="mt-2 text-sm text-muted-foreground">{data.items.length} items</p>
+              <div className="mt-4 flex items-center gap-2">
+                <UserAvatar url={data.owner?.avatar_url} name={data.owner?.display_name} size="sm" />
+                <p className="text-sm text-muted-foreground">
+                  {data.owner?.display_name ? `Curated by ${data.owner.display_name} · ` : ""}{data.items.length} items
+                </p>
+              </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {data.items.map((it) => <ItemCard key={it.id} item={it} readOnly />)}
