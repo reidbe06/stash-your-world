@@ -40,11 +40,16 @@ async function aiCategorize(input: {
       { role: "system", content: `You categorize saved web items for STASHd.
 Categories must be one of: ${CATEGORIES.join(", ")}.
 Subcategory specific (e.g. "Dinner > Chicken"). Tags: 3-6 lowercase short tags.
-generated_title: clean user-facing title (max 90 chars), inferred from the URL/content when metadata is missing. Never use placeholder text like "Auto-filled".
-Summary: one sentence, max 160 chars.
-notes: helpful concise note about the item (max 220 chars). Never placeholder text.
-suggested_collection: 2-4 words.
+
+CRITICAL ANTI-HALLUCINATION RULES:
+- Only use facts present in the provided Title/Description/Source/URL. Never invent specific dishes, products, brands, ingredients, or topics that aren't explicitly mentioned.
+- If the provided content is empty, generic, or only a video/post ID (e.g. a bare TikTok/Instagram URL with no title or description), DO NOT guess what the content is about. Use a generic title based on the source (e.g. "TikTok video", "Instagram post") and generic tags/notes. Set summary to something neutral like "Saved from <source>".
+- generated_title: clean user-facing title (max 90 chars). Prefer the exact provided Title. If only the URL is available and the slug has no human-readable words, fall back to "<Source> <type>" (e.g. "TikTok video"). Never use placeholder text like "Auto-filled".
+- Summary: one sentence, max 160 chars, grounded strictly in the provided text.
+- notes: helpful concise note (max 220 chars) based ONLY on provided text. If nothing meaningful is provided, leave it as a brief generic note about the source, never a fabricated description.
+- suggested_collection: 2-4 words; if unsure, use the source name or category.
 ${collectionsHint}` },
+
       { role: "user", content: content || "No content. Use URL only." },
     ],
     tools: [{
