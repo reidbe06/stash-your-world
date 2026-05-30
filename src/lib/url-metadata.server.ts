@@ -223,53 +223,75 @@ async function tryOembed(target: URL, signal: AbortSignal): Promise<Partial<UrlM
   } catch { return null; }
 }
 
+async function tryFirecrawlRequest(target: URL, body: object, signal: AbortSignal): Promise<Partial<UrlMetadata> | null> {
+  const apiKey = process.env.FIRECRAWL_API_KEY;
+  if (!apiKey) return null;
+  const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
+    method: "POST",
+    signal,
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    console.warn("[Firecrawl metadata] HTTP", res.status, text);
+    return null;
+  }
+  const raw: any = await res.json();
+  const doc = raw.data ?? raw;
+  const extracted = doc.extract ?? {};
+  const metadata = doc.metadata ?? {};
+  const html = doc.html ?? "";
+  const image = extracted.image_url || metadata.ogImage || metadata.image || pickImageFromHtml(html, target) || null;
+  return {
+    title: normalizeText(extracted.title || metadata.title || metadata.ogTitle),
+    description: normalizeText(extracted.description || metadata.description || metadata.ogDescription),
+    image,
+    source: normalizeText(
+      metadata.siteName ||
+      (metadata.sourceURL ? new URL(metadata.sourceURL).hostname.replace(/^www\./, "") : null)
+    ),
+  };
+}
+
 async function tryFirecrawl(target: URL): Promise<Partial<UrlMetadata> | null> {
   const apiKey = process.env.FIRECRAWL_API_KEY;
   if (!apiKey) return null;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  const timer = setTimeout(() => controller.abort(), 25000);
   try {
-    const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
-      method: "POST",
-      signal: controller.signal,
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url: target.toString(),
-        formats: ["extract", "html"],
-        extract: {
-          prompt: "Extract the page title, a direct product or thumbnail image URL, and a concise description or note. Return null for any field you cannot find.",
-          schema: {
-            type: "object",
-            properties: {
-              title: { type: "string" },
-              image_url: { type: "string" },
-              description: { type: "string" },
-            },
+    // First attempt: full extract + html (best quality)
+    const full = await tryFirecrawlRequest(target, {
+      url: target.toString(),
+      formats: ["extract", "html"],
+      extract: {
+        prompt: "Extract the page title, a direct product or thumbnail image URL, and a concise description or note. Return null for any field you cannot find.",
+        schema: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            image_url: { type: "string" },
+            description: { type: "string" },
           },
         },
-        onlyMainContent: false,
-        waitFor: 2000,
-        location: { country: "US", languages: ["en"] },
-      }),
-    });
-    if (!res.ok) {
-      console.warn("[Firecrawl metadata] HTTP", res.status, await res.text().catch(() => ""));
-      return null;
-    }
-    const raw: any = await res.json();
-    const doc = raw.data ?? raw;
-    const extracted = doc.extract ?? {};
-    const metadata = doc.metadata ?? {};
-    const html = doc.html ?? "";
-    return {
-      title: normalizeText(extracted.title || metadata.title || metadata.ogTitle),
-      description: normalizeText(extracted.description || metadata.description || metadata.ogDescription),
-      image: extracted.image_url || metadata.ogImage || metadata.image || pickImageFromHtml(html, target) || null,
-      source: normalizeText(
-        metadata.siteName ||
-        (metadata.sourceURL ? new URL(metadata.sourceURL).hostname.replace(/^www\./, "") : null)
-      ),
-    };
+      },
+      onlyMainContent: false,
+      waitFor: 2000,
+      location: { country: "US", languages: ["en"] },
+    }, controller.signal);
+
+    if (full?.image || full?.title) return full;
+
+    // Second attempt: html only — lighter, avoids HTTP/2 issues on some sites
+    const html = await tryFirecrawlRequest(target, {
+      url: target.toString(),
+      formats: ["html"],
+      onlyMainContent: false,
+      waitFor: 1500,
+      location: { country: "US", languages: ["en"] },
+    }, controller.signal);
+
+    return html;
   } catch (err) {
     console.warn("[Firecrawl metadata] error:", err);
     return null;
@@ -281,6 +303,24 @@ async function tryFirecrawl(target: URL): Promise<Partial<UrlMetadata> | null> {
 function absolutizeImage(image: string | null | undefined, target: URL): string | null {
   if (!image) return null;
   try { return new URL(image, target).toString(); } catch { return null; }
+}
+
+// For retailers whose scrapers are blocked but whose image CDNs follow predictable patterns,
+// construct the product image URL directly from the page URL.
+function tryKnownCdnImage(target: URL): string | null {
+  const host = target.hostname.replace(/^www\./, "");
+  const path = target.pathname;
+
+  // Best Buy: /site/{slug}/{SKU}.p  → pisces.bbystatic.com/image2/BestBuy_US/images/products/{sku[0:3]}/{sku}_sd.jpg
+  if (host === "bestbuy.com") {
+    const m = path.match(/\/(\d{7,})\.[a-z]$/i);
+    if (m) {
+      const sku = m[1];
+      return `https://pisces.bbystatic.com/image2/BestBuy_US/images/products/${sku.slice(0, 3)}/${sku}_sd.jpg`;
+    }
+  }
+
+  return null;
 }
 
 export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
@@ -352,11 +392,16 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
     }
   }
 
-  const fallbackImage = result.image || `https://www.google.com/s2/favicons?domain=${encodeURIComponent(hostSource)}&sz=128`;
+  // Last resort: site-specific CDN image patterns for retailers whose scrapers
+  // are blocked but whose product image URLs are predictable from the page URL.
+  if (!result.image) {
+    result.image = tryKnownCdnImage(target);
+  }
+
   return {
     title: result.title || bestTitleFromUrl(target.toString()) || hostSource,
     description: result.description ? result.description.slice(0, 1000) : null,
-    image: fallbackImage,
+    image: result.image || null,
     source: result.source || hostSource,
     type: result.type || "link",
   };
