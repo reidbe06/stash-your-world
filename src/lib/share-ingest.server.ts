@@ -139,6 +139,16 @@ export type IngestResult = {
   needs_info: boolean;
 };
 
+function isSocialVideoUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    return host.includes("tiktok.com") || host.includes("instagram.com") || /\/(reel|reels)\//i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Ingest a shared URL: optionally fetch metadata, AI-categorize, save, embed.
  * Pass only `{userId, url, share_source}` for fully-automatic mode (mobile share).
@@ -150,6 +160,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   const incomingTitle = isMeaningfulMetadataValue(input.title, input.url) ? input.title!.trim() : null;
   const incomingDescription = isMeaningfulMetadataValue(input.description) ? input.description!.trim() : null;
   const incomingImage = isMeaningfulMetadataValue(input.image) ? input.image!.trim() : null;
+  const userNote = isMeaningfulMetadataValue(input.note) ? input.note!.trim() : "";
+  const contextType = isMeaningfulMetadataValue(input.context_type) ? input.context_type!.trim() : "";
   const hasMeta = !!(incomingTitle && incomingDescription && incomingImage);
   let meta: UrlMetadata | null = null;
   if (!hasMeta) {
@@ -167,12 +179,15 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     .from("collections").select("id,name").eq("user_id", input.userId);
   const existingNames = (cols ?? []).map((c) => c.name);
 
+  const socialVideoNeedsInfo = isSocialVideoUrl(input.url) && !incomingTitle && !meta?.description && !userNote && !contextType;
   const ai = await aiCategorize({
     url: input.url, title, description, source,
+    notes: userNote,
+    contextType,
     existingCollections: existingNames,
   });
 
-  const category = ai?.category && (CATEGORIES as readonly string[]).includes(ai.category) ? ai.category : null;
+  const category = ai?.category && (CATEGORIES as readonly string[]).includes(ai.category) ? ai.category : "Uncategorized";
   const tags: string[] = Array.isArray(ai?.tags)
     ? ai.tags.map((t: any) => String(t).toLowerCase().replace(/^#/, "").trim()).filter(Boolean).slice(0, 8)
     : [];
@@ -185,7 +200,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   if (!incomingTitle && !meta?.title && aiTitle && isMeaningfulMetadataValue(aiTitle, input.url)) {
     title = aiTitle.slice(0, 500);
   }
-  if (!description) description = aiNotes || summary || "";
+  if (!description) description = userNote || aiNotes || summary || "";
   if (!image && meta?.image) image = meta.image;
 
   const { data: inserted, error: insErr } = await supabaseAdmin
@@ -237,6 +252,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     item: inserted as IngestResult["item"],
     suggested_collection: ai?.suggested_collection ? String(ai.suggested_collection).slice(0, 80) : null,
     fetched_metadata: !!meta,
+    ai_status: ai && category !== "Uncategorized" ? "organized" : socialVideoNeedsInfo ? "needs_info" : "uncategorized",
+    needs_info: socialVideoNeedsInfo,
   };
 }
 
