@@ -5,6 +5,8 @@ import { useAuth } from "@/lib/auth";
 import { Logo } from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { UserAvatar } from "@/components/UserAvatar";
+import { useProfile } from "@/hooks/useProfile";
 
 export const Route = createFileRoute("/_authenticated")({ component: AuthedLayout });
 
