@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ItemCard, type Item } from "@/components/ItemCard";
 import { Logo } from "@/components/Logo";
+import { UserAvatar } from "@/components/UserAvatar";
 
 export const Route = createFileRoute("/share/$slug")({
   head: () => ({ meta: [{ title: "Shared collection — STASHd" }] }),
@@ -18,7 +19,8 @@ function SharePage() {
       if (error) throw error;
       if (!c) return null;
       const { data: items } = await supabase.from("items").select("*").eq("collection_id", c.id).order("created_at", { ascending: false });
-      return { collection: c, items: (items ?? []) as Item[] };
+      const { data: owner } = await supabase.from("profiles").select("display_name, avatar_url").eq("user_id", c.user_id).maybeSingle();
+      return { collection: c, items: (items ?? []) as Item[], owner };
     },
   });
 
