@@ -71,12 +71,26 @@ export const fetchUrlMetadata = createServerFn({ method: "POST" })
     // recognized link-preview bots. A generic browser or "STASHdBot" UA gets
     // an empty SPA shell with no metadata. We try the unfurler UA first, then
     // a real browser UA as a fallback for sites that block bots.
+    // Try multiple UAs. Some retailers (Walmart, Target) block facebookexternalhit
+    // and serve a bot-challenge page ("Robot or human?"); they typically allow
+    // Googlebot/Bingbot. Instagram/TikTok/Pinterest only serve OG tags to known
+    // unfurlers. We try unfurler UAs first, then search bots, then real browser.
     const UAS = [
       "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
+      "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+      "Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)",
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
     ];
 
+    const isBlockedPage = (body: string): boolean => {
+      const t = pickTitle(body)?.toLowerCase() ?? "";
+      if (/robot or human|are you a robot|access denied|just a moment|attention required|pardon our interruption|captcha|cloudflare/i.test(t)) return true;
+      if (/<title[^>]*>\s*<\/title>/i.test(body) && body.length < 4000) return true;
+      return false;
+    };
+
     let html = "";
+    let htmlScore = 0; // higher = better
     for (const ua of UAS) {
       try {
         const res = await fetch(target.toString(), {
@@ -106,11 +120,15 @@ export const fetchUrlMetadata = createServerFn({ method: "POST" })
         } else {
           body = await res.text();
         }
-        if (body && /<meta[^>]+(og:|twitter:)/i.test(body)) {
+        if (!body) continue;
+        if (isBlockedPage(body)) continue; // try next UA
+        const hasOg = /<meta[^>]+(og:|twitter:)/i.test(body);
+        const score = hasOg ? 2 : 1;
+        if (score > htmlScore) {
           html = body;
-          break;
+          htmlScore = score;
+          if (hasOg) break;
         }
-        if (body && !html) html = body; // keep as fallback
       } catch { /* try next UA */ }
     }
 
