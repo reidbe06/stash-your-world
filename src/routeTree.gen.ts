@@ -20,6 +20,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
 import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
 import { Route as AuthenticatedCollectionsIdRouteImport } from './routes/_authenticated/collections.$id'
+import { Route as ApiPublicShareSaveRouteImport } from './routes/api/public/share.save'
 import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/extension.save'
 import { Route as ApiPublicExtensionCollectionsRouteImport } from './routes/api/public/extension.collections'
 
@@ -79,6 +80,11 @@ const AuthenticatedCollectionsIdRoute =
     path: '/$id',
     getParentRoute: () => AuthenticatedCollectionsRoute,
   } as any)
+const ApiPublicShareSaveRoute = ApiPublicShareSaveRouteImport.update({
+  id: '/api/public/share/save',
+  path: '/api/public/share/save',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicExtensionSaveRoute = ApiPublicExtensionSaveRouteImport.update({
   id: '/api/public/extension/save',
   path: '/api/public/extension/save',
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/share/save': typeof ApiPublicShareSaveRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -118,6 +125,7 @@ export interface FileRoutesByTo {
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/share/save': typeof ApiPublicShareSaveRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -134,6 +142,7 @@ export interface FileRoutesById {
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/share/save': typeof ApiPublicShareSaveRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/collections/$id'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/share/save'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -164,6 +174,7 @@ export interface FileRouteTypes {
     | '/collections/$id'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/share/save'
   id:
     | '__root__'
     | '/'
@@ -179,6 +190,7 @@ export interface FileRouteTypes {
     | '/_authenticated/collections/$id'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/share/save'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -188,6 +200,7 @@ export interface RootRouteChildren {
   ShareSlugRoute: typeof ShareSlugRoute
   ApiPublicExtensionCollectionsRoute: typeof ApiPublicExtensionCollectionsRoute
   ApiPublicExtensionSaveRoute: typeof ApiPublicExtensionSaveRoute
+  ApiPublicShareSaveRoute: typeof ApiPublicShareSaveRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -269,6 +282,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCollectionsIdRouteImport
       parentRoute: typeof AuthenticatedCollectionsRoute
     }
+    '/api/public/share/save': {
+      id: '/api/public/share/save'
+      path: '/api/public/share/save'
+      fullPath: '/api/public/share/save'
+      preLoaderRoute: typeof ApiPublicShareSaveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/extension/save': {
       id: '/api/public/extension/save'
       path: '/api/public/extension/save'
@@ -329,7 +349,18 @@ const rootRouteChildren: RootRouteChildren = {
   ShareSlugRoute: ShareSlugRoute,
   ApiPublicExtensionCollectionsRoute: ApiPublicExtensionCollectionsRoute,
   ApiPublicExtensionSaveRoute: ApiPublicExtensionSaveRoute,
+  ApiPublicShareSaveRoute: ApiPublicShareSaveRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
