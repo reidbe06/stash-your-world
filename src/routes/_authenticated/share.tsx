@@ -142,6 +142,10 @@ function SharePage() {
             <CheckCircle2 className="h-8 w-8" />
           </div>
           <h1 className="mt-4 text-2xl font-bold">Saved to STASHd.</h1>
+          <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
+            <Sparkles className="h-3 w-3" />
+            {status.item?.category === "Uncategorized" ? "Saved as Uncategorized" : "AI organized this save"}
+          </div>
           <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{status.item?.title}</p>
           {(status.item?.category || status.item?.subcategory) && (
             <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
@@ -165,6 +169,50 @@ function SharePage() {
               className="rounded-full border bg-card py-3 text-sm font-semibold text-muted-foreground hover:text-foreground"
             >
               Save another
+            </button>
+          </div>
+        </>
+      )}
+
+      {status.state === "needs_info" && (
+        <>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent text-accent-foreground">
+            <Sparkles className="h-7 w-7" />
+          </div>
+          <h1 className="mt-4 text-xl font-bold">Help STASHd understand this save</h1>
+          <p className="mt-2 text-sm font-semibold text-muted-foreground">AI needs more info</p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            {HELP_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                onClick={() => setHelp((cur) => ({ ...cur, contextType: option }))}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${help.contextType === option ? "border-primary bg-accent text-primary" : "bg-card text-muted-foreground"}`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+          <textarea
+            value={help.note}
+            onChange={(e) => setHelp((cur) => ({ ...cur, note: e.target.value }))}
+            rows={3}
+            maxLength={500}
+            placeholder="What do you want to remember about this?"
+            className="mt-4 w-full rounded-2xl border bg-card px-4 py-3 text-sm outline-none focus:border-primary"
+          />
+          <div className="mt-4 flex w-full flex-col gap-2">
+            <button
+              onClick={() => save(status.url, { contextType: help.contextType, note: help.note, metadata: status.metadata, skipPrompt: true })}
+              className="rounded-full bg-brand-gradient py-3 text-sm font-semibold text-primary-foreground shadow-brand"
+            >
+              Organize with AI
+            </button>
+            <button
+              onClick={() => save(status.url, { metadata: status.metadata, skipPrompt: true })}
+              className="rounded-full border bg-card py-3 text-sm font-semibold text-muted-foreground hover:text-foreground"
+            >
+              Save as Uncategorized
             </button>
           </div>
         </>
