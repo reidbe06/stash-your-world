@@ -166,6 +166,7 @@ function SavePage() {
       }
     } catch (err: any) {
       console.warn("Metadata fetch failed", err);
+      if (isSocialVideoUrl(url)) setSaveStatus("needs_info");
     } finally {
       setFetching(false);
     }
@@ -205,7 +206,8 @@ function SavePage() {
       }));
       setSuggestedCollections(ai.suggested_collections?.length ? ai.suggested_collections : (ai.suggested_collection ? [ai.suggested_collection] : []));
       setAiLoaded(true);
-      setSaveStatus(ai.category === "Uncategorized" ? "uncategorized" : "organized");
+      const needsHelp = isSocialVideoUrl(url) && !hasUsefulSocialMetadata(f) && !help.contextType && !help.note;
+      setSaveStatus(needsHelp ? "needs_info" : ai.category === "Uncategorized" ? "uncategorized" : "organized");
     } catch (err: any) {
       console.warn("AI categorize failed", err);
       setForm((cur) => ({ ...cur, category: cur.category || "Uncategorized" }));
