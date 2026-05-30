@@ -143,7 +143,7 @@ async function apiFetch(path, opts = {}) {
     throw err;
   }
   const appUrl = await getAppUrl();
-  const res = await fetch(`${appUrl}${path}`, {
+  const makeRequest = (baseUrl) => fetch(`${baseUrl}${path}`, {
     ...opts,
     headers: {
       ...(opts.headers || {}),
@@ -151,9 +151,23 @@ async function apiFetch(path, opts = {}) {
       "Content-Type": "application/json",
     },
   });
+
+  let activeAppUrl = appUrl;
+  let res = await makeRequest(activeAppUrl);
+
+  // Older installs may still have the unpublished production URL saved in settings.
+  // If that endpoint is missing, fall back to the working preview URL and remember it.
+  if (res.status === 404 && activeAppUrl !== DEFAULT_APP_URL) {
+    activeAppUrl = DEFAULT_APP_URL;
+    await setStored({ appUrl: DEFAULT_APP_URL });
+    res = await makeRequest(activeAppUrl);
+  }
+
   let json = null;
   try { json = await res.json(); } catch {}
-  if (!res.ok) throw new Error(json?.error || `Request failed (${res.status})`);
+  if (!res.ok) {
+    throw new Error(json?.error || `Request failed (${res.status}) at ${activeAppUrl}`);
+  }
   return json;
 }
 
