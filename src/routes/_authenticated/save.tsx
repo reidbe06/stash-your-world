@@ -76,6 +76,8 @@ function SavePage() {
     ai_summary: "",
     suggested_collection: "",
   });
+  const [suggestedCollections, setSuggestedCollections] = useState<string[]>([]);
+  const [acceptingCollection, setAcceptingCollection] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [categorizing, setCategorizing] = useState(false);
