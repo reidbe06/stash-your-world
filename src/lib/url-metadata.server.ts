@@ -278,6 +278,7 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
 
   let html = "";
   let htmlScore = 0;
+  let finalUrl: URL = target;
   for (const ua of userAgents) {
     try {
       const res = await fetch(target.toString(), {
@@ -286,6 +287,7 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
         headers: { "User-Agent": ua, Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "en-US,en;q=0.9" },
       });
       if (!res.ok) continue;
+      try { finalUrl = new URL(res.url || target.toString()); } catch {}
       const body = await readHead(res);
       if (!body || isBlockedPage(body)) continue;
       const score = (/<meta[^>]+(?:og:|twitter:)/i.test(body) ? 4 : 0) + (/<script[^>]+ld\+json/i.test(body) ? 3 : 0) + (/<img\s/i.test(body) ? 1 : 0);
@@ -305,7 +307,7 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
   const ogType = html ? pickMeta(html, ["og:type"]) : null;
   const siteName = html ? pickMeta(html, ["og:site_name", "application-name"]) : null;
   const image = html ? pickMeta(html, ["og:image:secure_url", "og:image:url", "og:image", "twitter:image", "twitter:image:src", "thumbnail"]) || jsonLd.image || pickImageFromHtml(html, target) : null;
-  const oembed = await tryOembed(target, new AbortController().signal);
+  const oembed = (await tryOembed(finalUrl, new AbortController().signal)) || (finalUrl.toString() !== target.toString() ? await tryOembed(target, new AbortController().signal) : null);
 
   let result: UrlMetadata = {
     title: null,
