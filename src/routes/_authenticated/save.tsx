@@ -47,6 +47,45 @@ const TYPES: { key: string; label: string; icon: LucideIcon }[] = [
   { key: "article", label: "Article", icon: FileText },
 ];
 
+const HELP_OPTIONS = [
+  "Recipe",
+  "Outfit",
+  "Product",
+  "Travel idea",
+  "Home idea",
+  "Workout",
+  "Beauty",
+  "Business idea",
+  "Parenting",
+  "Other",
+];
+
+function getPlatform(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    if (host.includes("tiktok.com")) return "TikTok";
+    if (host.includes("instagram.com")) return "Instagram";
+    return host;
+  } catch { return ""; }
+}
+
+function isSocialVideoUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    return host.includes("tiktok.com") || host.includes("instagram.com") || /\/(reel|reels)\//i.test(parsed.pathname);
+  } catch { return false; }
+}
+
+function hasUsefulSocialMetadata(f: { title: string; description: string; image_url: string; url: string }) {
+  const platform = getPlatform(f.url).toLowerCase();
+  const title = f.title.trim().toLowerCase();
+  return !!(
+    f.description.trim().length >= 8 ||
+    (title.length >= 8 && platform && !title.includes(platform.toLowerCase()))
+  );
+}
+
 function isValidUrl(s: string): boolean {
   try {
     const u = new URL(s.trim());
@@ -76,6 +115,8 @@ function SavePage() {
     ai_summary: "",
     suggested_collection: "",
   });
+  const [help, setHelp] = useState({ contextType: "", note: "" });
+  const [saveStatus, setSaveStatus] = useState<"idle" | "organized" | "needs_info" | "uncategorized">("idle");
   const [suggestedCollections, setSuggestedCollections] = useState<string[]>([]);
   const [acceptingCollection, setAcceptingCollection] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -114,8 +155,17 @@ function SavePage() {
         type: f.type === "link" && meta.type ? meta.type : f.type,
       }));
       setMetaLoaded(true);
+      if (isSocialVideoUrl(url) && !hasUsefulSocialMetadata({
+        title: meta.title || "",
+        description: meta.description || "",
+        image_url: meta.image || "",
+        url,
+      })) {
+        setSaveStatus("needs_info");
+      }
     } catch (err: any) {
       console.warn("Metadata fetch failed", err);
+      if (isSocialVideoUrl(url)) setSaveStatus("needs_info");
     } finally {
       setFetching(false);
     }
@@ -127,7 +177,7 @@ function SavePage() {
     if (!isValidUrl(url)) return;
     let source = "";
     try { source = new URL(url).hostname.replace(/^www\./, ""); } catch {}
-    const key = JSON.stringify([url, f.title, f.description]);
+    const key = JSON.stringify([url, f.title, f.description, help.contextType, help.note]);
     if (key === lastAiKey.current) return;
     lastAiKey.current = key;
     setCategorizing(true);
@@ -137,7 +187,8 @@ function SavePage() {
           url,
           title: f.title || "",
           description: f.description || "",
-          notes: "",
+          notes: help.note,
+          contextType: help.contextType,
           source,
           existingCollections: (collections || []).map((c) => c.name),
         },
@@ -154,8 +205,12 @@ function SavePage() {
       }));
       setSuggestedCollections(ai.suggested_collections?.length ? ai.suggested_collections : (ai.suggested_collection ? [ai.suggested_collection] : []));
       setAiLoaded(true);
+      const needsHelp = isSocialVideoUrl(url) && !hasUsefulSocialMetadata(f) && !help.contextType && !help.note;
+      setSaveStatus(needsHelp ? "needs_info" : ai.category === "Uncategorized" ? "uncategorized" : "organized");
     } catch (err: any) {
       console.warn("AI categorize failed", err);
+      setForm((cur) => ({ ...cur, category: cur.category || "Uncategorized" }));
+      setSaveStatus("uncategorized");
       toast.error(err.message || "AI suggestion failed");
     } finally {
       setCategorizing(false);
@@ -166,7 +221,7 @@ function SavePage() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const url = form.url.trim();
-    if (!url) { setMetaLoaded(false); lastFetchedUrl.current = ""; return; }
+    if (!url) { setMetaLoaded(false); lastFetchedUrl.current = ""; setSaveStatus("idle"); return; }
     if (!isValidUrl(url)) return;
     if (url === lastFetchedUrl.current) return;
     debounceRef.current = setTimeout(() => { runMetaFetch(url); }, 600);
@@ -181,7 +236,7 @@ function SavePage() {
     aiDebounceRef.current = setTimeout(() => { runAi(); }, 1200);
     return () => { if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.url, form.title, form.description]);
+  }, [form.url, form.title, form.description, help.contextType, help.note]);
 
   const acceptCollection = async (rawName: string) => {
     const name = rawName.trim();
@@ -220,22 +275,26 @@ function SavePage() {
       let source: string | null = null;
       try { source = new URL(form.url).hostname.replace(/^www\./, ""); } catch {}
       const fallbackTitle = source ?? "Saved link";
+      const finalCategory = form.category || "Uncategorized";
+      const finalDescription = form.description || help.note || null;
       const { data: inserted, error } = await supabase.from("items").insert({
         user_id: user.id,
         title: form.title.trim() || fallbackTitle,
         url: form.url,
         image_url: form.image_url || null,
-        description: form.description || null,
+        description: finalDescription,
         type: form.type,
         tags,
         source,
         collection_id: form.collection_id || null,
-        category: form.category || null,
+        category: finalCategory,
         subcategory: form.subcategory || null,
         ai_summary: form.ai_summary || null,
       }).select("id").single();
       if (error) throw error;
-      toast.success("Saved to STASHd!");
+      const finalStatusMessage = finalCategory === "Uncategorized" ? "Saved as Uncategorized" : "AI organized this save";
+      if (!form.category || finalCategory === "Uncategorized") setSaveStatus("uncategorized");
+      toast.success(finalStatusMessage);
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["collection-items"] });
       if (inserted?.id) {
@@ -248,6 +307,17 @@ function SavePage() {
       toast.error(err.message);
     } finally { setBusy(false); }
   };
+
+  const hasHelp = !!help.contextType || !!help.note.trim();
+  const showHelpPrompt = isSocialVideoUrl(form.url) && !hasUsefulSocialMetadata(form) && saveStatus !== "organized" && (!hasHelp || saveStatus === "needs_info");
+  const displayStatus = showHelpPrompt && saveStatus === "idle" ? "needs_info" : saveStatus;
+  const statusMessage = displayStatus === "organized"
+    ? "AI organized this save"
+    : displayStatus === "needs_info"
+      ? "AI needs more info"
+      : displayStatus === "uncategorized"
+        ? "Saved as Uncategorized"
+        : "";
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -293,6 +363,61 @@ function SavePage() {
             )}
           </p>
         </div>
+
+        {statusMessage && (
+          <div className="flex items-center gap-2 rounded-2xl border bg-accent/40 px-4 py-3 text-sm font-semibold">
+            {displayStatus === "organized" ? <Sparkles className="h-4 w-4 text-primary" /> : <Wand2 className="h-4 w-4 text-muted-foreground" />}
+            {statusMessage}
+          </div>
+        )}
+
+        {showHelpPrompt && (
+          <div className="space-y-4 rounded-2xl border bg-card p-4 md:p-5">
+            <div>
+              <h2 className="text-base font-bold">Help STASHd understand this save</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{getPlatform(form.url) || "This"} did not provide enough details. Add a quick hint so AI can organize it.</p>
+            </div>
+            <div>
+              <Label>What is this?</Label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {HELP_OPTIONS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setHelp((cur) => ({ ...cur, contextType: option }))}
+                    className={cn(
+                      "rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                      help.contextType === option ? "border-primary bg-accent text-primary" : "bg-card text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="help-note">Optional note</Label>
+              <Textarea
+                id="help-note"
+                value={help.note}
+                onChange={(e) => setHelp((cur) => ({ ...cur, note: e.target.value }))}
+                rows={3}
+                maxLength={500}
+                className="mt-1.5"
+                placeholder="What do you want to remember about this?"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => { lastAiKey.current = ""; runAi(); }}
+              disabled={categorizing}
+              className="inline-flex items-center gap-2 rounded-full bg-brand-gradient px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-brand disabled:opacity-60"
+            >
+              {categorizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              Organize with AI
+            </button>
+          </div>
+        )}
 
         {/* AI suggestions panel */}
         {(aiLoaded || categorizing) && (

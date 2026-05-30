@@ -16,11 +16,12 @@ export type ShareSource = (typeof SHARE_SOURCES)[number];
 const CATEGORIES = [
   "Products", "Fashion", "Beauty", "Home", "Recipes", "Travel", "Fitness",
   "Parenting", "Business Ideas", "Shopping Deals", "Entertainment",
-  "Videos", "Education", "Other",
+  "Videos", "Education", "Uncategorized", "Other",
 ] as const;
 
 async function aiCategorize(input: {
   url: string; title: string; description: string; source: string;
+  notes?: string; contextType?: string;
   existingCollections: string[];
 }) {
   const key = process.env.LOVABLE_API_KEY;
@@ -30,6 +31,8 @@ async function aiCategorize(input: {
     input.source && `Source: ${input.source}`,
     input.title && `Title: ${input.title}`,
     input.description && `Description: ${input.description}`,
+    input.contextType && `User hint: ${input.contextType}`,
+    input.notes && `Notes: ${input.notes}`,
   ].filter(Boolean).join("\n");
   const collectionsHint = input.existingCollections.length
     ? `User's existing collections (prefer one if it fits): ${input.existingCollections.join(", ")}`
@@ -42,8 +45,9 @@ Categories must be one of: ${CATEGORIES.join(", ")}.
 Subcategory specific (e.g. "Dinner > Chicken"). Tags: 3-6 lowercase short tags.
 
 CRITICAL ANTI-HALLUCINATION RULES:
-- Only use facts present in the provided Title/Description/Source/URL. Never invent specific dishes, products, brands, ingredients, or topics that aren't explicitly mentioned.
-- If the provided content is empty, generic, or only a video/post ID (e.g. a bare TikTok/Instagram URL with no title or description), DO NOT guess what the content is about. Use a generic title based on the source (e.g. "TikTok video", "Instagram post") and generic tags/notes. Set summary to something neutral like "Saved from <source>".
+- Only use facts present in the provided Title/Description/Source/URL/User hint/Notes. Never invent specific dishes, products, brands, ingredients, or topics that aren't explicitly mentioned.
+- User hint and Notes are user-provided facts. Use them to choose category/subcategory/tags, but do not invent details beyond them.
+- If the provided content is empty, generic, or only a video/post ID (e.g. a bare TikTok/Instagram URL with no title or description) and there is no user hint or note, DO NOT guess what the content is about. Use category "Uncategorized", a generic title based on the source (e.g. "TikTok video", "Instagram post") and generic tags/notes. Set summary to something neutral like "Saved from <source>".
 - generated_title: clean user-facing title (max 90 chars). Prefer the exact provided Title. If only the URL is available and the slug has no human-readable words, fall back to "<Source> <type>" (e.g. "TikTok video"). Never use placeholder text like "Auto-filled".
 - Summary: one sentence, max 160 chars, grounded strictly in the provided text.
 - notes: helpful concise note (max 220 chars) based ONLY on provided text. If nothing meaningful is provided, leave it as a brief generic note about the source, never a fabricated description.
@@ -111,6 +115,9 @@ export type IngestInput = {
   description?: string | null;
   image?: string | null;
   source?: string | null;
+  note?: string | null;
+  context_type?: string | null;
+  skip_ai?: boolean | null;
   collection_id?: string | null;
   share_source: ShareSource;
 };
@@ -129,7 +136,19 @@ export type IngestResult = {
   };
   suggested_collection: string | null;
   fetched_metadata: boolean;
+  ai_status: "organized" | "needs_info" | "uncategorized";
+  needs_info: boolean;
 };
+
+function isSocialVideoUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    return host.includes("tiktok.com") || host.includes("instagram.com") || /\/(reel|reels)\//i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Ingest a shared URL: optionally fetch metadata, AI-categorize, save, embed.
@@ -142,6 +161,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   const incomingTitle = isMeaningfulMetadataValue(input.title, input.url) ? input.title!.trim() : null;
   const incomingDescription = isMeaningfulMetadataValue(input.description) ? input.description!.trim() : null;
   const incomingImage = isMeaningfulMetadataValue(input.image) ? input.image!.trim() : null;
+  const userNote = isMeaningfulMetadataValue(input.note) ? input.note!.trim() : "";
+  const contextType = isMeaningfulMetadataValue(input.context_type) ? input.context_type!.trim() : "";
   const hasMeta = !!(incomingTitle && incomingDescription && incomingImage);
   let meta: UrlMetadata | null = null;
   if (!hasMeta) {
@@ -159,12 +180,15 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     .from("collections").select("id,name").eq("user_id", input.userId);
   const existingNames = (cols ?? []).map((c) => c.name);
 
-  const ai = await aiCategorize({
+  const socialVideoNeedsInfo = isSocialVideoUrl(input.url) && !incomingTitle && !meta?.description && !userNote && !contextType;
+  const ai = input.skip_ai ? null : await aiCategorize({
     url: input.url, title, description, source,
+    notes: userNote,
+    contextType,
     existingCollections: existingNames,
   });
 
-  const category = ai?.category && (CATEGORIES as readonly string[]).includes(ai.category) ? ai.category : null;
+  const category = ai?.category && (CATEGORIES as readonly string[]).includes(ai.category) ? ai.category : "Uncategorized";
   const tags: string[] = Array.isArray(ai?.tags)
     ? ai.tags.map((t: any) => String(t).toLowerCase().replace(/^#/, "").trim()).filter(Boolean).slice(0, 8)
     : [];
@@ -177,7 +201,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   if (!incomingTitle && !meta?.title && aiTitle && isMeaningfulMetadataValue(aiTitle, input.url)) {
     title = aiTitle.slice(0, 500);
   }
-  if (!description) description = aiNotes || summary || "";
+  if (!description) description = userNote || aiNotes || summary || "";
   if (!image && meta?.image) image = meta.image;
 
   const { data: inserted, error: insErr } = await supabaseAdmin
@@ -229,6 +253,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     item: inserted as IngestResult["item"],
     suggested_collection: ai?.suggested_collection ? String(ai.suggested_collection).slice(0, 80) : null,
     fetched_metadata: !!meta,
+    ai_status: socialVideoNeedsInfo ? "needs_info" : ai && category !== "Uncategorized" ? "organized" : "uncategorized",
+    needs_info: socialVideoNeedsInfo,
   };
 }
 

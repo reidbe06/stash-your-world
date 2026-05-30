@@ -15,6 +15,7 @@ export const CATEGORIES = [
   "Entertainment",
   "Videos",
   "Education",
+  "Uncategorized",
   "Other",
 ] as const;
 
@@ -34,6 +35,7 @@ const inputSchema = z.object({
   title: z.string().max(500).optional().default(""),
   description: z.string().max(2000).optional().default(""),
   notes: z.string().max(2000).optional().default(""),
+  contextType: z.string().max(80).optional().default(""),
   source: z.string().max(200).optional().default(""),
   existingCollections: z.array(z.string().max(200)).max(50).optional().default([]),
 });
@@ -49,6 +51,7 @@ export const categorizeItem = createServerFn({ method: "POST" })
       data.source && `Source: ${data.source}`,
       data.title && `Title: ${data.title}`,
       data.description && `Description: ${data.description}`,
+      data.contextType && `User hint: ${data.contextType}`,
       data.notes && `Notes: ${data.notes}`,
     ]
       .filter(Boolean)
@@ -56,7 +59,7 @@ export const categorizeItem = createServerFn({ method: "POST" })
 
     const collectionsHint = data.existingCollections.length
       ? `User's existing collections (prefer one of these if it fits, otherwise suggest a new short name): ${data.existingCollections.join(", ")}`
-      : "User has no existing collections — suggest a short collection name.";
+: "User has no existing collections — suggest a short collection name.";
 
     const systemPrompt = `You categorize saved web items for STASHd, a social organization app.
 Always respond by calling the categorize_item tool. Be concise and specific.
@@ -66,7 +69,8 @@ Tags: 3-6 lowercase short tags, no '#'.
 
 CRITICAL ANTI-HALLUCINATION RULES:
 - Only use facts that appear in the provided Title/Description/Source/URL. Never invent specific dishes, products, brands, ingredients, recipes, or topics that are not explicitly present.
-- If the provided content is empty, generic, or only an opaque video/post ID (e.g. a bare TikTok or Instagram URL with no readable title/description), DO NOT guess what the content is about. Use a generic title based on the source (e.g. "TikTok video", "Instagram post"), generic tags, and a neutral note. Better to be vague than wrong.
+- User hint and Notes are user-provided facts. Use them to choose category/subcategory/tags, but do not invent details beyond them.
+- If the provided content is empty, generic, or only an opaque video/post ID (e.g. a bare TikTok or Instagram URL with no readable title/description) and there is no user hint or note, DO NOT guess what the content is about. Use category "Uncategorized", a generic title based on the source (e.g. "TikTok video", "Instagram post"), generic tags, and a neutral note. Better to be vague than wrong.
 - generated_title: clean user-facing item title, max 90 chars. Prefer the exact provided title. If only an opaque URL is available, fall back to "<Source> <type>" (e.g. "TikTok video"). Never say "Auto-filled".
 - Summary: one sentence, max 160 chars, grounded strictly in the provided text.
 - notes: one concise note (max 220 chars) grounded ONLY in the provided text. If nothing meaningful is provided, write a brief generic note about the source rather than fabricating details.

@@ -14,6 +14,9 @@ const InputSchema = z.object({
   description: z.string().trim().max(2000).optional().default(""),
   image: z.string().trim().max(2000).optional().nullable().default(null),
   source: z.string().trim().max(200).optional().default(""),
+  note: z.string().trim().max(2000).optional().nullable().default(null),
+  context_type: z.string().trim().max(80).optional().nullable().default(null),
+  skip_ai: z.boolean().optional().default(false),
   collection_id: z.string().uuid().nullable().optional().default(null),
 });
 
@@ -48,6 +51,9 @@ export const Route = createFileRoute("/api/public/extension/save")({
             description: payload.description || null,
             image: payload.image || null,
             source: payload.source || null,
+            note: payload.note || null,
+            context_type: payload.context_type || null,
+            skip_ai: payload.skip_ai,
             collection_id: payload.collection_id,
             share_source: "extension",
           });
