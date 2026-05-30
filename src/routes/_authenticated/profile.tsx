@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { LogOut, Mail, Bell, Lock, HelpCircle, ChevronRight, Sparkles } from "lucide-react";
+import { LogOut, Mail, Bell, Lock, HelpCircle, ChevronRight, Sparkles, Chrome, Download } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -56,6 +56,8 @@ function Profile() {
         </Link>
       </div>
 
+      <ChromeExtensionCard />
+
       <div>
         <h2 className="mb-2 px-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Settings</h2>
         <div className="overflow-hidden rounded-2xl border bg-card shadow-card">
@@ -84,6 +86,58 @@ function Profile() {
       >
         <LogOut className="h-4 w-4" /> Sign out
       </button>
+    </div>
+  );
+}
+
+function ChromeExtensionCard() {
+  const handleDownload = () => {
+    fetch("/save-to-stashd.zip")
+      .then((res) => {
+        if (!res.ok) throw new Error(`Download failed (${res.status})`);
+        return res.blob();
+      })
+      .then((blob) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "save-to-stashd.zip";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+      })
+      .catch((err) => alert(err.message));
+  };
+
+  return (
+    <div className="rounded-3xl border bg-card p-6 shadow-card">
+      <div className="flex items-start gap-4">
+        <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-brand-gradient text-primary-foreground shadow-brand">
+          <Chrome className="h-6 w-6" />
+        </span>
+        <div className="flex-1">
+          <h2 className="text-base font-bold">Save to STASHd — Chrome Extension</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Save any page in one click. Auto-captures the title, image, description, and runs AI categorization.
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={handleDownload}
+        className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-gradient py-3 text-sm font-semibold text-primary-foreground shadow-brand"
+      >
+        <Download className="h-4 w-4" /> Download extension
+      </button>
+      <details className="mt-3 text-xs text-muted-foreground">
+        <summary className="cursor-pointer font-medium text-foreground">How to install</summary>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>Unzip the downloaded file.</li>
+          <li>Open <code className="rounded bg-accent px-1 py-0.5">chrome://extensions</code> in Chrome.</li>
+          <li>Enable <strong>Developer mode</strong> (top-right).</li>
+          <li>Click <strong>Load unpacked</strong> and select the unzipped folder.</li>
+          <li>Pin the extension and sign in with your STASHd account.</li>
+        </ol>
+      </details>
     </div>
   );
 }

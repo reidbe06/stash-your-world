@@ -20,6 +20,8 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
 import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
 import { Route as AuthenticatedCollectionsIdRouteImport } from './routes/_authenticated/collections.$id'
+import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/extension.save'
+import { Route as ApiPublicExtensionCollectionsRouteImport } from './routes/api/public/extension.collections'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -77,6 +79,17 @@ const AuthenticatedCollectionsIdRoute =
     path: '/$id',
     getParentRoute: () => AuthenticatedCollectionsRoute,
   } as any)
+const ApiPublicExtensionSaveRoute = ApiPublicExtensionSaveRouteImport.update({
+  id: '/api/public/extension/save',
+  path: '/api/public/extension/save',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicExtensionCollectionsRoute =
+  ApiPublicExtensionCollectionsRouteImport.update({
+    id: '/api/public/extension/collections',
+    path: '/api/public/extension/collections',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -89,6 +102,8 @@ export interface FileRoutesByFullPath {
   '/search': typeof AuthenticatedSearchRoute
   '/share/$slug': typeof ShareSlugRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
+  '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
+  '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -101,6 +116,8 @@ export interface FileRoutesByTo {
   '/search': typeof AuthenticatedSearchRoute
   '/share/$slug': typeof ShareSlugRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
+  '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
+  '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -115,6 +132,8 @@ export interface FileRoutesById {
   '/_authenticated/search': typeof AuthenticatedSearchRoute
   '/share/$slug': typeof ShareSlugRoute
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
+  '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
+  '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -129,6 +148,8 @@ export interface FileRouteTypes {
     | '/search'
     | '/share/$slug'
     | '/collections/$id'
+    | '/api/public/extension/collections'
+    | '/api/public/extension/save'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -141,6 +162,8 @@ export interface FileRouteTypes {
     | '/search'
     | '/share/$slug'
     | '/collections/$id'
+    | '/api/public/extension/collections'
+    | '/api/public/extension/save'
   id:
     | '__root__'
     | '/'
@@ -154,6 +177,8 @@ export interface FileRouteTypes {
     | '/_authenticated/search'
     | '/share/$slug'
     | '/_authenticated/collections/$id'
+    | '/api/public/extension/collections'
+    | '/api/public/extension/save'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -161,6 +186,8 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
   ShareSlugRoute: typeof ShareSlugRoute
+  ApiPublicExtensionCollectionsRoute: typeof ApiPublicExtensionCollectionsRoute
+  ApiPublicExtensionSaveRoute: typeof ApiPublicExtensionSaveRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -242,6 +269,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCollectionsIdRouteImport
       parentRoute: typeof AuthenticatedCollectionsRoute
     }
+    '/api/public/extension/save': {
+      id: '/api/public/extension/save'
+      path: '/api/public/extension/save'
+      fullPath: '/api/public/extension/save'
+      preLoaderRoute: typeof ApiPublicExtensionSaveRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/extension/collections': {
+      id: '/api/public/extension/collections'
+      path: '/api/public/extension/collections'
+      fullPath: '/api/public/extension/collections'
+      preLoaderRoute: typeof ApiPublicExtensionCollectionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -286,6 +327,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
   ShareSlugRoute: ShareSlugRoute,
+  ApiPublicExtensionCollectionsRoute: ApiPublicExtensionCollectionsRoute,
+  ApiPublicExtensionSaveRoute: ApiPublicExtensionSaveRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
