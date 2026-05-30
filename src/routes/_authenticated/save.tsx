@@ -116,6 +116,8 @@ function SavePage() {
     ai_summary: "",
     suggested_collection: "",
   });
+  const [help, setHelp] = useState({ contextType: "", note: "" });
+  const [saveStatus, setSaveStatus] = useState<"idle" | "organized" | "needs_info" | "uncategorized">("idle");
   const [suggestedCollections, setSuggestedCollections] = useState<string[]>([]);
   const [acceptingCollection, setAcceptingCollection] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -167,7 +169,7 @@ function SavePage() {
     if (!isValidUrl(url)) return;
     let source = "";
     try { source = new URL(url).hostname.replace(/^www\./, ""); } catch {}
-    const key = JSON.stringify([url, f.title, f.description]);
+    const key = JSON.stringify([url, f.title, f.description, help.contextType, help.note]);
     if (key === lastAiKey.current) return;
     lastAiKey.current = key;
     setCategorizing(true);
@@ -177,7 +179,8 @@ function SavePage() {
           url,
           title: f.title || "",
           description: f.description || "",
-          notes: "",
+          notes: help.note,
+          contextType: help.contextType,
           source,
           existingCollections: (collections || []).map((c) => c.name),
         },
@@ -194,8 +197,11 @@ function SavePage() {
       }));
       setSuggestedCollections(ai.suggested_collections?.length ? ai.suggested_collections : (ai.suggested_collection ? [ai.suggested_collection] : []));
       setAiLoaded(true);
+      setSaveStatus(ai.category === "Uncategorized" ? "uncategorized" : "organized");
     } catch (err: any) {
       console.warn("AI categorize failed", err);
+      setForm((cur) => ({ ...cur, category: cur.category || "Uncategorized" }));
+      setSaveStatus("uncategorized");
       toast.error(err.message || "AI suggestion failed");
     } finally {
       setCategorizing(false);
@@ -221,7 +227,7 @@ function SavePage() {
     aiDebounceRef.current = setTimeout(() => { runAi(); }, 1200);
     return () => { if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.url, form.title, form.description]);
+  }, [form.url, form.title, form.description, help.contextType, help.note]);
 
   const acceptCollection = async (rawName: string) => {
     const name = rawName.trim();
