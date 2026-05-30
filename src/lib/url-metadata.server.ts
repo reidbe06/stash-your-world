@@ -58,23 +58,20 @@ export function bestTitleFromUrl(rawUrl: string): string | null {
       .split("/")
       .map((part) => decodeURIComponent(part).trim())
       .filter(Boolean);
+    const isSkippable = (segment: string) =>
+      /^\d{4,}$/.test(segment) ||
+      /^[a-f0-9-]{16,}$/i.test(segment) ||
+      /^(dp|gp|pin|reel|reels|video|videos|watch|shorts|status|ip|product|products|p|item|items|article|articles|post|posts|recipe|recipes|story|stories|news|blog|page|pages|en|us|en-us|index)$/i.test(segment);
     const productMarker = parts.findIndex((part) => ["ip", "product", "products", "p", "item"].includes(part.toLowerCase()));
-    const candidates = productMarker >= 0 ? parts.slice(productMarker + 1) : parts;
-    for (const segment of candidates) {
-      if (/^\d{4,}$/.test(segment) || /^[a-f0-9-]{16,}$/i.test(segment)) continue;
-      if (/^(dp|gp|pin|reel|reels|video|watch|shorts|status)$/i.test(segment)) continue;
-      const cleaned = segment
-        .replace(/\.[a-z0-9]{2,5}$/i, "")
-        .replace(/[+_-]+/g, " ")
-        .replace(/([a-z])([A-Z])/g, "$1 $2")
-        .replace(/\b\d{5,}\b/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-      if (cleaned.length >= 4 && /[a-z]/i.test(cleaned)) {
-        return cleaned === cleaned.toLowerCase() ? titleCase(cleaned) : cleaned;
-      }
-    }
-    return null;
+    const ordered = (productMarker >= 0 ? parts.slice(productMarker + 1) : parts).filter((segment) => !isSkippable(segment));
+    // Prefer the longest segment that looks like a slug (has separators or multiple words).
+    const ranked = ordered
+      .map((segment) => segment.replace(/\.[a-z0-9]{2,5}$/i, "").replace(/[+_-]+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\b\d{5,}\b/g, "").replace(/\s+/g, " ").trim())
+      .filter((s) => s.length >= 4 && /[a-z]/i.test(s));
+    ranked.sort((a, b) => b.length - a.length);
+    const top = ranked[0];
+    if (!top) return null;
+    return top === top.toLowerCase() ? titleCase(top) : top;
   } catch {
     return null;
   }
