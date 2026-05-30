@@ -3,12 +3,12 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-const EMBED_MODEL = "openai/text-embedding-3-small"; // 1536 dims
+const EMBED_MODEL = "text-embedding-3-small"; // 1536 dims
 
 async function embedText(text: string): Promise<number[]> {
-  const key = process.env.LOVABLE_API_KEY;
-  if (!key) throw new Error("LOVABLE_API_KEY not configured");
-  const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("OPENAI_API_KEY not configured");
+  const res = await fetch("https://api.openai.com/v1/embeddings", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model: EMBED_MODEL, input: text.slice(0, 8000) }),

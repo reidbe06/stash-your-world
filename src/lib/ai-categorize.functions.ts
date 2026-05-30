@@ -43,8 +43,8 @@ const inputSchema = z.object({
 export const categorizeItem = createServerFn({ method: "POST" })
   .inputValidator((input) => inputSchema.parse(input))
   .handler(async ({ data }): Promise<AiCategorization> => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("LOVABLE_API_KEY not configured");
+    const key = process.env.OPENAI_API_KEY;
+    if (!key) throw new Error("OPENAI_API_KEY not configured");
 
     const content = [
       data.url && `URL: ${data.url}`,
@@ -79,7 +79,7 @@ CRITICAL ANTI-HALLUCINATION RULES:
 ${collectionsHint}`;
 
     const body = {
-      model: "google/gemini-3-flash-preview",
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: content || "No content provided. Use the URL only." },
@@ -111,7 +111,7 @@ ${collectionsHint}`;
       tool_choice: { type: "function", function: { name: "categorize_item" } },
     };
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
@@ -121,8 +121,9 @@ ${collectionsHint}`;
     });
 
     if (!res.ok) {
-      if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
-      if (res.status === 402) throw new Error("AI credits exhausted. Add credits in workspace settings.");
+      if (res.status === 429) throw new Error("OpenAI rate limit reached. Try again in a moment.");
+      if (res.status === 401) throw new Error("OpenAI API key is invalid. Check your OPENAI_API_KEY secret.");
+      if (res.status === 402) throw new Error("OpenAI credits exhausted. Add credits at platform.openai.com.");
       const txt = await res.text();
       console.error("AI gateway error", res.status, txt);
       throw new Error("AI categorization failed");

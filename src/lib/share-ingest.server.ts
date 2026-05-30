@@ -94,7 +94,7 @@ async function aiCategorize(input: {
   notes?: string; contextType?: string;
   existingCollections: string[];
 }) {
-  const key = process.env.LOVABLE_API_KEY;
+  const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
   const content = [
     input.url && `URL: ${input.url}`,
@@ -112,7 +112,7 @@ async function aiCategorize(input: {
     ? `User's existing collections (prefer one if it fits): ${input.existingCollections.join(", ")}`
     : "User has no existing collections — suggest a short name.";
   const body = {
-    model: "google/gemini-3-flash-preview",
+    model: "gpt-4o-mini",
     messages: [
       { role: "system", content: `You categorize saved web/video items for STASHd.
 Categories must be one of: ${CATEGORIES.join(", ")}.
@@ -175,7 +175,7 @@ ${collectionsHint}` },
     tool_choice: { type: "function", function: { name: "categorize_item" } },
   };
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -191,13 +191,13 @@ ${collectionsHint}` },
 }
 
 async function embed(text: string): Promise<number[] | null> {
-  const key = process.env.LOVABLE_API_KEY;
+  const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
+    const res = await fetch("https://api.openai.com/v1/embeddings", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "openai/text-embedding-3-small", input: text.slice(0, 8000) }),
+      body: JSON.stringify({ model: "text-embedding-3-small", input: text.slice(0, 8000) }),
     });
     if (!res.ok) return null;
     const json = await res.json();
