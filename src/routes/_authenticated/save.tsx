@@ -156,6 +156,14 @@ function SavePage() {
         type: f.type === "link" && meta.type ? meta.type : f.type,
       }));
       setMetaLoaded(true);
+      if (isSocialVideoUrl(url) && !hasUsefulSocialMetadata({
+        title: meta.title || "",
+        description: meta.description || "",
+        image_url: meta.image || "",
+        url,
+      })) {
+        setSaveStatus("needs_info");
+      }
     } catch (err: any) {
       console.warn("Metadata fetch failed", err);
     } finally {
@@ -212,7 +220,7 @@ function SavePage() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const url = form.url.trim();
-    if (!url) { setMetaLoaded(false); lastFetchedUrl.current = ""; return; }
+    if (!url) { setMetaLoaded(false); lastFetchedUrl.current = ""; setSaveStatus("idle"); return; }
     if (!isValidUrl(url)) return;
     if (url === lastFetchedUrl.current) return;
     debounceRef.current = setTimeout(() => { runMetaFetch(url); }, 600);
