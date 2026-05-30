@@ -305,6 +305,33 @@ function absolutizeImage(image: string | null | undefined, target: URL): string 
   try { return new URL(image, target).toString(); } catch { return null; }
 }
 
+// Sites that block cloud-server scraping — use image search as fallback for these.
+const SCRAPER_BLOCKED_HOSTS = new Set(["bestbuy.com", "costco.com", "samsclub.com"]);
+
+// When a product page can't be scraped, search DuckDuckGo Images for the product title
+// and return the first result. Two-step: get vqd token, then hit the JSON image endpoint.
+async function tryImageSearch(query: string): Promise<string | null> {
+  try {
+    const ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+    const searchRes = await fetch(`https://duckduckgo.com/?q=${encodeURIComponent(query)}&ia=images&iax=images`, {
+      headers: { "User-Agent": ua },
+      signal: AbortSignal.timeout(8000),
+    });
+    const html = await searchRes.text();
+    const vqdMatch = html.match(/vqd[=:]['"]([^'"]+)['"]/);
+    if (!vqdMatch) return null;
+
+    const imgRes = await fetch(`https://duckduckgo.com/i.js?q=${encodeURIComponent(query)}&o=json&s=0&u=bing&f=,,,,,&l=us-en&vqd=${vqdMatch[1]}`, {
+      headers: { "User-Agent": ua, Referer: "https://duckduckgo.com/" },
+      signal: AbortSignal.timeout(8000),
+    });
+    const json = await imgRes.json() as any;
+    return (json.results?.[0]?.image as string) || null;
+  } catch {
+    return null;
+  }
+}
+
 // For retailers whose scrapers are blocked but whose image CDNs follow predictable patterns,
 // construct the product image URL directly from the page URL.
 // Returns null if the CDN URL resolves to a placeholder/error image rather than a real photo.
@@ -404,9 +431,15 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
     }
   }
 
-  // Last resort: site-specific CDN image patterns for retailers whose scrapers
-  // are blocked but whose product image URLs are predictable from the page URL.
-  if (!result.image) {
+  // For known-blocked hosts: try CDN pattern first, then image search by title.
+  if (!result.image && SCRAPER_BLOCKED_HOSTS.has(hostSource)) {
+    result.image = await tryKnownCdnImage(target);
+    if (!result.image) {
+      const titleForSearch = result.title || bestTitleFromUrl(target.toString());
+      if (titleForSearch) result.image = await tryImageSearch(titleForSearch);
+    }
+  } else if (!result.image) {
+    // Non-blocked host: still try CDN pattern (may help other retailers in future)
     result.image = await tryKnownCdnImage(target);
   }
 
