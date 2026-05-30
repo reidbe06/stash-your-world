@@ -150,6 +150,7 @@ function SavePage() {
         suggested_collection: cur.suggested_collection || ai.suggested_collection,
         tags: cur.tags?.trim() ? cur.tags : ai.tags.join(", "),
       }));
+      setSuggestedCollections(ai.suggested_collections?.length ? ai.suggested_collections : (ai.suggested_collection ? [ai.suggested_collection] : []));
       setAiLoaded(true);
     } catch (err: any) {
       console.warn("AI categorize failed", err);
