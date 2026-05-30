@@ -277,12 +277,13 @@ function SavePage() {
       try { source = new URL(form.url).hostname.replace(/^www\./, ""); } catch {}
       const fallbackTitle = source ?? "Saved link";
       const finalCategory = form.category || "Uncategorized";
+      const finalDescription = form.description || help.note || null;
       const { data: inserted, error } = await supabase.from("items").insert({
         user_id: user.id,
         title: form.title.trim() || fallbackTitle,
         url: form.url,
         image_url: form.image_url || null,
-        description: form.description || null,
+        description: finalDescription,
         type: form.type,
         tags,
         source,
