@@ -293,8 +293,9 @@ function SavePage() {
         ai_summary: form.ai_summary || null,
       }).select("id").single();
       if (error) throw error;
+      const finalStatusMessage = finalCategory === "Uncategorized" ? "Saved as Uncategorized" : "AI organized this save";
       if (!form.category || finalCategory === "Uncategorized") setSaveStatus("uncategorized");
-      toast.success("Saved to STASHd!");
+      toast.success(finalStatusMessage);
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["collection-items"] });
       if (inserted?.id) {
