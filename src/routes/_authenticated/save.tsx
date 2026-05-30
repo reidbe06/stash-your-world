@@ -47,6 +47,46 @@ const TYPES: { key: string; label: string; icon: LucideIcon }[] = [
   { key: "article", label: "Article", icon: FileText },
 ];
 
+const HELP_OPTIONS = [
+  "Recipe",
+  "Outfit",
+  "Product",
+  "Travel idea",
+  "Home idea",
+  "Workout",
+  "Beauty",
+  "Business idea",
+  "Parenting",
+  "Other",
+];
+
+function getPlatform(url: string): string {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "").toLowerCase();
+    if (host.includes("tiktok.com")) return "TikTok";
+    if (host.includes("instagram.com")) return "Instagram";
+    return host;
+  } catch { return ""; }
+}
+
+function isSocialVideoUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+    return host.includes("tiktok.com") || host.includes("instagram.com") || /\/(reel|reels)\//i.test(parsed.pathname);
+  } catch { return false; }
+}
+
+function hasUsefulSocialMetadata(f: { title: string; description: string; image_url: string; url: string }) {
+  const platform = getPlatform(f.url).toLowerCase();
+  const title = f.title.trim().toLowerCase();
+  return !!(
+    f.description.trim().length >= 8 ||
+    (title.length >= 8 && platform && !title.includes(platform.toLowerCase())) ||
+    (f.image_url && !f.image_url.includes("google.com/s2/favicons"))
+  );
+}
+
 function isValidUrl(s: string): boolean {
   try {
     const u = new URL(s.trim());
