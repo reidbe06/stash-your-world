@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useNavigate, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Home, Search, Library, User as UserIcon, Plus, LogOut, Sparkles } from "lucide-react";
+import { Home, Search, Library, Plus, LogOut, Sparkles } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Logo } from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +15,6 @@ const navItems = [
   { to: "/search", icon: Search, label: "Search" },
   { to: "/ask", icon: Sparkles, label: "Ask" },
   { to: "/collections", icon: Library, label: "Collections" },
-  { to: "/profile", icon: UserIcon, label: "Profile" },
 ] as const;
 
 function AuthedLayout() {
