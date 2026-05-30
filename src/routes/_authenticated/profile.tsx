@@ -4,6 +4,7 @@ import { LogOut, Mail, Bell, Lock, HelpCircle, ChevronRight, Sparkles, Chrome, D
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { AvatarUploader } from "@/components/AvatarUploader";
 
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({ meta: [{ title: "Profile & Settings — STASHd" }] }),
