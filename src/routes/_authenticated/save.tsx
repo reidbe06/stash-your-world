@@ -350,17 +350,48 @@ function SavePage() {
               />
             </div>
 
-            {form.suggested_collection && (
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Suggested collection:</span>
-                <span className="rounded-full bg-card border px-3 py-1 text-xs font-semibold">{form.suggested_collection}</span>
-                <button
-                  type="button"
-                  onClick={applySuggestedCollection}
-                  className="text-xs font-semibold text-primary hover:underline"
-                >
-                  Use it
-                </button>
+            {suggestedCollections.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground">Suggested collections</span>
+                  <span className="text-[10px] text-muted-foreground">One-click to add</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {suggestedCollections.map((name) => {
+                    const existing = collections?.find((c) => c.name.toLowerCase() === name.toLowerCase());
+                    const isSelected = !!existing && form.collection_id === existing.id;
+                    const isBusy = acceptingCollection === name;
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => acceptCollection(name)}
+                        disabled={isBusy || isSelected}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                          isSelected
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "bg-card hover:border-primary hover:text-primary",
+                          isBusy && "opacity-60",
+                        )}
+                      >
+                        {isBusy ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : isSelected ? (
+                          <Check className="h-3 w-3" />
+                        ) : existing ? (
+                          <Bookmark className="h-3 w-3" />
+                        ) : (
+                          <Plus className="h-3 w-3" />
+                        )}
+                        {name}
+                        {!existing && !isSelected && (
+                          <span className="ml-1 text-[10px] font-normal opacity-70">new</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
