@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShareSlugRouteImport } from './routes/share.$slug'
+import { Route as AuthenticatedShareRouteImport } from './routes/_authenticated/share'
 import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
 import { Route as AuthenticatedSaveRouteImport } from './routes/_authenticated/save'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
@@ -42,6 +43,11 @@ const ShareSlugRoute = ShareSlugRouteImport.update({
   id: '/share/$slug',
   path: '/share/$slug',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedShareRoute = AuthenticatedShareRouteImport.update({
+  id: '/share',
+  path: '/share',
+  getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedSearchRoute = AuthenticatedSearchRouteImport.update({
   id: '/search',
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthenticatedProfileRoute
   '/save': typeof AuthenticatedSaveRoute
   '/search': typeof AuthenticatedSearchRoute
+  '/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -121,6 +128,7 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthenticatedProfileRoute
   '/save': typeof AuthenticatedSaveRoute
   '/search': typeof AuthenticatedSearchRoute
+  '/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -138,6 +146,7 @@ export interface FileRoutesById {
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/save': typeof AuthenticatedSaveRoute
   '/_authenticated/search': typeof AuthenticatedSearchRoute
+  '/_authenticated/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/save'
     | '/search'
+    | '/share'
     | '/share/$slug'
     | '/collections/$id'
     | '/api/public/extension/collections'
@@ -170,6 +180,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/save'
     | '/search'
+    | '/share'
     | '/share/$slug'
     | '/collections/$id'
     | '/api/public/extension/collections'
@@ -186,6 +197,7 @@ export interface FileRouteTypes {
     | '/_authenticated/profile'
     | '/_authenticated/save'
     | '/_authenticated/search'
+    | '/_authenticated/share'
     | '/share/$slug'
     | '/_authenticated/collections/$id'
     | '/api/public/extension/collections'
@@ -232,6 +244,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/share/$slug'
       preLoaderRoute: typeof ShareSlugRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/share': {
+      id: '/_authenticated/share'
+      path: '/share'
+      fullPath: '/share'
+      preLoaderRoute: typeof AuthenticatedShareRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/search': {
       id: '/_authenticated/search'
@@ -327,6 +346,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedSaveRoute: typeof AuthenticatedSaveRoute
   AuthenticatedSearchRoute: typeof AuthenticatedSearchRoute
+  AuthenticatedShareRoute: typeof AuthenticatedShareRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -336,6 +356,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedSaveRoute: AuthenticatedSaveRoute,
   AuthenticatedSearchRoute: AuthenticatedSearchRoute,
+  AuthenticatedShareRoute: AuthenticatedShareRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
