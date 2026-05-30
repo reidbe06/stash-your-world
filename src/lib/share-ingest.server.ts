@@ -16,11 +16,12 @@ export type ShareSource = (typeof SHARE_SOURCES)[number];
 const CATEGORIES = [
   "Products", "Fashion", "Beauty", "Home", "Recipes", "Travel", "Fitness",
   "Parenting", "Business Ideas", "Shopping Deals", "Entertainment",
-  "Videos", "Education", "Other",
+  "Videos", "Education", "Uncategorized", "Other",
 ] as const;
 
 async function aiCategorize(input: {
   url: string; title: string; description: string; source: string;
+  notes?: string; contextType?: string;
   existingCollections: string[];
 }) {
   const key = process.env.LOVABLE_API_KEY;
@@ -30,6 +31,8 @@ async function aiCategorize(input: {
     input.source && `Source: ${input.source}`,
     input.title && `Title: ${input.title}`,
     input.description && `Description: ${input.description}`,
+    input.contextType && `User hint: ${input.contextType}`,
+    input.notes && `Notes: ${input.notes}`,
   ].filter(Boolean).join("\n");
   const collectionsHint = input.existingCollections.length
     ? `User's existing collections (prefer one if it fits): ${input.existingCollections.join(", ")}`
@@ -42,8 +45,9 @@ Categories must be one of: ${CATEGORIES.join(", ")}.
 Subcategory specific (e.g. "Dinner > Chicken"). Tags: 3-6 lowercase short tags.
 
 CRITICAL ANTI-HALLUCINATION RULES:
-- Only use facts present in the provided Title/Description/Source/URL. Never invent specific dishes, products, brands, ingredients, or topics that aren't explicitly mentioned.
-- If the provided content is empty, generic, or only a video/post ID (e.g. a bare TikTok/Instagram URL with no title or description), DO NOT guess what the content is about. Use a generic title based on the source (e.g. "TikTok video", "Instagram post") and generic tags/notes. Set summary to something neutral like "Saved from <source>".
+- Only use facts present in the provided Title/Description/Source/URL/User hint/Notes. Never invent specific dishes, products, brands, ingredients, or topics that aren't explicitly mentioned.
+- User hint and Notes are user-provided facts. Use them to choose category/subcategory/tags, but do not invent details beyond them.
+- If the provided content is empty, generic, or only a video/post ID (e.g. a bare TikTok/Instagram URL with no title or description) and there is no user hint or note, DO NOT guess what the content is about. Use category "Uncategorized", a generic title based on the source (e.g. "TikTok video", "Instagram post") and generic tags/notes. Set summary to something neutral like "Saved from <source>".
 - generated_title: clean user-facing title (max 90 chars). Prefer the exact provided Title. If only the URL is available and the slug has no human-readable words, fall back to "<Source> <type>" (e.g. "TikTok video"). Never use placeholder text like "Auto-filled".
 - Summary: one sentence, max 160 chars, grounded strictly in the provided text.
 - notes: helpful concise note (max 220 chars) based ONLY on provided text. If nothing meaningful is provided, leave it as a brief generic note about the source, never a fabricated description.
