@@ -61,6 +61,7 @@ export type Database = {
           embedding_updated_at: string | null
           id: string
           image_url: string | null
+          share_source: string
           source: string | null
           subcategory: string | null
           tags: string[]
@@ -80,6 +81,7 @@ export type Database = {
           embedding_updated_at?: string | null
           id?: string
           image_url?: string | null
+          share_source?: string
           source?: string | null
           subcategory?: string | null
           tags?: string[]
@@ -99,6 +101,7 @@ export type Database = {
           embedding_updated_at?: string | null
           id?: string
           image_url?: string | null
+          share_source?: string
           source?: string | null
           subcategory?: string | null
           tags?: string[]

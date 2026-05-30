@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { LogOut, Mail, Bell, Lock, HelpCircle, ChevronRight, Sparkles, Chrome, Download } from "lucide-react";
+import { LogOut, Mail, Bell, Lock, HelpCircle, ChevronRight, Sparkles, Chrome, Download, Share2, Smartphone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -57,6 +57,7 @@ function Profile() {
       </div>
 
       <ChromeExtensionCard />
+      <MobileShareCard />
 
       <div>
         <h2 className="mb-2 px-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Settings</h2>
@@ -136,6 +137,46 @@ function ChromeExtensionCard() {
           <li>Enable <strong>Developer mode</strong> (top-right).</li>
           <li>Click <strong>Load unpacked</strong> and select the unzipped folder.</li>
           <li>Pin the extension and sign in with your STASHd account.</li>
+        </ol>
+      </details>
+    </div>
+  );
+}
+
+function MobileShareCard() {
+  return (
+    <div className="rounded-3xl border bg-card p-6 shadow-card">
+      <div className="flex items-start gap-4">
+        <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-brand-gradient text-primary-foreground shadow-brand">
+          <Share2 className="h-6 w-6" />
+        </span>
+        <div className="flex-1">
+          <h2 className="text-base font-bold">Share to STASHd — Mobile</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Tap Share in Instagram, TikTok, Pinterest, YouTube, Safari or Chrome and send the link straight to STASHd. AI handles the rest.
+          </p>
+        </div>
+      </div>
+
+      <details className="mt-4 text-xs text-muted-foreground" open>
+        <summary className="cursor-pointer text-sm font-semibold text-foreground">
+          <Smartphone className="mr-1 inline h-4 w-4" /> Android &amp; Chrome
+        </summary>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>Open STASHd in Chrome on your phone.</li>
+          <li>Tap the menu and choose <strong>Install app</strong> / <strong>Add to Home screen</strong>.</li>
+          <li>From any app, tap <strong>Share</strong> → pick <strong>STASHd</strong>. We save and categorize instantly.</li>
+        </ol>
+      </details>
+
+      <details className="mt-3 text-xs text-muted-foreground">
+        <summary className="cursor-pointer text-sm font-semibold text-foreground">
+          <Smartphone className="mr-1 inline h-4 w-4" /> iPhone &amp; iPad
+        </summary>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>Open STASHd in Safari and tap <strong>Share → Add to Home Screen</strong>.</li>
+          <li>From any app, tap <strong>Share → Copy</strong>, then open STASHd and tap <strong>Paste link</strong>.</li>
+          <li>Or set up an iOS Shortcut that POSTs to your STASHd share API for true one-tap saving.</li>
         </ol>
       </details>
     </div>
