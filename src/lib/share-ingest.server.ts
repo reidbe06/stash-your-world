@@ -40,7 +40,10 @@ async function aiCategorize(input: {
       { role: "system", content: `You categorize saved web items for STASHd.
 Categories must be one of: ${CATEGORIES.join(", ")}.
 Subcategory specific (e.g. "Dinner > Chicken"). Tags: 3-6 lowercase short tags.
-Summary: one sentence, max 160 chars. suggested_collection: 2-4 words.
+generated_title: clean user-facing title (max 90 chars), inferred from the URL/content when metadata is missing. Never use placeholder text like "Auto-filled".
+Summary: one sentence, max 160 chars.
+notes: helpful concise note about the item (max 220 chars). Never placeholder text.
+suggested_collection: 2-4 words.
 ${collectionsHint}` },
       { role: "user", content: content || "No content. Use URL only." },
     ],
@@ -52,12 +55,14 @@ ${collectionsHint}` },
           type: "object",
           properties: {
             category: { type: "string", enum: [...CATEGORIES] },
+            generated_title: { type: "string" },
             subcategory: { type: "string" },
             tags: { type: "array", items: { type: "string" } },
             summary: { type: "string" },
+            notes: { type: "string" },
             suggested_collection: { type: "string" },
           },
-          required: ["category", "subcategory", "tags", "summary", "suggested_collection"],
+          required: ["category", "generated_title", "subcategory", "tags", "summary", "notes", "suggested_collection"],
         },
       },
     }],
