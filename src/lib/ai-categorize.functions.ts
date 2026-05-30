@@ -63,11 +63,15 @@ Always respond by calling the categorize_item tool. Be concise and specific.
 Categories must be exactly one of: ${CATEGORIES.join(", ")}.
 Subcategory should be specific (e.g. "Dinner > Chicken", "Women's Clothing > Casual", "Home Decor", "Strength Training").
 Tags: 3-6 lowercase short tags, no '#'.
-generated_title: a clean user-facing item title, max 90 chars. Prefer the actual product/post/article/recipe title; if metadata is missing, infer from the URL slug without saying "Auto-filled".
-Summary: one sentence, max 160 chars.
-notes: one useful concise note for the saved item, max 220 chars. Never return placeholder text.
-suggested_collection: the single best short title (2-4 words) for organizing this item.
-suggested_collections: 3 short collection names (2-4 words each) the user could file this under. Prefer reusing the user's existing collections when they fit; otherwise propose new ones. Examples — Recipes: "Dinner Ideas", "Healthy Meals", "Chicken Recipes". Fashion: "Summer Outfits", "Work Clothes", "Date Night Looks". Home: "Living Room Ideas", "Kitchen Remodel", "Organization". Order from best fit to alternative. The first entry should match suggested_collection.
+
+CRITICAL ANTI-HALLUCINATION RULES:
+- Only use facts that appear in the provided Title/Description/Source/URL. Never invent specific dishes, products, brands, ingredients, recipes, or topics that are not explicitly present.
+- If the provided content is empty, generic, or only an opaque video/post ID (e.g. a bare TikTok or Instagram URL with no readable title/description), DO NOT guess what the content is about. Use a generic title based on the source (e.g. "TikTok video", "Instagram post"), generic tags, and a neutral note. Better to be vague than wrong.
+- generated_title: clean user-facing item title, max 90 chars. Prefer the exact provided title. If only an opaque URL is available, fall back to "<Source> <type>" (e.g. "TikTok video"). Never say "Auto-filled".
+- Summary: one sentence, max 160 chars, grounded strictly in the provided text.
+- notes: one concise note (max 220 chars) grounded ONLY in the provided text. If nothing meaningful is provided, write a brief generic note about the source rather than fabricating details.
+- suggested_collection: single best short title (2-4 words) for organizing this item.
+- suggested_collections: 3 short collection names (2-4 words each). Prefer reusing the user's existing collections when they fit. Order from best fit to alternative. The first entry should match suggested_collection.
 ${collectionsHint}`;
 
     const body = {
