@@ -4,7 +4,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Link2, UtensilsCrossed, Video, ShoppingBag, Shirt, Lightbulb, FileText, Bookmark, ImageIcon, Loader2, Sparkles, Wand2 } from "lucide-react";
+import { ArrowLeft, Link2, UtensilsCrossed, Video, ShoppingBag, Shirt, Lightbulb, FileText, Bookmark, ImageIcon, Loader2, Sparkles, Wand2, Plus, Check } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -76,6 +76,8 @@ function SavePage() {
     ai_summary: "",
     suggested_collection: "",
   });
+  const [suggestedCollections, setSuggestedCollections] = useState<string[]>([]);
+  const [acceptingCollection, setAcceptingCollection] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [fetching, setFetching] = useState(false);
   const [categorizing, setCategorizing] = useState(false);
@@ -148,6 +150,7 @@ function SavePage() {
         suggested_collection: cur.suggested_collection || ai.suggested_collection,
         tags: cur.tags?.trim() ? cur.tags : ai.tags.join(", "),
       }));
+      setSuggestedCollections(ai.suggested_collections?.length ? ai.suggested_collections : (ai.suggested_collection ? [ai.suggested_collection] : []));
       setAiLoaded(true);
     } catch (err: any) {
       console.warn("AI categorize failed", err);
@@ -178,25 +181,31 @@ function SavePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.url, form.title, form.description]);
 
-  const applySuggestedCollection = async () => {
-    const name = form.suggested_collection.trim();
+  const acceptCollection = async (rawName: string) => {
+    const name = rawName.trim();
     if (!name || !user) return;
-    const existing = collections?.find((c) => c.name.toLowerCase() === name.toLowerCase());
-    if (existing) {
-      setForm((f) => ({ ...f, collection_id: existing.id }));
-      toast.success(`Using collection "${existing.name}"`);
-      return;
+    setAcceptingCollection(name);
+    try {
+      const existing = collections?.find((c) => c.name.toLowerCase() === name.toLowerCase());
+      if (existing) {
+        setForm((f) => ({ ...f, collection_id: existing.id }));
+        toast.success(`Added to "${existing.name}"`);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("collections")
+        .insert({ user_id: user.id, name })
+        .select("id,name")
+        .single();
+      if (error) { toast.error(error.message); return; }
+      qc.invalidateQueries({ queryKey: ["collections"] });
+      setForm((f) => ({ ...f, collection_id: data.id }));
+      toast.success(`Created "${data.name}" and added`);
+    } finally {
+      setAcceptingCollection(null);
     }
-    const { data, error } = await supabase
-      .from("collections")
-      .insert({ user_id: user.id, name })
-      .select("id,name")
-      .single();
-    if (error) { toast.error(error.message); return; }
-    qc.invalidateQueries({ queryKey: ["collections"] });
-    setForm((f) => ({ ...f, collection_id: data.id }));
-    toast.success(`Created collection "${data.name}"`);
   };
+
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -341,17 +350,48 @@ function SavePage() {
               />
             </div>
 
-            {form.suggested_collection && (
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Suggested collection:</span>
-                <span className="rounded-full bg-card border px-3 py-1 text-xs font-semibold">{form.suggested_collection}</span>
-                <button
-                  type="button"
-                  onClick={applySuggestedCollection}
-                  className="text-xs font-semibold text-primary hover:underline"
-                >
-                  Use it
-                </button>
+            {suggestedCollections.length > 0 && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-muted-foreground">Suggested collections</span>
+                  <span className="text-[10px] text-muted-foreground">One-click to add</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {suggestedCollections.map((name) => {
+                    const existing = collections?.find((c) => c.name.toLowerCase() === name.toLowerCase());
+                    const isSelected = !!existing && form.collection_id === existing.id;
+                    const isBusy = acceptingCollection === name;
+                    return (
+                      <button
+                        key={name}
+                        type="button"
+                        onClick={() => acceptCollection(name)}
+                        disabled={isBusy || isSelected}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition",
+                          isSelected
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "bg-card hover:border-primary hover:text-primary",
+                          isBusy && "opacity-60",
+                        )}
+                      >
+                        {isBusy ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : isSelected ? (
+                          <Check className="h-3 w-3" />
+                        ) : existing ? (
+                          <Bookmark className="h-3 w-3" />
+                        ) : (
+                          <Plus className="h-3 w-3" />
+                        )}
+                        {name}
+                        {!existing && !isSelected && (
+                          <span className="ml-1 text-[10px] font-normal opacity-70">new</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
