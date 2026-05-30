@@ -181,25 +181,31 @@ function SavePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.url, form.title, form.description]);
 
-  const applySuggestedCollection = async () => {
-    const name = form.suggested_collection.trim();
+  const acceptCollection = async (rawName: string) => {
+    const name = rawName.trim();
     if (!name || !user) return;
-    const existing = collections?.find((c) => c.name.toLowerCase() === name.toLowerCase());
-    if (existing) {
-      setForm((f) => ({ ...f, collection_id: existing.id }));
-      toast.success(`Using collection "${existing.name}"`);
-      return;
+    setAcceptingCollection(name);
+    try {
+      const existing = collections?.find((c) => c.name.toLowerCase() === name.toLowerCase());
+      if (existing) {
+        setForm((f) => ({ ...f, collection_id: existing.id }));
+        toast.success(`Added to "${existing.name}"`);
+        return;
+      }
+      const { data, error } = await supabase
+        .from("collections")
+        .insert({ user_id: user.id, name })
+        .select("id,name")
+        .single();
+      if (error) { toast.error(error.message); return; }
+      qc.invalidateQueries({ queryKey: ["collections"] });
+      setForm((f) => ({ ...f, collection_id: data.id }));
+      toast.success(`Created "${data.name}" and added`);
+    } finally {
+      setAcceptingCollection(null);
     }
-    const { data, error } = await supabase
-      .from("collections")
-      .insert({ user_id: user.id, name })
-      .select("id,name")
-      .single();
-    if (error) { toast.error(error.message); return; }
-    qc.invalidateQueries({ queryKey: ["collections"] });
-    setForm((f) => ({ ...f, collection_id: data.id }));
-    toast.success(`Created collection "${data.name}"`);
   };
+
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
