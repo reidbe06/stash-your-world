@@ -311,12 +311,15 @@ function tryKnownCdnImage(target: URL): string | null {
   const host = target.hostname.replace(/^www\./, "");
   const path = target.pathname;
 
-  // Best Buy: /site/{slug}/{SKU}.p  → pisces.bbystatic.com/image2/BestBuy_US/images/products/{sku[0:3]}/{sku}_sd.jpg
+  // Best Buy CDN: works for both URL formats:
+  //   /site/{slug}/{numericSKU}.p      (e.g. /site/.../6447382.p)
+  //   /product/{slug}/{alphanumericID} (e.g. /product/.../JJGCQ88C8X)
+  // Image lives at: pisces.bbystatic.com/image2/BestBuy_US/images/products/{id[0:3]}/{id}_sd.jpg
   if (host === "bestbuy.com") {
-    const m = path.match(/\/(\d{7,})\.[a-z]$/i);
+    const m = path.match(/\/([A-Z0-9]{6,})\.[a-z]$/i) || path.match(/\/product\/[^/]+\/([A-Z0-9]{6,})$/i);
     if (m) {
-      const sku = m[1];
-      return `https://pisces.bbystatic.com/image2/BestBuy_US/images/products/${sku.slice(0, 3)}/${sku}_sd.jpg`;
+      const id = m[1];
+      return `https://pisces.bbystatic.com/image2/BestBuy_US/images/products/${id.slice(0, 3)}/${id}_sd.jpg`;
     }
   }
 
