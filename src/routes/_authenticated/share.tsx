@@ -70,7 +70,7 @@ function SharePage() {
     return m ? m[0] : "";
   })();
 
-  async function save(url: string, options?: { contextType?: string; note?: string; metadata?: { title?: string | null; description?: string | null; image?: string | null; source?: string | null }; skipPrompt?: boolean }) {
+  async function save(url: string, options?: { contextType?: string; note?: string; metadata?: { title?: string | null; description?: string | null; image?: string | null; source?: string | null }; skipPrompt?: boolean; skipAi?: boolean }) {
     if (!url || !user) return;
     setStatus({ state: "saving" });
     try {
@@ -97,6 +97,7 @@ function SharePage() {
           source: metadata?.source || undefined,
           note: options?.note || undefined,
           context_type: options?.contextType || undefined,
+          skip_ai: options?.skipAi || false,
           share_source: "pwa_share",
         }),
       });
@@ -209,7 +210,7 @@ function SharePage() {
               Organize with AI
             </button>
             <button
-              onClick={() => save(status.url, { metadata: status.metadata, skipPrompt: true })}
+              onClick={() => save(status.url, { metadata: status.metadata, skipPrompt: true, skipAi: true })}
               className="rounded-full border bg-card py-3 text-sm font-semibold text-muted-foreground hover:text-foreground"
             >
               Save as Uncategorized
