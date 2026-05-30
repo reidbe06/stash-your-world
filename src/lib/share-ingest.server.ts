@@ -129,16 +129,19 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   if (!input.url) throw new Error("URL is required");
   const parsed = new URL(input.url);
 
-  const hasMeta = !!(input.title || input.description || input.image);
+  const incomingTitle = isMeaningfulMetadataValue(input.title, input.url) ? input.title!.trim() : null;
+  const incomingDescription = isMeaningfulMetadataValue(input.description) ? input.description!.trim() : null;
+  const incomingImage = isMeaningfulMetadataValue(input.image) ? input.image!.trim() : null;
+  const hasMeta = !!(incomingTitle && incomingDescription && incomingImage);
   let meta: UrlMetadata | null = null;
   if (!hasMeta) {
     try { meta = await fetchMetadata(input.url); } catch (err) { console.warn("Metadata fetch failed", err); }
   }
 
   const host = parsed.hostname.replace(/^www\./, "");
-  const title = (input.title || meta?.title || host).slice(0, 500);
-  const description = input.description || meta?.description || "";
-  const image = input.image || meta?.image || null;
+  const title = (incomingTitle || meta?.title || bestTitleFromUrl(input.url) || host).slice(0, 500);
+  let description = incomingDescription || meta?.description || "";
+  const image = incomingImage || meta?.image || null;
   const source = input.source || meta?.source || host;
 
   // Existing collection names (for AI hint)
@@ -157,6 +160,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     : [];
   const subcategory = ai?.subcategory ? String(ai.subcategory).slice(0, 200) : null;
   const summary = ai?.summary ? String(ai.summary).slice(0, 240) : null;
+  if (!description && summary) description = summary;
 
   const { data: inserted, error: insErr } = await supabaseAdmin
     .from("items")
