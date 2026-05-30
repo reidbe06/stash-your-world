@@ -3,6 +3,7 @@
 // mobile share handlers.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { bestTitleFromUrl, fetchMetadata, isMeaningfulMetadataValue, type UrlMetadata } from "./url-metadata.server";
+import { fetchTranscript } from "./transcript.server";
 
 export const SHARE_SOURCES = [
   "web",
@@ -279,10 +280,12 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   const source = input.source || meta?.source || host;
   const creator = creatorFromUrl(input.url, platform);
 
-  // Transcript: not yet implemented (placeholder for future TikTok/IG/YouTube
-  // transcript or audio-transcription integration). When wired, set
-  // processing_status = "transcript_found" after fetch.
-  const transcript: string | null = null;
+  // Transcript / caption extraction — runs in parallel with existing metadata path.
+  // fetchTranscript is best-effort: YouTube timedtext API, TikTok page scrape,
+  // Instagram via Firecrawl. Returns null if nothing useful can be extracted.
+  const transcriptResult = await fetchTranscript(input.url, platform);
+  const transcript: string | null = transcriptResult?.text ?? null;
+  if (transcript) processingStatus = "transcript_found";
 
   // Existing collection names (for AI hint)
   const { data: cols } = await supabaseAdmin
