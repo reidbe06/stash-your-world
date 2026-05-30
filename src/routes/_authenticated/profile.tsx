@@ -37,9 +37,7 @@ function Profile() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div className="rounded-3xl border bg-card p-8 text-center shadow-card">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-brand-gradient text-3xl font-bold text-primary-foreground shadow-brand">
-          {user?.email?.[0].toUpperCase()}
-        </div>
+        <AvatarUploader />
         <h1 className="mt-4 text-xl font-bold">{user?.email}</h1>
         <p className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
           <Mail className="h-3 w-3" /> Verified member
