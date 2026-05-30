@@ -307,7 +307,8 @@ function absolutizeImage(image: string | null | undefined, target: URL): string 
 
 // For retailers whose scrapers are blocked but whose image CDNs follow predictable patterns,
 // construct the product image URL directly from the page URL.
-function tryKnownCdnImage(target: URL): string | null {
+// Returns null if the CDN URL resolves to a placeholder/error image rather than a real photo.
+async function tryKnownCdnImage(target: URL): Promise<string | null> {
   const host = target.hostname.replace(/^www\./, "");
   const path = target.pathname;
 
@@ -315,11 +316,19 @@ function tryKnownCdnImage(target: URL): string | null {
   //   /site/{slug}/{numericSKU}.p      (e.g. /site/.../6447382.p)
   //   /product/{slug}/{alphanumericID} (e.g. /product/.../JJGCQ88C8X)
   // Image lives at: pisces.bbystatic.com/image2/BestBuy_US/images/products/{id[0:3]}/{id}_sd.jpg
+  // NOTE: The CDN returns a tiny PNG placeholder (~14KB) when no real image exists.
+  //       Real product images are always JPEG. Reject the URL if the CDN returns PNG.
   if (host === "bestbuy.com") {
     const m = path.match(/\/([A-Z0-9]{6,})\.[a-z]$/i) || path.match(/\/product\/[^/]+\/([A-Z0-9]{6,})$/i);
     if (m) {
       const id = m[1];
-      return `https://pisces.bbystatic.com/image2/BestBuy_US/images/products/${id.slice(0, 3)}/${id}_sd.jpg`;
+      const cdnUrl = `https://pisces.bbystatic.com/image2/BestBuy_US/images/products/${id.slice(0, 3)}/${id}_sd.jpg`;
+      try {
+        const head = await fetch(cdnUrl, { method: "HEAD", signal: AbortSignal.timeout(5000) });
+        const ct = head.headers.get("content-type") || "";
+        // PNG = "no image available" placeholder — reject it
+        if (head.ok && ct.includes("jpeg")) return cdnUrl;
+      } catch {}
     }
   }
 
@@ -398,7 +407,7 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
   // Last resort: site-specific CDN image patterns for retailers whose scrapers
   // are blocked but whose product image URLs are predictable from the page URL.
   if (!result.image) {
-    result.image = tryKnownCdnImage(target);
+    result.image = await tryKnownCdnImage(target);
   }
 
   return {
