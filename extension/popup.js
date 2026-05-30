@@ -2,7 +2,11 @@
 // Auth: Supabase email/password via the project's REST endpoint.
 // Save: POST /api/public/extension/save on the STASHd app.
 
-const DEFAULT_APP_URL = "https://project--26a4cdd9-8737-4b1a-a009-f87ca1db9bb4.lovable.app";
+// Stable preview URL — works before the app is published.
+// After publishing, you can switch this to the production URL
+// (https://project--26a4cdd9-8737-4b1a-a009-f87ca1db9bb4.lovable.app)
+// or override it via the ⚙ Settings panel inside the extension popup.
+const DEFAULT_APP_URL = "https://project--26a4cdd9-8737-4b1a-a009-f87ca1db9bb4-dev.lovable.app";
 const SUPABASE_URL = "https://lefanhnswvkmtwbawowy.supabase.co";
 const SUPABASE_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlZmFuaG5zd3ZrbXR3YmF3b3d5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAwNzgxNjEsImV4cCI6MjA5NTY1NDE2MX0.K02B0-VtdM_m_yrogpqJ1WBLfZ6UsQisnRoVo6PRzJQ";
