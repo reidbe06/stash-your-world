@@ -310,11 +310,12 @@ function SavePage() {
 
   const hasHelp = !!help.contextType || !!help.note.trim();
   const showHelpPrompt = isSocialVideoUrl(form.url) && !hasUsefulSocialMetadata(form) && saveStatus !== "organized" && (!hasHelp || saveStatus === "needs_info");
-  const statusMessage = saveStatus === "organized"
+  const displayStatus = showHelpPrompt && saveStatus === "idle" ? "needs_info" : saveStatus;
+  const statusMessage = displayStatus === "organized"
     ? "AI organized this save"
-    : saveStatus === "needs_info"
+    : displayStatus === "needs_info"
       ? "AI needs more info"
-      : saveStatus === "uncategorized"
+      : displayStatus === "uncategorized"
         ? "Saved as Uncategorized"
         : "";
 
@@ -365,7 +366,7 @@ function SavePage() {
 
         {statusMessage && (
           <div className="flex items-center gap-2 rounded-2xl border bg-accent/40 px-4 py-3 text-sm font-semibold">
-            {saveStatus === "organized" ? <Sparkles className="h-4 w-4 text-primary" /> : <Wand2 className="h-4 w-4 text-muted-foreground" />}
+            {displayStatus === "organized" ? <Sparkles className="h-4 w-4 text-primary" /> : <Wand2 className="h-4 w-4 text-muted-foreground" />}
             {statusMessage}
           </div>
         )}
