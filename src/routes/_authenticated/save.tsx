@@ -12,7 +12,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { fetchUrlMetadata } from "@/lib/url-metadata.functions";
 import { categorizeItem, CATEGORIES } from "@/lib/ai-categorize.functions";
 import { embedItem } from "@/lib/semantic-search.functions";
 import { cn } from "@/lib/utils";
@@ -98,7 +97,6 @@ function SavePage() {
   const { collection } = Route.useSearch();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const fetchMeta = useServerFn(fetchUrlMetadata);
   const runCategorize = useServerFn(categorizeItem);
   const embedItemFn = useServerFn(embedItem);
 
@@ -146,22 +144,31 @@ function SavePage() {
     lastFetchedUrl.current = url;
     setFetching(true);
     try {
-      const meta = await fetchMeta({ data: { url } });
-      setForm((f) => ({
-        ...f,
-        title: f.title || meta.title || "",
-        image_url: f.image_url || meta.image || "",
-        description: f.description || meta.description || "",
-        type: f.type === "link" && meta.type ? meta.type : f.type,
-      }));
-      setMetaLoaded(true);
-      if (isSocialVideoUrl(url) && !hasUsefulSocialMetadata({
-        title: meta.title || "",
-        description: meta.description || "",
-        image_url: meta.image || "",
-        url,
-      })) {
-        setSaveStatus("needs_info");
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      const res = await fetch("/api/public/url-metadata", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ url }),
+      });
+      const meta: { title?: string | null; description?: string | null; image?: string | null; type?: string | null; ok?: boolean } = await res.json();
+      if (res.ok && meta) {
+        setForm((f) => ({
+          ...f,
+          title: f.title || meta.title || "",
+          image_url: f.image_url || meta.image || "",
+          description: f.description || meta.description || "",
+          type: f.type === "link" && meta.type ? meta.type : f.type,
+        }));
+        setMetaLoaded(true);
+        if (isSocialVideoUrl(url) && !hasUsefulSocialMetadata({
+          title: meta.title || "",
+          description: meta.description || "",
+          image_url: meta.image || "",
+          url,
+        })) {
+          setSaveStatus("needs_info");
+        }
       }
     } catch (err: any) {
       console.warn("Metadata fetch failed", err);

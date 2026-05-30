@@ -21,6 +21,7 @@ import { Route as AuthenticatedDevNotesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
 import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
+import { Route as ApiPublicUrlMetadataRouteImport } from './routes/api/public/url-metadata'
 import { Route as AuthenticatedCollectionsIdRouteImport } from './routes/_authenticated/collections.$id'
 import { Route as ApiPublicShareSaveRouteImport } from './routes/api/public/share.save'
 import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/extension.save'
@@ -86,6 +87,11 @@ const AuthenticatedAskRoute = AuthenticatedAskRouteImport.update({
   path: '/ask',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const ApiPublicUrlMetadataRoute = ApiPublicUrlMetadataRouteImport.update({
+  id: '/api/public/url-metadata',
+  path: '/api/public/url-metadata',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedCollectionsIdRoute =
   AuthenticatedCollectionsIdRouteImport.update({
     id: '/$id',
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
+  '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
   '/api/public/share/save': typeof ApiPublicShareSaveRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
+  '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
   '/api/public/share/save': typeof ApiPublicShareSaveRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/_authenticated/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
+  '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
   '/api/public/share/save': typeof ApiPublicShareSaveRoute
@@ -177,6 +186,7 @@ export interface FileRouteTypes {
     | '/share'
     | '/share/$slug'
     | '/collections/$id'
+    | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
     | '/api/public/share/save'
@@ -194,6 +204,7 @@ export interface FileRouteTypes {
     | '/share'
     | '/share/$slug'
     | '/collections/$id'
+    | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
     | '/api/public/share/save'
@@ -212,6 +223,7 @@ export interface FileRouteTypes {
     | '/_authenticated/share'
     | '/share/$slug'
     | '/_authenticated/collections/$id'
+    | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
     | '/api/public/share/save'
@@ -222,6 +234,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
   ShareSlugRoute: typeof ShareSlugRoute
+  ApiPublicUrlMetadataRoute: typeof ApiPublicUrlMetadataRoute
   ApiPublicExtensionCollectionsRoute: typeof ApiPublicExtensionCollectionsRoute
   ApiPublicExtensionSaveRoute: typeof ApiPublicExtensionSaveRoute
   ApiPublicShareSaveRoute: typeof ApiPublicShareSaveRoute
@@ -313,6 +326,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAskRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/api/public/url-metadata': {
+      id: '/api/public/url-metadata'
+      path: '/api/public/url-metadata'
+      fullPath: '/api/public/url-metadata'
+      preLoaderRoute: typeof ApiPublicUrlMetadataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/collections/$id': {
       id: '/_authenticated/collections/$id'
       path: '/$id'
@@ -389,6 +409,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
   ShareSlugRoute: ShareSlugRoute,
+  ApiPublicUrlMetadataRoute: ApiPublicUrlMetadataRoute,
   ApiPublicExtensionCollectionsRoute: ApiPublicExtensionCollectionsRoute,
   ApiPublicExtensionSaveRoute: ApiPublicExtensionSaveRoute,
   ApiPublicShareSaveRoute: ApiPublicShareSaveRoute,

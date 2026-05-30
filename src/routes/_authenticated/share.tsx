@@ -14,11 +14,9 @@
 import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { useServerFn } from "@tanstack/react-start";
 import { Loader2, CheckCircle2, AlertTriangle, Sparkles, Clipboard } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
-import { fetchUrlMetadata } from "@/lib/url-metadata.functions";
 
 const searchSchema = z.object({
   url: z.string().optional(),
@@ -58,7 +56,6 @@ function hasUsefulMetadata(meta?: { title?: string | null; description?: string 
 function SharePage() {
   const params = useSearch({ from: "/_authenticated/share" });
   const { user } = useAuth();
-  const fetchMeta = useServerFn(fetchUrlMetadata);
   const [status, setStatus] = useState<Status>({ state: "idle" });
   const [manualUrl, setManualUrl] = useState("");
   const [help, setHelp] = useState({ contextType: "", note: "" });
@@ -75,14 +72,22 @@ function SharePage() {
     setStatus({ state: "saving" });
     try {
       let metadata = options?.metadata;
+      const { data: sess } = await supabase.auth.getSession();
       if (isSocialVideoUrl(url) && !options?.skipPrompt) {
-        metadata = await fetchMeta({ data: { url } }).catch(() => null) || undefined;
+        try {
+          const token = sess.session?.access_token;
+          const metaRes = await fetch("/api/public/url-metadata", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ url }),
+          });
+          if (metaRes.ok) metadata = await metaRes.json();
+        } catch {}
         if (!hasUsefulMetadata(metadata, url)) {
           setStatus({ state: "needs_info", url, metadata });
           return;
         }
       }
-      const { data: sess } = await supabase.auth.getSession();
       const token = sess.session?.access_token;
       if (!token) throw new Error("Not signed in");
       const res = await fetch("/api/public/share/save", {
