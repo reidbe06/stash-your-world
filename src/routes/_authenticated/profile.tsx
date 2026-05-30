@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { LogOut, Mail, Bell, Lock, HelpCircle, ChevronRight, Sparkles, Chrome, Download } from "lucide-react";
+import { LogOut, Mail, Bell, Lock, HelpCircle, ChevronRight, Sparkles, Chrome, Download, Share2, Smartphone } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -57,6 +57,7 @@ function Profile() {
       </div>
 
       <ChromeExtensionCard />
+      <MobileShareCard />
 
       <div>
         <h2 className="mb-2 px-1 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Settings</h2>
