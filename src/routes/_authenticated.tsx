@@ -20,6 +20,7 @@ const navItems = [
 
 function AuthedLayout() {
   const { user, loading } = useAuth();
+  const { data: profile } = useProfile();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
