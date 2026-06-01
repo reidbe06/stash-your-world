@@ -24,6 +24,7 @@ import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/as
 import { Route as ApiPublicUrlMetadataRouteImport } from './routes/api/public/url-metadata'
 import { Route as AuthenticatedCollectionsIdRouteImport } from './routes/_authenticated/collections.$id'
 import { Route as ApiPublicShareSaveRouteImport } from './routes/api/public/share.save'
+import { Route as ApiPublicItemsRecategorizeRouteImport } from './routes/api/public/items.recategorize'
 import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/extension.save'
 import { Route as ApiPublicExtensionCollectionsRouteImport } from './routes/api/public/extension.collections'
 
@@ -103,6 +104,12 @@ const ApiPublicShareSaveRoute = ApiPublicShareSaveRouteImport.update({
   path: '/api/public/share/save',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicItemsRecategorizeRoute =
+  ApiPublicItemsRecategorizeRouteImport.update({
+    id: '/api/public/items/recategorize',
+    path: '/api/public/items/recategorize',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicExtensionSaveRoute = ApiPublicExtensionSaveRouteImport.update({
   id: '/api/public/extension/save',
   path: '/api/public/extension/save',
@@ -131,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/items/recategorize': typeof ApiPublicItemsRecategorizeRoute
   '/api/public/share/save': typeof ApiPublicShareSaveRoute
 }
 export interface FileRoutesByTo {
@@ -149,6 +157,7 @@ export interface FileRoutesByTo {
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/items/recategorize': typeof ApiPublicItemsRecategorizeRoute
   '/api/public/share/save': typeof ApiPublicShareSaveRoute
 }
 export interface FileRoutesById {
@@ -169,6 +178,7 @@ export interface FileRoutesById {
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/items/recategorize': typeof ApiPublicItemsRecategorizeRoute
   '/api/public/share/save': typeof ApiPublicShareSaveRoute
 }
 export interface FileRouteTypes {
@@ -189,6 +199,7 @@ export interface FileRouteTypes {
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/items/recategorize'
     | '/api/public/share/save'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -207,6 +218,7 @@ export interface FileRouteTypes {
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/items/recategorize'
     | '/api/public/share/save'
   id:
     | '__root__'
@@ -226,6 +238,7 @@ export interface FileRouteTypes {
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/items/recategorize'
     | '/api/public/share/save'
   fileRoutesById: FileRoutesById
 }
@@ -237,6 +250,7 @@ export interface RootRouteChildren {
   ApiPublicUrlMetadataRoute: typeof ApiPublicUrlMetadataRoute
   ApiPublicExtensionCollectionsRoute: typeof ApiPublicExtensionCollectionsRoute
   ApiPublicExtensionSaveRoute: typeof ApiPublicExtensionSaveRoute
+  ApiPublicItemsRecategorizeRoute: typeof ApiPublicItemsRecategorizeRoute
   ApiPublicShareSaveRoute: typeof ApiPublicShareSaveRoute
 }
 
@@ -347,6 +361,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicShareSaveRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/items/recategorize': {
+      id: '/api/public/items/recategorize'
+      path: '/api/public/items/recategorize'
+      fullPath: '/api/public/items/recategorize'
+      preLoaderRoute: typeof ApiPublicItemsRecategorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/extension/save': {
       id: '/api/public/extension/save'
       path: '/api/public/extension/save'
@@ -412,6 +433,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicUrlMetadataRoute: ApiPublicUrlMetadataRoute,
   ApiPublicExtensionCollectionsRoute: ApiPublicExtensionCollectionsRoute,
   ApiPublicExtensionSaveRoute: ApiPublicExtensionSaveRoute,
+  ApiPublicItemsRecategorizeRoute: ApiPublicItemsRecategorizeRoute,
   ApiPublicShareSaveRoute: ApiPublicShareSaveRoute,
 }
 export const routeTree = rootRouteImport

@@ -548,6 +548,153 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   };
 }
 
+// ─── Recategorize an existing item from a user note ──────────────────────────
+// Used by the ItemCard "What do you want STASHd to remember?" flow.
+// Fetches the saved item, runs AI with the note, updates all AI fields.
+
+export type RecategorizeInput = {
+  userId: string;
+  itemId: string;
+  note: string;
+};
+
+export type RecategorizeResult = {
+  id: string;
+  title: string;
+  category: string | null;
+  subcategory: string | null;
+  tags: string[];
+  ai_summary: string | null;
+  ai_category: string | null;
+  ai_subcategory: string | null;
+  ai_tags: string[];
+  ai_key_takeaways: string[];
+  recipe_ingredients: string[];
+  recipe_steps: string[];
+  product_names: string[];
+  confidence_score: number | null;
+  processing_status: string;
+};
+
+export async function recategorizeItem(input: RecategorizeInput): Promise<RecategorizeResult> {
+  const { userId, itemId, note } = input;
+  const trimmedNote = note.trim();
+  if (!trimmedNote) throw new Error("Note is required");
+
+  // Fetch the existing item (server-side, admin client)
+  const { data: item, error: fetchErr } = await supabaseAdmin
+    .from("items")
+    .select("id,url,title,source,source_platform,creator_name,original_caption,transcript,image_url,collection_id,user_id")
+    .eq("id", itemId)
+    .eq("user_id", userId)
+    .single();
+
+  if (fetchErr || !item) throw new Error(fetchErr?.message || "Item not found");
+
+  const platform = (item.source_platform ?? "web") as SourcePlatform;
+
+  // Existing collections for the suggested_collection hint
+  const { data: cols } = await supabaseAdmin
+    .from("collections").select("id,name").eq("user_id", userId);
+  const existingNames = (cols ?? []).map((c) => c.name);
+
+  const cleanArr = (v: any, max = 8, maxLen = 200): string[] =>
+    Array.isArray(v)
+      ? v.map((t: any) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, max)
+         .map((s: string) => s.slice(0, maxLen))
+      : [];
+
+  console.log(`[RECATEGORIZE] item=${itemId} platform=${platform} note=${JSON.stringify(trimmedNote.slice(0, 120))}`);
+
+  const ai = await aiCategorize({
+    url: item.url ?? "",
+    title: item.title ?? "",
+    description: "",
+    source: item.source ?? "",
+    platform,
+    creator: item.creator_name ?? null,
+    caption: item.original_caption ?? null,
+    transcript: item.transcript ?? null,
+    notes: trimmedNote,
+    existingCollections: existingNames,
+  });
+
+  console.log(`[RECATEGORIZE] OpenAI response: category=${ai?.category} title=${JSON.stringify(ai?.generated_title)} confidence=${ai?.confidence_score}`);
+
+  const CATS = CATEGORIES as readonly string[];
+  const category = ai?.category && CATS.includes(ai.category) ? ai.category : "Uncategorized";
+  const tags = cleanArr(ai?.tags, 8, 60).map((t: string) => t.toLowerCase());
+  const keyTakeaways = cleanArr(ai?.key_takeaways, 6, 240);
+  const recipeIngredients = cleanArr(ai?.recipe_ingredients, 40, 200);
+  const recipeSteps = cleanArr(ai?.recipe_steps, 30, 600);
+  const productNames = cleanArr(ai?.product_names, 20, 200);
+  const travelDetails =
+    ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
+      ? ai.travel_details : null;
+  const confidence = typeof ai?.confidence_score === "number"
+    ? Math.max(0, Math.min(1, ai.confidence_score)) : null;
+  const subcategory = ai?.subcategory ? String(ai.subcategory).slice(0, 200) : null;
+  const summary = ai?.summary ? String(ai.summary).slice(0, 240) : null;
+  const aiTitle = ai?.generated_title ? String(ai.generated_title).trim() : "";
+
+  // Build update payload
+  const updatePayload: Record<string, any> = {
+    category,
+    subcategory,
+    tags,
+    ai_summary: summary,
+    ai_category: category,
+    ai_subcategory: subcategory,
+    ai_tags: tags,
+    ai_key_takeaways: keyTakeaways,
+    recipe_ingredients: recipeIngredients,
+    recipe_steps: recipeSteps,
+    product_names: productNames,
+    travel_details: travelDetails,
+    confidence_score: confidence,
+    processing_status: "ai_processed",
+    // Store the user's note in description so it's visible
+    description: trimmedNote,
+  };
+
+  if (aiTitle && isMeaningfulMetadataValue(aiTitle, item.url ?? "")) {
+    updatePayload.title = aiTitle.slice(0, 500);
+  }
+
+  const { data: updated, error: updErr } = await supabaseAdmin
+    .from("items")
+    .update(updatePayload as any)
+    .eq("id", itemId)
+    .eq("user_id", userId)
+    .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,product_names,confidence_score,processing_status")
+    .single();
+
+  if (updErr || !updated) throw new Error(updErr?.message || "Failed to update item");
+
+  // Re-embed best-effort
+  try {
+    const text = [
+      updated.title && `Title: ${updated.title}`,
+      updated.category && `Category: ${updated.category}`,
+      updated.subcategory && `Subcategory: ${updated.subcategory}`,
+      updated.tags?.length && `Tags: ${updated.tags.join(", ")}`,
+      keyTakeaways.length && `Takeaways: ${keyTakeaways.join(" | ")}`,
+      productNames.length && `Products: ${productNames.join(", ")}`,
+      recipeIngredients.length && `Ingredients: ${recipeIngredients.join(", ")}`,
+      updated.ai_summary && `Summary: ${updated.ai_summary}`,
+      trimmedNote && `Notes: ${trimmedNote}`,
+    ].filter(Boolean).join("\n");
+    const vec = await embed(text);
+    if (vec) {
+      await supabaseAdmin.from("items")
+        .update({ embedding: vec as any, embedding_updated_at: new Date().toISOString() })
+        .eq("id", itemId);
+    }
+  } catch (err) { console.warn("[RECATEGORIZE] Embed failed", err); }
+
+  return updated as RecategorizeResult;
+}
+
 export async function getUserIdFromBearer(request: Request): Promise<string | null> {
   const auth = request.headers.get("authorization") || "";
   const token = auth.replace(/^Bearer\s+/i, "").trim();

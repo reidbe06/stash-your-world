@@ -1,2 +1,2 @@
-- [yt-dlp platform reality](ytdlp-platform-reality.md) — yt-dlp works on YouTube from Replit servers; Instagram requires cookies, TikTok blocks datacenter IPs.
-- [yt-dlp integration pattern](ytdlp-integration-pattern.md) — use child_process.spawn (not Bun.spawn) for yt-dlp; TranscriptResult carries ytdlp enrichment for share-ingest to consume.
+- [yt-dlp platform reality](ytdlp-platform-reality.md) — which platforms yt-dlp and Apify can actually access from Replit's server IP (updated with full findings)
+- [yt-dlp + Apify integration pattern](ytdlp-integration-pattern.md) — actor input shapes, field mappings, wiring into transcript/ingest pipeline, recategorize endpoint pattern

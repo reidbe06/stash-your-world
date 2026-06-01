@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Bookmark, ChevronDown, ChevronUp, ExternalLink, Folder, Trash2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { Bookmark, ChevronDown, ChevronUp, ExternalLink, Folder, Sparkles, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -65,6 +65,7 @@ const STATUS_MAP: Record<string, StatusConfig> = {
   caption_found:     { label: "Caption Found",     className: "bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/40 dark:text-violet-400 dark:border-violet-800" },
   metadata_found:    { label: "Fully Organized",   className: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800" },
   needs_user_context:{ label: "Needs More Context",className: "bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-600 dark:border-amber-800" },
+  ai_processed:      { label: "Fully Organized",   className: "bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800" },
   pending:           { label: "Saved Only",        className: "bg-muted text-muted-foreground border border-border" },
   error:             { label: "Processing Failed", className: "bg-destructive/10 text-destructive border border-destructive/20" },
   failed:            { label: "Processing Failed", className: "bg-destructive/10 text-destructive border border-destructive/20" },
@@ -220,6 +221,81 @@ function AIDetails({ item }: { item: Item }) {
   );
 }
 
+// ─── Inline note prompt for "Needs More Context" items ───────────────────────
+// Shown only when processing_status === "needs_user_context".
+// Calls /api/public/items/recategorize, then refreshes the item list.
+
+function NeedsContextPanel({ item, onDone }: { item: Item; onDone: () => void }) {
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = note.trim();
+    if (!trimmed || busy) return;
+
+    setBusy(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) {
+        toast.error("You need to be signed in to do this.");
+        return;
+      }
+
+      const res = await fetch("/api/public/items/recategorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ item_id: item.id, note: trimmed }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        toast.error(json.error || "Something went wrong. Please try again.");
+        return;
+      }
+
+      toast.success("Organized! Your item has been categorized.");
+      onDone();
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-amber-200 bg-amber-50/60 px-4 py-3 dark:border-amber-800/40 dark:bg-amber-950/20">
+      <p className="mb-2 text-[11px] font-semibold text-amber-800 dark:text-amber-400">
+        What do you want STASHd to remember about this?
+      </p>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+        <textarea
+          ref={textareaRef}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. Pasta recipe for weeknights, or outfit idea for summer…"
+          rows={2}
+          disabled={busy}
+          className="w-full resize-none rounded-lg border border-amber-200 bg-white px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400 disabled:opacity-50 dark:border-amber-800/40 dark:bg-card"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e as any); }
+          }}
+        />
+        <button
+          type="submit"
+          disabled={!note.trim() || busy}
+          className="flex items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-amber-600 dark:hover:bg-amber-500"
+        >
+          <Sparkles className="h-3 w-3" />
+          {busy ? "Organizing…" : "Organize with AI"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean }) {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -239,10 +315,17 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
     qc.invalidateQueries({ queryKey: ["collection-items"] });
   };
 
+  const handleRecategorizeDone = () => {
+    qc.invalidateQueries({ queryKey: ["items"] });
+    qc.invalidateQueries({ queryKey: ["collection-items"] });
+  };
+
   let host: string | null = item.source;
   if (!host && item.url) {
     try { host = new URL(item.url).hostname.replace("www.", ""); } catch {}
   }
+
+  const needsContext = item.processing_status === "needs_user_context";
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-card transition hover:shadow-brand">
@@ -285,13 +368,13 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
           <span className="shrink-0">{timeAgo(item.created_at)}</span>
         </div>
 
-        {item.processing_status && (
+        {item.processing_status && !needsContext && (
           <div className="mt-2">
             <StatusBadge status={item.processing_status} />
           </div>
         )}
 
-        {item.tags.length > 0 && (
+        {item.tags.length > 0 && !needsContext && (
           <div className="mt-2 flex flex-wrap gap-1">
             {item.tags.slice(0, 3).map((t) => (
               <span key={t} className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">#{t}</span>
@@ -317,7 +400,11 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
         </div>
       </div>
 
-      <AIDetails item={item} />
+      {needsContext && !readOnly && (
+        <NeedsContextPanel item={item} onDone={handleRecategorizeDone} />
+      )}
+
+      {!needsContext && <AIDetails item={item} />}
 
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
