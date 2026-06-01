@@ -89,7 +89,7 @@ export function SaveItemDialog({ open, onOpenChange, defaultCollection }: Props)
               <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
                 <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["Recipe", "Product", "Fashion / Outfit", "Home Idea", "Travel Idea", "Tutorial", "Fitness / Workout", "Beauty", "Entertainment", "Other"].map((t) => (
+                  {["Recipe", "Fashion", "Product", "Home", "Travel", "Tutorial", "Fitness", "Beauty", "Parenting", "Business", "Entertainment", "Other"].map((t) => (
                     <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
                 </SelectContent>

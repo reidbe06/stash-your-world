@@ -21,14 +21,32 @@ export const CATEGORIES = [
 ] as const;
 
 export const CONTENT_TYPES = [
-  "Recipe", "Product", "Fashion / Outfit", "Home Idea", "Travel Idea",
-  "Tutorial", "Fitness / Workout", "Beauty", "Parenting", "Business Idea",
+  "Recipe", "Fashion", "Product", "Home", "Travel",
+  "Tutorial", "Fitness", "Beauty", "Parenting", "Business",
   "Entertainment", "Other",
 ] as const;
 
 export const MEDIA_FORMATS = [
   "Video", "Article", "Webpage", "Social Post", "Product Page", "Image",
 ] as const;
+
+export const SUBCATEGORY_TAXONOMY: Record<string, string[]> = {
+  Recipe:       ["Breakfast", "Lunch", "Dinner", "Dessert", "Snacks", "Drinks", "Meal Prep", "Salad", "Soup", "Baking", "Sides"],
+  Fashion:      ["Dresses", "Tops & Shirts", "Pants & Jeans", "Shoes", "Accessories", "Workwear", "Casual", "Vacation", "Activewear", "Jewelry"],
+  Product:      ["Electronics", "Kitchen", "Beauty & Skincare", "Home & Decor", "Fitness", "Clothing", "Gifts"],
+  Travel:       ["Mexico", "Europe", "Asia", "Caribbean", "Beach & Resorts", "Weekend Trips", "Restaurants", "Activities", "Budget", "Luxury", "Destinations"],
+  Home:         ["Living Room", "Bedroom", "Kitchen", "Bathroom", "Outdoor", "Organization", "DIY", "Lighting", "Furniture", "Decor & Styling"],
+  Tutorial:     ["Cooking", "Makeup & Beauty", "DIY & Crafts", "Tech", "Fitness", "Fashion", "Photography & Film", "How-To"],
+  Fitness:      ["Strength Training", "Cardio", "Yoga", "HIIT", "Running", "Pilates", "Stretching", "Nutrition", "Workouts"],
+  Beauty:       ["Skincare", "Makeup", "Hair", "Nails", "Fragrance", "Body Care", "Tools & Gadgets"],
+  Parenting:    ["Baby", "Toddler", "School Age", "Teen", "Pregnancy", "Feeding", "Sleep", "Kids & Family"],
+  Business:     ["Marketing", "Finance", "Productivity", "Side Hustle", "E-commerce", "Social Media", "Branding", "Entrepreneurship"],
+  Entertainment:["Movies & TV", "Music", "Gaming", "Books", "Podcasts", "Comedy"],
+};
+
+const SUBCATEGORY_HINT = Object.entries(SUBCATEGORY_TAXONOMY)
+  .map(([type, subs]) => `  ${type}: ${subs.join(", ")}`)
+  .join("\n");
 
 export type AiCategorization = {
   generated_title: string;
@@ -72,23 +90,32 @@ export const categorizeItem = createServerFn({ method: "POST" })
 
     const collectionsHint = data.existingCollections.length
       ? `User's existing collections (prefer one of these if it fits, otherwise suggest a new short name): ${data.existingCollections.join(", ")}`
-: "User has no existing collections — suggest a short collection name.";
+      : "User has no existing collections — suggest a short collection name.";
 
-    const systemPrompt = `You categorize saved web items for STASHd, a social organization app.
+    const systemPrompt = `You categorize saved web items for STASHd, a personal organization app.
 Always respond by calling the categorize_item tool. Be concise and specific.
-Categories must be exactly one of: ${CATEGORIES.join(", ")}.
-Subcategory should be specific (e.g. "Dinner > Chicken", "Women's Clothing > Casual", "Home Decor", "Strength Training").
+
+content_type is the PURPOSE of the content (what it's ABOUT), not the media format:
+- A recipe video → "Recipe"
+- A fashion TikTok → "Fashion"
+- A product page → "Product"
+- A YouTube tutorial → "Tutorial"
+content_type must be exactly one of: ${CONTENT_TYPES.join(", ")}.
+
+subcategory must be one value from this taxonomy for the chosen content_type:
+${SUBCATEGORY_HINT}
+If none fit perfectly, pick the closest. For Recipe, default to "Dinner" when unclear.
+
 Tags: 3-6 lowercase short tags, no '#'.
 
 CRITICAL ANTI-HALLUCINATION RULES:
-- Only use facts that appear in the provided Title/Description/Source/URL. Never invent specific dishes, products, brands, ingredients, recipes, or topics that are not explicitly present.
-- User hint and Notes are user-provided facts. Use them to choose category/subcategory/tags, but do not invent details beyond them.
-- If the provided content is empty, generic, or only an opaque video/post ID (e.g. a bare TikTok or Instagram URL with no readable title/description) and there is no user hint or note, DO NOT guess what the content is about. Use category "Uncategorized", a generic title based on the source (e.g. "TikTok video", "Instagram post"), generic tags, and a neutral note. Better to be vague than wrong.
-- generated_title: clean user-facing item title, max 90 chars. Prefer the exact provided title. If only an opaque URL is available, fall back to "<Source> <type>" (e.g. "TikTok video"). Never say "Auto-filled".
-- Summary: one sentence, max 160 chars, grounded strictly in the provided text.
-- notes: one concise note (max 220 chars) grounded ONLY in the provided text. If nothing meaningful is provided, write a brief generic note about the source rather than fabricating details.
+- Only use facts that appear in the provided Title/Description/Source/URL. Never invent specific dishes, products, brands, ingredients, or topics not explicitly present.
+- If content is empty or only an opaque video/post ID with no title/description/hint, use category "Uncategorized", a generic title, generic tags, and neutral note.
+- generated_title: clean user-facing title, max 90 chars.
+- summary: one sentence, max 160 chars, grounded strictly in provided text.
+- notes: concise note, max 220 chars, based only on provided text.
 - suggested_collection: single best short title (2-4 words) for organizing this item.
-- suggested_collections: 3 short collection names (2-4 words each). Prefer reusing the user's existing collections when they fit. Order from best fit to alternative. The first entry should match suggested_collection.
+- suggested_collections: 3 short collection names (2-4 words each), first matching suggested_collection.
 ${collectionsHint}`;
 
     const body = {
@@ -107,10 +134,10 @@ ${collectionsHint}`;
               type: "object",
               properties: {
                 category: { type: "string", enum: [...CATEGORIES] },
-                content_type: { type: "string", enum: [...CONTENT_TYPES], description: "Content purpose — what is this about? (Recipe, Product, Tutorial, etc.) NOT the media format." },
-                media_format: { type: "string", enum: [...MEDIA_FORMATS], description: "Technical delivery format (Video, Article, Webpage, Social Post, Product Page, Image)." },
+                content_type: { type: "string", enum: [...CONTENT_TYPES], description: "Content purpose — what is this about? NOT the media format." },
+                media_format: { type: "string", enum: [...MEDIA_FORMATS], description: "Technical delivery format." },
                 generated_title: { type: "string" },
-                subcategory: { type: "string" },
+                subcategory: { type: "string", description: "One value from the subcategory taxonomy for the chosen content_type." },
                 tags: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 8 },
                 summary: { type: "string" },
                 notes: { type: "string" },
@@ -158,7 +185,6 @@ ${collectionsHint}`;
     const suggestedCollections = Array.isArray(parsed.suggested_collections)
       ? parsed.suggested_collections.map((s) => String(s).trim().slice(0, 80)).filter(Boolean)
       : [];
-    // Ensure top suggestion is in the list, dedupe (case-insensitive)
     const merged: string[] = [];
     const seen = new Set<string>();
     for (const name of [suggestedCollection, ...suggestedCollections]) {

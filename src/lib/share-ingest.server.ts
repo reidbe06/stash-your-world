@@ -21,23 +21,41 @@ const CATEGORIES = [
 ] as const;
 
 const CONTENT_TYPES = [
-  "Recipe", "Product", "Fashion / Outfit", "Home Idea", "Travel Idea",
-  "Tutorial", "Fitness / Workout", "Beauty", "Parenting", "Business Idea",
+  "Recipe", "Fashion", "Product", "Home", "Travel",
+  "Tutorial", "Fitness", "Beauty", "Parenting", "Business",
   "Entertainment", "Other",
 ] as const;
+
+const SUBCATEGORY_TAXONOMY: Record<string, string[]> = {
+  Recipe:       ["Breakfast", "Lunch", "Dinner", "Dessert", "Snacks", "Drinks", "Meal Prep", "Salad", "Soup", "Baking", "Sides"],
+  Fashion:      ["Dresses", "Tops & Shirts", "Pants & Jeans", "Shoes", "Accessories", "Workwear", "Casual", "Vacation", "Activewear", "Jewelry"],
+  Product:      ["Electronics", "Kitchen", "Beauty & Skincare", "Home & Decor", "Fitness", "Clothing", "Gifts"],
+  Travel:       ["Mexico", "Europe", "Asia", "Caribbean", "Beach & Resorts", "Weekend Trips", "Restaurants", "Activities", "Budget", "Luxury", "Destinations"],
+  Home:         ["Living Room", "Bedroom", "Kitchen", "Bathroom", "Outdoor", "Organization", "DIY", "Lighting", "Furniture", "Decor & Styling"],
+  Tutorial:     ["Cooking", "Makeup & Beauty", "DIY & Crafts", "Tech", "Fitness", "Fashion", "Photography & Film", "How-To"],
+  Fitness:      ["Strength Training", "Cardio", "Yoga", "HIIT", "Running", "Pilates", "Stretching", "Nutrition", "Workouts"],
+  Beauty:       ["Skincare", "Makeup", "Hair", "Nails", "Fragrance", "Body Care", "Tools & Gadgets"],
+  Parenting:    ["Baby", "Toddler", "School Age", "Teen", "Pregnancy", "Feeding", "Sleep", "Kids & Family"],
+  Business:     ["Marketing", "Finance", "Productivity", "Side Hustle", "E-commerce", "Social Media", "Branding", "Entrepreneurship"],
+  Entertainment:["Movies & TV", "Music", "Gaming", "Books", "Podcasts", "Comedy"],
+};
+
+const SUBCATEGORY_HINT = Object.entries(SUBCATEGORY_TAXONOMY)
+  .map(([type, subs]) => `  ${type}: ${subs.join(", ")}`)
+  .join("\n");
 
 function contentTypeFromCategory(category: string): string {
   const map: Record<string, string> = {
     "Recipes": "Recipe",
     "Products": "Product",
     "Shopping Deals": "Product",
-    "Fashion": "Fashion / Outfit",
-    "Home": "Home Idea",
-    "Travel": "Travel Idea",
-    "Fitness": "Fitness / Workout",
+    "Fashion": "Fashion",
+    "Home": "Home",
+    "Travel": "Travel",
+    "Fitness": "Fitness",
     "Beauty": "Beauty",
     "Parenting": "Parenting",
-    "Business Ideas": "Business Idea",
+    "Business Ideas": "Business",
     "Entertainment": "Entertainment",
     "Videos": "Entertainment",
     "Education": "Tutorial",
@@ -151,13 +169,16 @@ async function aiCategorize(input: {
 Categories must be one of: ${CATEGORIES.join(", ")}.
 content_type is the PURPOSE of the content (what it's ABOUT), not the media format.
   - A recipe video → content_type "Recipe", NOT "Video"
-  - A fashion TikTok → content_type "Fashion / Outfit"
+  - A fashion TikTok → content_type "Fashion"
   - A product demo → content_type "Product"
   - A YouTube tutorial → content_type "Tutorial"
   content_type must be one of: ${CONTENT_TYPES.join(", ")}.
 media_format is the TECHNICAL DELIVERY (how it's delivered):
   - Video, Article, Webpage, Social Post, Product Page, Image.
-Subcategory specific (e.g. "Dinner > Chicken"). Tags: 3-6 lowercase short tags.
+subcategory must be ONE value chosen from this taxonomy for the chosen content_type:
+${SUBCATEGORY_HINT}
+If none fit, pick the closest. For Recipe, default subcategory is "Dinner" when unclear.
+Tags: 3-6 lowercase short tags.
 
 CRITICAL ANTI-HALLUCINATION RULES:
 - Only use facts present in the provided fields (Title/Caption/Description/Transcript/User hint/Notes/URL). Never invent specific dishes, products, brands, ingredients, locations, or topics that aren't explicitly mentioned.

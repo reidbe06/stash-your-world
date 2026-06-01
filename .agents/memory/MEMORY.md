@@ -1,2 +1,2 @@
-- [yt-dlp platform reality](ytdlp-platform-reality.md) — which platforms yt-dlp and Apify can actually access from Replit's server IP (updated with full findings)
-- [yt-dlp + Apify integration pattern](ytdlp-integration-pattern.md) — actor input shapes, field mappings, wiring into transcript/ingest pipeline, recategorize endpoint pattern
+- [Three-level taxonomy](taxonomy.md) — Type > Subcategory > Tags system; SUBCATEGORY_TAXONOMY defined in ai-categorize.functions.ts & share-ingest.server.ts must stay in sync.
+- [Type name simplification](type-names.md) — Canonical DB type values are simplified: Fashion, Home, Travel, Fitness, Business (not "Fashion / Outfit" etc.); all code must match.

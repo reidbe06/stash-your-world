@@ -37,16 +37,18 @@ const schema = z.object({
 });
 
 const TYPES: { key: string; label: string; icon: LucideIcon }[] = [
-  { key: "Recipe", label: "Recipe", icon: UtensilsCrossed },
-  { key: "Product", label: "Product", icon: ShoppingBag },
-  { key: "Fashion / Outfit", label: "Fashion", icon: Shirt },
-  { key: "Home Idea", label: "Home Idea", icon: Home },
-  { key: "Travel Idea", label: "Travel", icon: Plane },
-  { key: "Tutorial", label: "Tutorial", icon: BookOpen },
-  { key: "Fitness / Workout", label: "Fitness", icon: Dumbbell },
-  { key: "Beauty", label: "Beauty", icon: Sparkles },
+  { key: "Recipe",        label: "Recipe",        icon: UtensilsCrossed },
+  { key: "Fashion",       label: "Fashion",       icon: Shirt },
+  { key: "Product",       label: "Product",       icon: ShoppingBag },
+  { key: "Home",          label: "Home",          icon: Home },
+  { key: "Travel",        label: "Travel",        icon: Plane },
+  { key: "Tutorial",      label: "Tutorial",      icon: BookOpen },
+  { key: "Fitness",       label: "Fitness",       icon: Dumbbell },
+  { key: "Beauty",        label: "Beauty",        icon: Sparkles },
+  { key: "Parenting",     label: "Parenting",     icon: Video },
+  { key: "Business",      label: "Business",      icon: Bookmark },
   { key: "Entertainment", label: "Entertainment", icon: Video },
-  { key: "Other", label: "Other", icon: Bookmark },
+  { key: "Other",         label: "Other",         icon: Bookmark },
 ];
 
 const HELP_OPTIONS = [

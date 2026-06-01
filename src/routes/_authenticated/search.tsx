@@ -35,6 +35,7 @@ export const Route = createFileRoute("/_authenticated/search")({
   validateSearch: (s: Record<string, unknown>) => ({
     type: (s.type as string) || "all",
     q: (s.q as string) || "",
+    sub: (s.sub as string) || "",
   }),
   component: SearchPage,
 });
@@ -42,17 +43,19 @@ export const Route = createFileRoute("/_authenticated/search")({
 type SortKey = "newest" | "oldest" | "category";
 
 const CATEGORY_CHIPS = [
-  { key: "all", label: "All" },
-  { key: "Recipe", label: "Recipes" },
-  { key: "Product", label: "Products" },
-  { key: "Fashion / Outfit", label: "Fashion" },
-  { key: "Home Idea", label: "Home" },
-  { key: "Travel Idea", label: "Travel" },
-  { key: "Tutorial", label: "Tutorials" },
-  { key: "Fitness / Workout", label: "Fitness" },
-  { key: "Beauty", label: "Beauty" },
-  { key: "Entertainment", label: "Entertainment" },
-  { key: "Other", label: "Other" },
+  { key: "all",          label: "All" },
+  { key: "Recipe",       label: "Recipes" },
+  { key: "Product",      label: "Products" },
+  { key: "Fashion",      label: "Fashion" },
+  { key: "Home",         label: "Home" },
+  { key: "Travel",       label: "Travel" },
+  { key: "Tutorial",     label: "Tutorials" },
+  { key: "Fitness",      label: "Fitness" },
+  { key: "Beauty",       label: "Beauty" },
+  { key: "Business",     label: "Business" },
+  { key: "Parenting",    label: "Parenting" },
+  { key: "Entertainment",label: "Entertainment" },
+  { key: "Other",        label: "Other" },
 ];
 
 type ItemWithCollection = Item & { collection?: { id: string; name: string } | null };
@@ -69,11 +72,12 @@ function timeAgo(iso: string) {
 
 function SearchPage() {
   const { user } = useAuth();
-  const { type, q: initialQ } = Route.useSearch();
+  const { type, q: initialQ, sub: initialSub } = Route.useSearch();
   const [q, setQ] = useState(initialQ);
   const [category, setCategory] = useState(
     CATEGORY_CHIPS.some((c) => c.key === type) ? type : "all"
   );
+  const [subcategory, setSubcategory] = useState(initialSub || "");
   const [collectionFilter, setCollectionFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("newest");
@@ -108,7 +112,6 @@ function SearchPage() {
     },
   });
 
-  // One-time backfill so older items become searchable
   const backfilledRef = useRef(false);
   useEffect(() => {
     if (!items || backfilledRef.current) return;
@@ -120,7 +123,12 @@ function SearchPage() {
     );
   }, [items, runBackfill]);
 
-  // Debounced semantic search whenever the query changes (in AI mode)
+  // Reset subcategory when type changes
+  useEffect(() => {
+    setSubcategory("");
+  }, [category]);
+
+  // Debounced semantic search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const text = q.trim();
@@ -155,6 +163,19 @@ function SearchPage() {
     return Array.from(set).sort().slice(0, 24);
   }, [items]);
 
+  // Dynamic subcategory chips for selected type
+  const availableSubcats = useMemo(() => {
+    if (category === "all") return [];
+    const counts = new Map<string, number>();
+    items?.filter((it) => it.type === category).forEach((it) => {
+      const sub = (it as any).subcategory;
+      if (sub) counts.set(sub, (counts.get(sub) ?? 0) + 1);
+    });
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([sub, count]) => ({ sub, count }));
+  }, [items, category]);
+
   const useSemanticRanking = aiMode && q.trim().length > 0 && aiScores !== null;
 
   const results = useMemo(() => {
@@ -163,6 +184,7 @@ function SearchPage() {
 
     const passesFilters = (it: ItemWithCollection) => {
       if (category !== "all" && it.type !== category) return false;
+      if (subcategory && (it as any).subcategory !== subcategory) return false;
       if (collectionFilter !== "all") {
         if (collectionFilter === "none" && it.collection_id) return false;
         if (collectionFilter !== "none" && it.collection_id !== collectionFilter) return false;
@@ -190,6 +212,7 @@ function SearchPage() {
         (it.url ?? "").toLowerCase().includes(needle) ||
         (it.collection?.name ?? "").toLowerCase().includes(needle) ||
         it.type.toLowerCase().includes(needle) ||
+        ((it as any).subcategory ?? "").toLowerCase().includes(needle) ||
         it.tags.some((t) => t.toLowerCase().includes(needle))
       );
     });
@@ -199,12 +222,11 @@ function SearchPage() {
     else if (sort === "category") sorted.sort((a, b) => a.type.localeCompare(b.type) || +new Date(b.created_at) - +new Date(a.created_at));
     else sorted.sort((a, b) => +new Date(b.created_at) - +new Date(a.created_at));
     return sorted;
-  }, [items, q, category, collectionFilter, tagFilter, sort, useSemanticRanking, aiScores]);
-
-
+  }, [items, q, category, subcategory, collectionFilter, tagFilter, sort, useSemanticRanking, aiScores]);
 
   const activeFilters: { key: string; label: string; clear: () => void }[] = [];
-  if (category !== "all") activeFilters.push({ key: "cat", label: `Category: ${category}`, clear: () => setCategory("all") });
+  if (category !== "all") activeFilters.push({ key: "cat", label: `Type: ${category}`, clear: () => setCategory("all") });
+  if (subcategory) activeFilters.push({ key: "sub", label: subcategory, clear: () => setSubcategory("") });
   if (collectionFilter !== "all") {
     const name = collectionFilter === "none" ? "No collection" : collections?.find((c) => c.id === collectionFilter)?.name ?? "Collection";
     activeFilters.push({ key: "col", label: `In: ${name}`, clear: () => setCollectionFilter("all") });
@@ -213,6 +235,7 @@ function SearchPage() {
 
   const clearAll = () => {
     setCategory("all");
+    setSubcategory("");
     setCollectionFilter("all");
     setTagFilter("all");
     setQ("");
@@ -251,7 +274,7 @@ function SearchPage() {
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={aiMode ? "Try: chicken dinners, pink outfit, vacation ideas for Mexico…" : "Search title, notes, URL, tag, collection…"}
+            placeholder={aiMode ? "Try: chicken dinners, pink dresses, Mexico trip ideas…" : "Search title, notes, URL, tag, collection…"}
             className="h-11 rounded-full border-0 bg-muted pl-11 pr-10 text-sm"
           />
           {aiLoading ? (
@@ -266,7 +289,6 @@ function SearchPage() {
             </button>
           ) : null}
         </div>
-
 
         <DropdownMenu>
           <DropdownMenuTrigger className="flex h-11 shrink-0 items-center gap-1.5 rounded-full bg-muted px-4 text-sm font-semibold text-foreground hover:bg-accent">
@@ -318,6 +340,7 @@ function SearchPage() {
         </DropdownMenu>
       </div>
 
+      {/* Level 1: Content type chips */}
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex gap-2 pb-1">
           {CATEGORY_CHIPS.map((c) => {
@@ -339,6 +362,40 @@ function SearchPage() {
           })}
         </div>
       </div>
+
+      {/* Level 2: Subcategory chips (dynamic, shown when a type is selected) */}
+      {category !== "all" && availableSubcats.length > 0 && (
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-1.5 pb-1">
+            <button
+              onClick={() => setSubcategory("")}
+              className={cn(
+                "shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition",
+                !subcategory
+                  ? "border-primary/30 bg-primary/10 text-primary"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground"
+              )}
+            >
+              All
+            </button>
+            {availableSubcats.map(({ sub, count }) => (
+              <button
+                key={sub}
+                onClick={() => setSubcategory(sub === subcategory ? "" : sub)}
+                className={cn(
+                  "shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition",
+                  subcategory === sub
+                    ? "border-primary/30 bg-primary/10 text-primary"
+                    : "border-border bg-card text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {sub}
+                <span className="ml-1 text-[10px] opacity-60">{count}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {activeFilters.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
@@ -410,6 +467,10 @@ function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity
     qc.invalidateQueries({ queryKey: ["collection-items"] });
   };
 
+  const badgeLabel = (item as any).subcategory
+    ? `${item.type} › ${(item as any).subcategory}`
+    : item.type;
+
   return (
     <div className="group relative">
       <a
@@ -426,8 +487,8 @@ function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity
               <Bookmark className="h-10 w-10 text-primary/40" />
             </div>
           )}
-          <span className="absolute left-2 top-2 rounded-full bg-card/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
-            {item.type}
+          <span className="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-card/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
+            {badgeLabel}
           </span>
           {typeof similarity === "number" && (
             <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-brand">

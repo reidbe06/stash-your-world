@@ -21,6 +21,7 @@ export interface Item {
   description: string | null;
   image_url: string | null;
   type: string;
+  subcategory?: string | null;
   source: string | null;
   tags: string[];
   created_at: string;
