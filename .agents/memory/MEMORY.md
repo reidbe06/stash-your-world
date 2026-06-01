@@ -1,2 +1,3 @@
 - [Three-level taxonomy](taxonomy.md) — Type > Subcategory > Tags system; SUBCATEGORY_TAXONOMY defined in ai-categorize.functions.ts & share-ingest.server.ts must stay in sync.
 - [Type name simplification](type-names.md) — Canonical DB type values are simplified: Fashion, Home, Travel, Fitness, Business (not "Fashion / Outfit" etc.); all code must match.
+- [Image extraction pipeline](image-extraction.md) — score-based image selection; isRejectedImageUrl + scoreImageCandidate; JSON-LD type-priority order.

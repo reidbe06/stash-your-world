@@ -428,6 +428,43 @@ function SavePage() {
           </p>
         </div>
 
+        {/* Thumbnail preview / manual image entry */}
+        {metaLoaded && !fetching && (
+          form.image_url ? (
+            <div className="flex items-center gap-3 rounded-2xl border bg-accent/30 px-4 py-3">
+              <img
+                src={form.image_url}
+                alt=""
+                className="h-14 w-14 shrink-0 rounded-xl object-cover border"
+                onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-muted-foreground">Thumbnail</p>
+                <p className="mt-0.5 truncate text-xs text-foreground/70">{form.image_url}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, image_url: "" }))}
+                className="shrink-0 text-xs text-destructive hover:underline"
+              >
+                Remove
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2.5 rounded-2xl border border-dashed px-4 py-3">
+              <ImageIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <Input
+                type="url"
+                value={form.image_url}
+                onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))}
+                placeholder="No thumbnail found — paste an image URL to add one"
+                maxLength={2000}
+                className="h-auto border-0 p-0 text-sm shadow-none focus-visible:ring-0"
+              />
+            </div>
+          )
+        )}
+
         {statusMessage && (
           <div className="flex items-center gap-2 rounded-2xl border bg-accent/40 px-4 py-3 text-sm font-semibold">
             {displayStatus === "organized" ? <Sparkles className="h-4 w-4 text-primary" /> : <Wand2 className="h-4 w-4 text-muted-foreground" />}
