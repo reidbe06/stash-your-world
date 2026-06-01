@@ -25,6 +25,89 @@ async function embedQuery(text: string): Promise<number[]> {
   return vec;
 }
 
+// ─── Intent Classification ────────────────────────────────────────────────────
+
+const BROWSE_PATTERNS = [
+  /\b(recipe|recipes|food|meal|meals|dish|dishes|cook|cooking)\b/i,
+  /\b(outfit|outfits|fashion|style|looks?|wear|clothing|clothes)\b/i,
+  /\b(product|products|buy|purchase|shop|shopping)\b/i,
+  /\b(home\s+idea|home\s+decor|decor|interior|furniture|room)\b/i,
+  /\b(travel\s+idea|travel|trip|vacation|destination)\b/i,
+  /\b(tutorial|guide|how\s*to|how-to|lesson)\b/i,
+  /\bideas?\b/i,
+  /\b(fitness|workout|exercise|gym)\b/i,
+  /\b(beauty|skincare|makeup)\b/i,
+  /\b(entertainment|video|videos)\b/i,
+  /\b(business|startup)\b/i,
+  /\b(parenting|kids|baby|children)\b/i,
+  /\bshow\s+(me\s+)?(all|every|my)/i,
+  /\bfind\s+(all|every|my)/i,
+  /\blist\s+(all|my|every)/i,
+  /\bwhat\s+.*(have\s+i\s+saved|i'?ve?\s+saved|saved)/i,
+  /\ball\s+my\b/i,
+];
+
+function isBrowseQuery(question: string): boolean {
+  return BROWSE_PATTERNS.some((p) => p.test(question));
+}
+
+// ─── Content-Type Detection ───────────────────────────────────────────────────
+
+const TYPE_KEYWORD_MAP: Record<string, string> = {
+  recipe: "Recipe", recipes: "Recipe", food: "Recipe", meal: "Recipe", meals: "Recipe",
+  dish: "Recipe", dishes: "Recipe", cooking: "Recipe",
+  outfit: "Fashion / Outfit", outfits: "Fashion / Outfit", fashion: "Fashion / Outfit",
+  style: "Fashion / Outfit", clothing: "Fashion / Outfit", clothes: "Fashion / Outfit",
+  product: "Product", products: "Product", buy: "Product", purchase: "Product",
+  shopping: "Product", shop: "Product",
+  "home idea": "Home Idea", "home decor": "Home Idea", decor: "Home Idea",
+  interior: "Home Idea", furniture: "Home Idea",
+  travel: "Travel Idea", trip: "Travel Idea", vacation: "Travel Idea", destination: "Travel Idea",
+  tutorial: "Tutorial", guide: "Tutorial",
+  fitness: "Fitness / Workout", workout: "Fitness / Workout", exercise: "Fitness / Workout",
+  gym: "Fitness / Workout",
+  beauty: "Beauty", skincare: "Beauty", makeup: "Beauty",
+  entertainment: "Entertainment",
+  business: "Business Idea", startup: "Business Idea",
+  parenting: "Parenting", kids: "Parenting", baby: "Parenting",
+};
+
+function detectContentType(question: string): string | null {
+  const lower = question.toLowerCase();
+  // Multi-word phrases first
+  for (const [kw, type] of Object.entries(TYPE_KEYWORD_MAP)) {
+    if (kw.includes(" ")) {
+      if (lower.includes(kw)) return type;
+    }
+  }
+  // Single words with word boundary
+  for (const [kw, type] of Object.entries(TYPE_KEYWORD_MAP)) {
+    if (!kw.includes(" ") && new RegExp(`\\b${kw}\\b`).test(lower)) return type;
+  }
+  return null;
+}
+
+// ─── Topic Keyword Extraction ─────────────────────────────────────────────────
+
+const STOP_WORDS = new Set([
+  "what", "have", "ive", "i've", "saved", "show", "me", "find", "all", "my", "the", "a",
+  "an", "for", "with", "about", "items", "things", "do", "get", "is", "are", "was", "in",
+  "on", "at", "to", "of", "and", "or", "that", "this", "from", "by", "any", "some", "most",
+  "more", "which", "can", "could", "would", "should", "using", "use", "save", "stash",
+  "ideas", "idea", "saved", "ever", "list", "every", "each", "across",
+]);
+
+function extractTopicKeywords(question: string): string[] {
+  const typeWords = new Set(Object.keys(TYPE_KEYWORD_MAP).filter((k) => !k.includes(" ")));
+  return question
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !STOP_WORDS.has(w) && !typeWords.has(w));
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 export type AskMatchItem = {
   id: string;
   title: string;
@@ -47,7 +130,13 @@ export type AskResult = {
   collectionIds: string[];
   items: AskMatchItem[];
   collections: AskCollection[];
+  /** All matched items — for the "Show All Results" section */
+  allItems: AskMatchItem[];
+  totalCount: number;
+  isBrowse: boolean;
 };
+
+// ─── Server Function ──────────────────────────────────────────────────────────
 
 export const askStashd = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -71,17 +160,58 @@ export const askStashd = createServerFn({ method: "POST" })
     const key = process.env.OPENAI_API_KEY;
     if (!key) throw new Error("OPENAI_API_KEY not configured");
 
-    // 1) Semantic search restricted to this user (use the user-scoped client so RLS + auth.uid() apply)
+    const isBrowse = isBrowseQuery(data.question);
+    const detectedType = detectContentType(data.question);
+    const topicKeywords = extractTopicKeywords(data.question);
+
+    console.log(`[ASK] intent=${isBrowse ? "browse" : "specific"} type=${detectedType ?? "none"} keywords=${topicKeywords.join(",")}`);
+
+    // ── 1a. Embed query ───────────────────────────────────────────────────────
     const { supabase } = context;
     const vec = await embedQuery(data.question);
-    const { data: matches } = await supabase.rpc("search_items_semantic", {
+
+    // ── 1b. Semantic search (broad for browse, tight for specific) ────────────
+    const matchCount = isBrowse ? 150 : 20;
+    const minSim = isBrowse ? 0.05 : 0.1;
+
+    const semanticPromise = supabase.rpc("search_items_semantic", {
       query_embedding: vec as any,
-      match_count: 20,
-      min_similarity: 0.1,
+      match_count: matchCount,
+      min_similarity: minSim,
     });
-    let matchIds: string[] = Array.isArray(matches) ? matches.map((m: any) => m.id) : [];
-    if (matchIds.length === 0) {
-      // Fallback: cosine in JS over the user's items (handles missing/old embeddings)
+
+    // ── 1c. Structured DB search (browse queries only) ────────────────────────
+    let structuredIds: string[] = [];
+    if (isBrowse) {
+      let q = supabaseAdmin.from("items").select("id").eq("user_id", userId);
+
+      if (detectedType) {
+        q = q.eq("type", detectedType);
+      }
+
+      if (topicKeywords.length > 0) {
+        // Keywords narrow within the type, or across all items if no type detected
+        const orParts = topicKeywords.flatMap((kw) => [
+          `title.ilike.%${kw}%`,
+          `ai_summary.ilike.%${kw}%`,
+          `category.ilike.%${kw}%`,
+          `subcategory.ilike.%${kw}%`,
+        ]);
+        q = q.or(orParts.join(","));
+      }
+
+      const { data: sRows } = await q.limit(500);
+      structuredIds = sRows?.map((r: any) => r.id) ?? [];
+      console.log(`[ASK] structured search returned ${structuredIds.length} rows`);
+    }
+
+    // ── 1d. Fallback JS cosine if semantic returns nothing ─────────────────────
+    const { data: semanticMatches } = await semanticPromise;
+    let semanticIds: string[] = Array.isArray(semanticMatches)
+      ? semanticMatches.map((m: any) => m.id)
+      : [];
+
+    if (semanticIds.length === 0) {
       const { data: rows } = await supabaseAdmin
         .from("items")
         .select("id, embedding")
@@ -104,11 +234,21 @@ export const askStashd = createServerFn({ method: "POST" })
           })
           .filter(Boolean) as { id: string; sim: number }[];
         scored.sort((a, b) => b.sim - a.sim);
-        matchIds = scored.slice(0, 20).map((s) => s.id);
+        semanticIds = scored.slice(0, matchCount).map((s) => s.id);
       }
     }
 
-    if (matchIds.length === 0) {
+    console.log(`[ASK] semantic search returned ${semanticIds.length} ids`);
+
+    // ── 1e. Merge: structured (exact matches first), then semantic ─────────────
+    // For browse: structured + semantic union; for specific: semantic only
+    const mergedIds = isBrowse
+      ? [...new Set([...structuredIds, ...semanticIds])]
+      : semanticIds;
+
+    console.log(`[ASK] merged total: ${mergedIds.length} unique items`);
+
+    if (mergedIds.length === 0) {
       return {
         answer:
           "I couldn't find anything in your STASHd that matches. Try saving more items or rephrasing your question.",
@@ -116,22 +256,33 @@ export const askStashd = createServerFn({ method: "POST" })
         collectionIds: [],
         items: [],
         collections: [],
+        allItems: [],
+        totalCount: 0,
+        isBrowse,
       };
     }
 
-    // 2) Load full item rows + collections
-    const { data: itemRows, error: itemsErr } = await supabaseAdmin
-      .from("items")
-      .select(
-        "id,user_id,title,url,image_url,source,type,category,subcategory,ai_summary,description,tags,collection_id",
-      )
-      .in("id", matchIds)
-      .eq("user_id", userId);
-    if (itemsErr) throw new Error(itemsErr.message);
+    // ── 2. Load full item rows ─────────────────────────────────────────────────
+    // Batch in chunks of 100 to stay within PostgREST URL limits
+    const chunkSize = 100;
+    const chunks: string[][] = [];
+    for (let i = 0; i < mergedIds.length; i += chunkSize) {
+      chunks.push(mergedIds.slice(i, i + chunkSize));
+    }
+    const chunkResults = await Promise.all(
+      chunks.map((chunk) =>
+        supabaseAdmin
+          .from("items")
+          .select("id,user_id,title,url,image_url,source,type,category,subcategory,ai_summary,description,tags,collection_id")
+          .in("id", chunk)
+          .eq("user_id", userId),
+      ),
+    );
+    const itemRows = chunkResults.flatMap((r) => r.data ?? []);
 
-    const ordered = matchIds
-      .map((id) => itemRows?.find((r) => r.id === id))
-      .filter(Boolean) as NonNullable<typeof itemRows>;
+    // Preserve merge order (structured matches first for browse)
+    const itemById = new Map(itemRows.map((r) => [r.id, r]));
+    const ordered = mergedIds.map((id) => itemById.get(id)).filter(Boolean) as typeof itemRows;
 
     const collectionIds = Array.from(
       new Set(ordered.map((r) => r.collection_id).filter(Boolean) as string[]),
@@ -146,7 +297,7 @@ export const askStashd = createServerFn({ method: "POST" })
       cols?.forEach((c) => collectionMap.set(c.id, c.name));
     }
 
-    // 3) Build LLM context (numbered list so model can cite by index)
+    // ── 3. Build LLM context ───────────────────────────────────────────────────
     const isOpaqueSocial = (it: any) => {
       const url = String(it.url || "").toLowerCase();
       const social = /(tiktok\.com|instagram\.com|\/reel\/|\/reels\/)/.test(url);
@@ -158,40 +309,66 @@ export const askStashd = createServerFn({ method: "POST" })
       return social && !hasUserContext;
     };
 
-    const contextBlock = ordered
+    // For large result sets (browse), use compact format to stay within token budget.
+    // For specific queries keep the richer format.
+    const MAX_CONTEXT_ITEMS = 200;
+    const contextItems = ordered.slice(0, MAX_CONTEXT_ITEMS);
+
+    const contextBlock = contextItems
       .map((it, i) => {
         const opaque = isOpaqueSocial(it);
+        if (opaque) {
+          return `[${i + 1}] id=${it.id} | title: ${it.title || "(untitled)"} | NOTE: opaque social link — unknown content`;
+        }
         const parts = [
           `[${i + 1}] id=${it.id}`,
           it.title && `title: ${it.title}`,
+          it.type && `type: ${it.type}`,
           it.category && `category: ${it.category}${it.subcategory ? ` > ${it.subcategory}` : ""}`,
+          it.tags?.length ? `tags: ${it.tags.slice(0, 6).join(", ")}` : null,
           it.collection_id && collectionMap.get(it.collection_id)
             ? `collection: ${collectionMap.get(it.collection_id)}`
             : null,
-          it.tags?.length ? `tags: ${it.tags.join(", ")}` : null,
           it.source && `source: ${it.source}`,
-          it.type && `type: ${it.type}`,
-          it.ai_summary && `summary: ${it.ai_summary}`,
-          it.description && `notes: ${String(it.description).slice(0, 300)}`,
-          it.url && `url: ${it.url}`,
-          opaque ? `NOTE: opaque social link — no readable content. Do NOT guess what it is about.` : null,
+          // Include summary only in specific-query mode or for first 50 items in browse
+          (!isBrowse || i < 50) && it.ai_summary
+            ? `summary: ${it.ai_summary}`
+            : null,
+          (!isBrowse || i < 50) && it.description
+            ? `notes: ${String(it.description).slice(0, 200)}`
+            : null,
         ].filter(Boolean);
         return parts.join(" | ");
       })
       .join("\n");
 
+    const totalCount = ordered.length;
+    const overflowNote =
+      totalCount > MAX_CONTEXT_ITEMS
+        ? `\n\n(Showing first ${MAX_CONTEXT_ITEMS} of ${totalCount} total matching items.)`
+        : "";
+
+    const browseInstruction = isBrowse
+      ? `This is a BROWSE/COLLECTION query. The user wants to know about ALL matching items. You MUST:
+1. State the exact total count: "${totalCount}" matching items found.
+2. Give a helpful summary of the collection (common themes, notable items, variety).
+3. In "item_ids", return up to 12 of the MOST interesting/representative items.
+4. Keep the answer conversational and useful — tell the user what's in their collection.`
+      : `In "answer", write a short, conversational reply (1-3 sentences) referencing relevant items naturally. In "item_ids", return the ids of items most relevant to the answer (max 8, in order of relevance).`;
+
     const systemPrompt = `You are "Ask My STASHd", a friendly assistant that ONLY answers using the user's saved STASHd items provided below. Never invent items, links, or facts. Never use general internet knowledge. You CANNOT open URLs or watch videos — only the fields shown below exist.
 
 Rules:
-- Use ONLY these fields per item: title, category/subcategory, collection, tags, source, type, ai_summary, notes (user description), url.
-- For items marked "NOTE: opaque social link" (TikTok / Instagram / Reels with no notes, tags, or non-Uncategorized category), do NOT guess the topic, recipe, product, or content. Treat them as unknown.
-- If the user asks about an opaque social item, or if relevant items lack the detail needed to answer, say exactly: "I saved this link, but I need a note or category to understand it better." Then briefly suggest they add a note, tag, or category to that item.
-- If saved items don't answer the question at all, say so plainly and suggest what they could save next.
+- Use ONLY the fields shown per item: title, type, category/subcategory, collection, tags, source, ai_summary, notes.
+- For items marked "NOTE: opaque social link", do NOT guess the topic or content.
+- If saved items don't answer the question at all, say so plainly.
 
-Always call the answer tool. In "answer", write a short, conversational reply (1-3 sentences) referencing relevant items naturally. In "item_ids", return the ids of the items most relevant to the answer (max 8, in order of relevance). In "collection_ids", return ids of collections worth surfacing (max 4). Do not include items unrelated to the question.
+${browseInstruction}
+In "collection_ids", return ids of relevant collections (max 4).
+Always call the answer tool.
 
-USER'S SAVED ITEMS:
-${contextBlock || "(none)"}
+USER'S SAVED ITEMS (${totalCount} total matching):
+${contextBlock || "(none)"}${overflowNote}
 
 COLLECTIONS:
 ${collectionIds.length ? collectionIds.map((id) => `${id} = ${collectionMap.get(id)}`).join("\n") : "(none)"}`;
@@ -218,7 +395,14 @@ ${collectionIds.length ? collectionIds.map((id) => `${id} = ${collectionMap.get(
               type: "object",
               properties: {
                 answer: { type: "string" },
-                item_ids: { type: "array", items: { type: "string" }, maxItems: 8 },
+                item_ids: {
+                  type: "array",
+                  items: { type: "string" },
+                  maxItems: isBrowse ? 12 : 8,
+                  description: isBrowse
+                    ? "IDs of the most interesting/representative items (up to 12)"
+                    : "IDs of items most relevant to the answer (up to 8)",
+                },
                 collection_ids: { type: "array", items: { type: "string" }, maxItems: 4 },
               },
               required: ["answer", "item_ids", "collection_ids"],
@@ -230,19 +414,19 @@ ${collectionIds.length ? collectionIds.map((id) => `${id} = ${collectionMap.get(
       tool_choice: { type: "function", function: { name: "answer" } },
     };
 
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (!res.ok) {
-      if (res.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
-      if (res.status === 402) throw new Error("AI credits exhausted.");
-      const txt = await res.text();
-      console.error("Ask gateway error", res.status, txt);
+    if (!chatRes.ok) {
+      if (chatRes.status === 429) throw new Error("AI rate limit reached. Try again in a moment.");
+      if (chatRes.status === 402) throw new Error("AI credits exhausted.");
+      const txt = await chatRes.text();
+      console.error("Ask gateway error", chatRes.status, txt);
       throw new Error("Ask My STASHd failed");
     }
-    const json = await res.json();
+    const json = await chatRes.json();
     const call = json.choices?.[0]?.message?.tool_calls?.[0];
     const argsStr = call?.function?.arguments;
     if (!argsStr) throw new Error("No answer returned");
@@ -252,33 +436,43 @@ ${collectionIds.length ? collectionIds.map((id) => `${id} = ${collectionMap.get(
       collection_ids: string[];
     };
 
-    const filteredItemIds = (parsed.item_ids || []).filter((id) => validItemIds.has(id)).slice(0, 8);
+    const maxHighlights = isBrowse ? 12 : 8;
+    const filteredItemIds = (parsed.item_ids || []).filter((id) => validItemIds.has(id)).slice(0, maxHighlights);
     const filteredCollectionIds = (parsed.collection_ids || [])
       .filter((id) => validCollectionIds.has(id))
       .slice(0, 4);
 
+    // Build highlight items (AI-picked)
     const itemMap = new Map(ordered.map((r) => [r.id, r]));
+    const toAskItem = (r: (typeof ordered)[0]): AskMatchItem => ({
+      id: r.id,
+      title: r.title,
+      url: r.url,
+      image_url: r.image_url,
+      source: r.source,
+      type: r.type,
+      category: r.category,
+      subcategory: r.subcategory,
+      ai_summary: r.ai_summary,
+      tags: r.tags || [],
+      collection_id: r.collection_id,
+    });
+
     const items: AskMatchItem[] = filteredItemIds
       .map((id) => itemMap.get(id))
-      .filter(Boolean)
-      .map((r) => ({
-        id: r!.id,
-        title: r!.title,
-        url: r!.url,
-        image_url: r!.image_url,
-        source: r!.source,
-        type: r!.type,
-        category: r!.category,
-        subcategory: r!.subcategory,
-        ai_summary: r!.ai_summary,
-        tags: r!.tags || [],
-        collection_id: r!.collection_id,
-      }));
+      .filter((r): r is NonNullable<typeof r> => r != null)
+      .map(toAskItem);
 
     const collections: AskCollection[] = filteredCollectionIds.map((id) => ({
       id,
       name: collectionMap.get(id) || "Collection",
     }));
+
+    // All matched items (for "Show All Results") — exclude AI-picked highlights to avoid duplication
+    const highlightSet = new Set(filteredItemIds);
+    const allItems: AskMatchItem[] = ordered
+      .filter((r) => r && !highlightSet.has(r.id))
+      .map((r) => toAskItem(r!));
 
     return {
       answer: parsed.answer,
@@ -286,5 +480,8 @@ ${collectionIds.length ? collectionIds.map((id) => `${id} = ${collectionMap.get(
       collectionIds: filteredCollectionIds,
       items,
       collections,
+      allItems,
+      totalCount,
+      isBrowse,
     };
   });
