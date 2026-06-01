@@ -91,6 +91,7 @@ async function aiCategorize(input: {
   creator?: string | null;
   caption?: string | null;
   transcript?: string | null;
+  hashtags?: string[];
   notes?: string; contextType?: string;
   existingCollections: string[];
 }) {
@@ -105,6 +106,7 @@ async function aiCategorize(input: {
     input.caption && `Caption: ${input.caption}`,
     input.description && `Description: ${input.description}`,
     input.transcript && `Transcript: ${input.transcript.slice(0, 6000)}`,
+    input.hashtags?.length && `Hashtags: ${input.hashtags.map(h => `#${h}`).join(" ")}`,
     input.contextType && `User hint: ${input.contextType}`,
     input.notes && `Notes: ${input.notes}`,
   ].filter(Boolean).join("\n");
@@ -397,12 +399,12 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     processingStatus = "needs_user_context";
   } else {
     // We have at least some content — call OpenAI.
-    // Include yt-dlp video tags as hashtag hints if available
-    const ytTags = ytEnrich?.tags?.length ? ytEnrich.tags.slice(0, 10) : [];
+    // Hashtags from yt-dlp (YouTube tags) or Apify (Instagram/TikTok hashtags)
+    const enrichHashtags = ytEnrich?.tags?.length ? ytEnrich.tags.slice(0, 10) : [];
     const aiInput = {
       url: input.url, title, description, source,
       platform, creator, caption, transcript,
-      hashtags: ytTags.length ? ytTags : undefined,
+      hashtags: enrichHashtags.length ? enrichHashtags : undefined,
       notes: userNote,
       contextType,
       existingCollections: existingNames,
@@ -410,8 +412,10 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     const aiPromptText = [
       `URL: ${input.url}`,
       `Platform: ${platform}`,
+      creator && `Creator: ${creator}`,
       caption && `Caption: ${caption.slice(0, 300)}`,
-      transcript && `Transcript (first 300): ${transcript.slice(0, 300)}`,
+      transcript && `Transcript (first 400): ${transcript.slice(0, 400)}`,
+      enrichHashtags.length && `Hashtags: ${enrichHashtags.map(h => `#${h}`).join(" ")}`,
       userNote && `Note: ${userNote}`,
       contextType && `Hint: ${contextType}`,
     ].filter(Boolean).join("\n");
@@ -473,7 +477,12 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     // New structured fields
     source_platform: platform,
     creator_name: creator,
-    original_caption: caption,
+    // For Instagram/TikTok, Apify caption goes into original_caption (it IS the post caption)
+    original_caption: caption ?? (
+      (platform === "instagram_reel" || platform === "instagram" || platform === "tiktok") && transcript
+        ? transcript
+        : null
+    ),
     transcript,
     ai_category: opaqueVideo ? null : category,
     ai_subcategory: subcategory,

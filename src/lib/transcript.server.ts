@@ -6,12 +6,13 @@
  *
  * Priority per platform
  *   YouTube / Shorts  → yt-dlp (subtitle tracks + description) → timedtext API → page captions
- *   TikTok            → yt-dlp (datacenter IP blocked, logs + falls through) → page scrape → Firecrawl
- *   Instagram Reel    → yt-dlp (requires cookies, logs + falls through) → Firecrawl → og:description
+ *   TikTok            → yt-dlp (datacenter IP blocked) → Apify clockworks/tiktok-scraper → page scrape → Firecrawl
+ *   Instagram Reel    → yt-dlp (requires cookies) → Apify apify/instagram-scraper → Firecrawl → og:description
  *   Other video       → null (no transcript source available)
  */
 
 import { fetchYtDlpData, fetchSubtitleText, type YtDlpData } from "./ytdlp.server";
+import { fetchInstagramApify, fetchTikTokApify, type ApifyResult } from "./apify.server";
 
 const MAX_TRANSCRIPT_CHARS = 7500; // stays inside the 8000-char embedding limit
 const FETCH_TIMEOUT_MS = 12_000;
@@ -170,6 +171,15 @@ function ytdlpEnrichment(d: YtDlpData): YtDlpEnrichment {
     uploader: d.uploader,
     tags: d.tags,
     thumbnail: d.thumbnail,
+  };
+}
+
+function apifyToEnrichment(r: ApifyResult): YtDlpEnrichment {
+  return {
+    title: r.title,
+    uploader: r.creator_fullname ?? r.creator_username,
+    tags: r.hashtags,
+    thumbnail: r.thumbnail,
   };
 }
 
@@ -546,40 +556,46 @@ async function fetchInstagramPageCaption(url: string): Promise<TranscriptResult 
 
 async function fetchInstagramCaption(url: string): Promise<TranscriptResult | null> {
   // ── Tier 1: yt-dlp ─────────────────────────────────────────────────────────
-  // Instagram requires login cookies from a server environment — will fail and
-  // log the reason, then fall through to Firecrawl and og:description scraping.
+  // Instagram requires login cookies — will fail and fall through.
   console.log(`[transcript] Instagram: trying yt-dlp (Tier 1)…`);
   const ytdlp = await fetchYtDlpData(url);
   if (ytdlp?.description && ytdlp.description.length > 20) {
     const { text: t, isPartial } = trunc(ytdlp.description);
     console.log(`[transcript] Instagram: yt-dlp SUCCESS caption_len=${t.length}`);
-    console.log(`[transcript] Instagram yt-dlp caption (first 200): ${JSON.stringify(t.slice(0, 200))}`);
     return { text: t, method: "instagram_ytdlp", isPartial, ytdlp: ytdlpEnrichment(ytdlp) };
   }
-  console.log(`[transcript] Instagram: yt-dlp returned null (requires login cookies from server environment — use Apify for reliable access)`);
+  console.log(`[transcript] Instagram: yt-dlp failed (requires login cookies) — falling through`);
 
-  // ── Tier 2: Firecrawl ───────────────────────────────────────────────────────
+  // ── Tier 2: Apify instagram-scraper ────────────────────────────────────────
+  console.log(`[transcript] Instagram: trying Apify (Tier 2)…`);
+  const apify = await fetchInstagramApify(url);
+  if (apify?.caption && apify.caption.length > 10) {
+    const { text: t, isPartial } = trunc(apify.caption);
+    console.log(`[transcript] Instagram: Apify SUCCESS caption_len=${t.length} creator=${JSON.stringify(apify.creator_username)} hashtags=${apify.hashtags.length}`);
+    console.log(`[transcript] Instagram Apify caption (first 300): ${JSON.stringify(t.slice(0, 300))}`);
+    return { text: t, method: "instagram_apify", isPartial, ytdlp: apifyToEnrichment(apify) };
+  }
+  console.log(`[transcript] Instagram: Apify returned null — falling through to Firecrawl`);
+
+  // ── Tier 3: Firecrawl ───────────────────────────────────────────────────────
   const hasApiKey = !!process.env.FIRECRAWL_API_KEY;
-  console.log(`[transcript] Instagram: Firecrawl configured=${hasApiKey}`);
-
   if (hasApiKey) {
+    console.log(`[transcript] Instagram: trying Firecrawl (Tier 3)…`);
     const firecrawlResult = await fetchCaptionViaFirecrawl(url, "instagram");
     if (firecrawlResult) {
-      console.log(`[transcript] Instagram: Firecrawl SUCCESS method=${firecrawlResult.method} len=${firecrawlResult.text.length}`);
-      console.log(`[transcript] Instagram text (first 200): ${JSON.stringify(firecrawlResult.text.slice(0, 200))}`);
+      console.log(`[transcript] Instagram: Firecrawl SUCCESS len=${firecrawlResult.text.length}`);
       return firecrawlResult;
     }
-    console.log(`[transcript] Instagram: Firecrawl returned null (platform blocks free-plan scrapers with 403)`);
+    console.log(`[transcript] Instagram: Firecrawl returned null (platform blocks with 403)`);
   }
 
-  // ── Tier 3: direct og:description scrape ────────────────────────────────────
-  console.log(`[transcript] Instagram: trying direct page scrape (og:description)…`);
+  // ── Tier 4: direct og:description scrape ───────────────────────────────────
+  console.log(`[transcript] Instagram: trying direct page scrape (Tier 4)…`);
   const pageResult = await fetchInstagramPageCaption(url);
   if (pageResult) {
-    console.log(`[transcript] Instagram: page scrape SUCCESS method=${pageResult.method} len=${pageResult.text.length}`);
-    console.log(`[transcript] Instagram text (first 200): ${JSON.stringify(pageResult.text.slice(0, 200))}`);
+    console.log(`[transcript] Instagram: page scrape SUCCESS len=${pageResult.text.length}`);
   } else {
-    console.log(`[transcript] Instagram: all tiers failed — no caption extractable. Next step: Apify (Tier 2 from architecture report)`);
+    console.log(`[transcript] Instagram: all tiers exhausted — no caption extracted`);
   }
   return pageResult;
 }
@@ -603,7 +619,7 @@ export async function fetchTranscript(
       case "youtube_short":
         return await fetchYouTubeTranscript(url);
       case "tiktok": {
-        // Tier 1: yt-dlp (datacenter IPs blocked by TikTok — will fail and fall through)
+        // ── Tier 1: yt-dlp (datacenter IPs blocked — fails and falls through) ──
         console.log(`[transcript] TikTok: trying yt-dlp (Tier 1)…`);
         const ytd = await fetchYtDlpData(url);
         if (ytd?.description && ytd.description.length > 20) {
@@ -611,9 +627,21 @@ export async function fetchTranscript(
           console.log(`[transcript] TikTok: yt-dlp SUCCESS caption_len=${t.length}`);
           return { text: t, method: "tiktok_ytdlp", isPartial, ytdlp: ytdlpEnrichment(ytd) };
         }
-        console.log(`[transcript] TikTok: yt-dlp returned null (datacenter IP blocked — falling through to page scrape)`);
-        // Tier 2: page scrape (user-agent rotation)
-        // Tier 3: Firecrawl
+        console.log(`[transcript] TikTok: yt-dlp failed (datacenter IP blocked) — falling through`);
+
+        // ── Tier 2: Apify clockworks/tiktok-scraper ───────────────────────────
+        console.log(`[transcript] TikTok: trying Apify (Tier 2)…`);
+        const tktApify = await fetchTikTokApify(url);
+        if (tktApify?.caption && tktApify.caption.length > 10) {
+          const { text: t, isPartial } = trunc(tktApify.caption);
+          console.log(`[transcript] TikTok: Apify SUCCESS caption_len=${t.length} creator=${JSON.stringify(tktApify.creator_username)} hashtags=${tktApify.hashtags.length}`);
+          console.log(`[transcript] TikTok Apify caption (first 300): ${JSON.stringify(t.slice(0, 300))}`);
+          return { text: t, method: "tiktok_apify", isPartial, ytdlp: apifyToEnrichment(tktApify) };
+        }
+        console.log(`[transcript] TikTok: Apify returned null — falling through to page scrape`);
+
+        // ── Tier 3: page scrape (user-agent rotation) ─────────────────────────
+        // ── Tier 4: Firecrawl ─────────────────────────────────────────────────
         return await fetchTikTokPageCaption(url)
           ?? await fetchCaptionViaFirecrawl(url, "tiktok");
       }
