@@ -5,19 +5,30 @@
  * Plugs into share-ingest.server.ts at the transcript placeholder.
  *
  * Priority per platform
- *   YouTube / Shorts  → timedtext API (free, fast) → page caption track extraction
- *   TikTok            → page scrape (__NEXT_DATA__ / SIGI_STATE) → Firecrawl fallback
- *   Instagram Reel    → Firecrawl (JS-rendered, most reliable) → og:description fallback
+ *   YouTube / Shorts  → yt-dlp (subtitle tracks + description) → timedtext API → page captions
+ *   TikTok            → yt-dlp (datacenter IP blocked, logs + falls through) → page scrape → Firecrawl
+ *   Instagram Reel    → yt-dlp (requires cookies, logs + falls through) → Firecrawl → og:description
  *   Other video       → null (no transcript source available)
  */
 
+import { fetchYtDlpData, fetchSubtitleText, type YtDlpData } from "./ytdlp.server";
+
 const MAX_TRANSCRIPT_CHARS = 7500; // stays inside the 8000-char embedding limit
 const FETCH_TIMEOUT_MS = 12_000;
+
+export type YtDlpEnrichment = {
+  title: string | null;
+  uploader: string | null;
+  tags: string[];
+  thumbnail: string | null;
+};
 
 export type TranscriptResult = {
   text: string;
   method: string;
   isPartial: boolean;
+  /** Populated when yt-dlp succeeded — carries title/creator/tags/thumbnail for share-ingest to use */
+  ytdlp?: YtDlpEnrichment;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -153,26 +164,78 @@ async function tryYouTubePageCaptions(videoId: string): Promise<string | null> {
   } catch { return null; }
 }
 
+function ytdlpEnrichment(d: YtDlpData): YtDlpEnrichment {
+  return {
+    title: d.title,
+    uploader: d.uploader,
+    tags: d.tags,
+    thumbnail: d.thumbnail,
+  };
+}
+
 async function fetchYouTubeTranscript(url: string): Promise<TranscriptResult | null> {
   const videoId = extractYouTubeVideoId(url);
   if (!videoId) return null;
 
-  // 1. Try timedtext API with common English language codes
+  // ── Tier 1: yt-dlp ─────────────────────────────────────────────────────────
+  // Gets pre-authenticated subtitle track URLs + full description.
+  const ytdlp = await fetchYtDlpData(url);
+  if (ytdlp) {
+    const enrichment = ytdlpEnrichment(ytdlp);
+
+    // 1a. Try manual subtitle tracks (json3 → vtt)
+    const manualJson3 = ytdlp.subtitleTracks.filter((t) => t.ext === "json3");
+    const manualVtt   = ytdlp.subtitleTracks.filter((t) => t.ext === "vtt");
+    for (const track of [...manualJson3, ...manualVtt]) {
+      const text = await fetchSubtitleText(track);
+      if (text) {
+        const { text: t, isPartial } = trunc(text);
+        console.log(`[transcript] YouTube: yt-dlp subtitle SUCCESS (${track.ext}) len=${t.length}`);
+        return { text: t, method: "youtube_ytdlp_subtitles", isPartial, ytdlp: enrichment };
+      }
+    }
+
+    // 1b. Try auto-generated caption tracks (json3 → vtt)
+    const autoJson3 = ytdlp.autoCapTracks.filter((t) => t.ext === "json3");
+    const autoVtt   = ytdlp.autoCapTracks.filter((t) => t.ext === "vtt");
+    for (const track of [...autoJson3, ...autoVtt]) {
+      const text = await fetchSubtitleText(track);
+      if (text) {
+        const { text: t, isPartial } = trunc(text);
+        console.log(`[transcript] YouTube: yt-dlp auto-caption SUCCESS (${track.ext}) len=${t.length}`);
+        return { text: t, method: "youtube_ytdlp_autocaption", isPartial, ytdlp: enrichment };
+      }
+    }
+
+    // 1c. Fall back to description text if subtitles unavailable
+    if (ytdlp.description && ytdlp.description.length > 30) {
+      const { text: t, isPartial } = trunc(ytdlp.description);
+      console.log(`[transcript] YouTube: yt-dlp using description (${t.length} chars) — no subtitle tracks`);
+      return { text: t, method: "youtube_ytdlp_description", isPartial, ytdlp: enrichment };
+    }
+
+    console.log(`[transcript] YouTube: yt-dlp succeeded but no subtitles or description — falling through`);
+  }
+
+  // ── Tier 2: timedtext API (direct) ─────────────────────────────────────────
   for (const lang of ["en", "en-US", "en-GB", "en-CA", "en-AU"]) {
     const text = await tryYouTubeTimedtext(videoId, lang);
     if (text) {
       const { text: t, isPartial } = trunc(text);
+      console.log(`[transcript] YouTube: timedtext API SUCCESS lang=${lang} len=${t.length}`);
       return { text: t, method: "youtube_timedtext", isPartial };
     }
   }
 
-  // 2. Parse caption track URL from the watch page
+  // ── Tier 3: parse caption track from watch page ─────────────────────────────
   const pageText = await tryYouTubePageCaptions(videoId);
   if (pageText) {
     const { text: t, isPartial } = trunc(pageText);
+    console.log(`[transcript] YouTube: page caption SUCCESS len=${t.length}`);
     return { text: t, method: "youtube_page_caption", isPartial };
   }
 
+  console.log(`[transcript] YouTube: all tiers failed — no transcript`);
   return null;
 }
 
@@ -482,6 +545,20 @@ async function fetchInstagramPageCaption(url: string): Promise<TranscriptResult 
 }
 
 async function fetchInstagramCaption(url: string): Promise<TranscriptResult | null> {
+  // ── Tier 1: yt-dlp ─────────────────────────────────────────────────────────
+  // Instagram requires login cookies from a server environment — will fail and
+  // log the reason, then fall through to Firecrawl and og:description scraping.
+  console.log(`[transcript] Instagram: trying yt-dlp (Tier 1)…`);
+  const ytdlp = await fetchYtDlpData(url);
+  if (ytdlp?.description && ytdlp.description.length > 20) {
+    const { text: t, isPartial } = trunc(ytdlp.description);
+    console.log(`[transcript] Instagram: yt-dlp SUCCESS caption_len=${t.length}`);
+    console.log(`[transcript] Instagram yt-dlp caption (first 200): ${JSON.stringify(t.slice(0, 200))}`);
+    return { text: t, method: "instagram_ytdlp", isPartial, ytdlp: ytdlpEnrichment(ytdlp) };
+  }
+  console.log(`[transcript] Instagram: yt-dlp returned null (requires login cookies from server environment — use Apify for reliable access)`);
+
+  // ── Tier 2: Firecrawl ───────────────────────────────────────────────────────
   const hasApiKey = !!process.env.FIRECRAWL_API_KEY;
   console.log(`[transcript] Instagram: Firecrawl configured=${hasApiKey}`);
 
@@ -492,17 +569,17 @@ async function fetchInstagramCaption(url: string): Promise<TranscriptResult | nu
       console.log(`[transcript] Instagram text (first 200): ${JSON.stringify(firecrawlResult.text.slice(0, 200))}`);
       return firecrawlResult;
     }
-    console.log(`[transcript] Instagram: Firecrawl returned null (likely 403 — platform blocks free-plan scrapers)`);
+    console.log(`[transcript] Instagram: Firecrawl returned null (platform blocks free-plan scrapers with 403)`);
   }
 
-  // Direct scrape fallback (usually truncated but better than nothing)
+  // ── Tier 3: direct og:description scrape ────────────────────────────────────
   console.log(`[transcript] Instagram: trying direct page scrape (og:description)…`);
   const pageResult = await fetchInstagramPageCaption(url);
   if (pageResult) {
     console.log(`[transcript] Instagram: page scrape SUCCESS method=${pageResult.method} len=${pageResult.text.length}`);
     console.log(`[transcript] Instagram text (first 200): ${JSON.stringify(pageResult.text.slice(0, 200))}`);
   } else {
-    console.log(`[transcript] Instagram: page scrape returned null — no caption extractable`);
+    console.log(`[transcript] Instagram: all tiers failed — no caption extractable. Next step: Apify (Tier 2 from architecture report)`);
   }
   return pageResult;
 }
@@ -525,9 +602,21 @@ export async function fetchTranscript(
       case "youtube":
       case "youtube_short":
         return await fetchYouTubeTranscript(url);
-      case "tiktok":
+      case "tiktok": {
+        // Tier 1: yt-dlp (datacenter IPs blocked by TikTok — will fail and fall through)
+        console.log(`[transcript] TikTok: trying yt-dlp (Tier 1)…`);
+        const ytd = await fetchYtDlpData(url);
+        if (ytd?.description && ytd.description.length > 20) {
+          const { text: t, isPartial } = trunc(ytd.description);
+          console.log(`[transcript] TikTok: yt-dlp SUCCESS caption_len=${t.length}`);
+          return { text: t, method: "tiktok_ytdlp", isPartial, ytdlp: ytdlpEnrichment(ytd) };
+        }
+        console.log(`[transcript] TikTok: yt-dlp returned null (datacenter IP blocked — falling through to page scrape)`);
+        // Tier 2: page scrape (user-agent rotation)
+        // Tier 3: Firecrawl
         return await fetchTikTokPageCaption(url)
           ?? await fetchCaptionViaFirecrawl(url, "tiktok");
+      }
       case "instagram_reel":
       case "instagram":
         return await fetchInstagramCaption(url);

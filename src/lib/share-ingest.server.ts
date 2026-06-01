@@ -307,7 +307,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   let description = caption || "";
   let image = incomingImage || meta?.image || null;
   const source = input.source || meta?.source || host;
-  const creator = creatorFromUrl(input.url, platform);
+  let creator = creatorFromUrl(input.url, platform);
 
   console.log(`[INGEST] Caption (from metadata): ${caption ? JSON.stringify(caption.slice(0, 120)) : "null"}`);
 
@@ -320,6 +320,33 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   if (transcript) {
     console.log(`[INGEST] Transcript (first 200 chars): ${JSON.stringify(transcript.slice(0, 200))}`);
     processingStatus = "transcript_found";
+  }
+
+  // ── yt-dlp enrichment (title / creator / thumbnail / tags) ─────────────────
+  // When yt-dlp succeeded (YouTube), it returns structured metadata alongside
+  // the transcript. Use these to fill gaps the og: metadata couldn't provide.
+  const ytEnrich = transcriptResult?.ytdlp ?? null;
+  if (ytEnrich) {
+    console.log(`[INGEST] yt-dlp enrichment: title=${JSON.stringify(ytEnrich.title?.slice(0,60))} uploader=${JSON.stringify(ytEnrich.uploader)} tags=${ytEnrich.tags.length} thumb=${!!ytEnrich.thumbnail}`);
+
+    // Creator: prefer URL-derived handle, fall back to yt-dlp uploader
+    if (!creator && ytEnrich.uploader) {
+      creator = ytEnrich.uploader;
+      console.log(`[INGEST] creator set from yt-dlp uploader: ${creator}`);
+    }
+
+    // Title: only use yt-dlp title if we don't already have a meaningful one
+    const isPlatformDefault = title === platformDefault;
+    if (ytEnrich.title && (!incomingTitle || isPlatformDefault)) {
+      title = ytEnrich.title.slice(0, 500);
+      console.log(`[INGEST] title updated from yt-dlp: ${JSON.stringify(title.slice(0,80))}`);
+    }
+
+    // Thumbnail: prefer incoming → meta → yt-dlp
+    if (!image && ytEnrich.thumbnail) {
+      image = ytEnrich.thumbnail;
+      console.log(`[INGEST] thumbnail set from yt-dlp`);
+    }
   }
 
   // Existing collection names (for AI hint)
@@ -370,9 +397,12 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     processingStatus = "needs_user_context";
   } else {
     // We have at least some content — call OpenAI.
+    // Include yt-dlp video tags as hashtag hints if available
+    const ytTags = ytEnrich?.tags?.length ? ytEnrich.tags.slice(0, 10) : [];
     const aiInput = {
       url: input.url, title, description, source,
       platform, creator, caption, transcript,
+      hashtags: ytTags.length ? ytTags : undefined,
       notes: userNote,
       contextType,
       existingCollections: existingNames,
