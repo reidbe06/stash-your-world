@@ -5,15 +5,22 @@
  * Called after yt-dlp fails for Instagram/TikTok from a datacenter IP.
  *
  * Actors used:
- *   Instagram  →  apify/instagram-scraper
- *   TikTok     →  clockworks/tiktok-scraper
+ *   TikTok     →  clockworks/free-tiktok-scraper  (verified working via postURLs)
+ *   Instagram  →  apify/instagram-scraper          (requires cookies for direct reel URLs;
+ *                                                   works for public profile/username scraping)
+ *
+ * Field shapes verified from live actor responses:
+ *   TikTok:    item.text, item.authorMeta.{name,nickName,profileUrl}, item.hashtags[].name,
+ *              item.videoMeta.coverUrl, item.webVideoUrl
+ *   Instagram: item.caption, item.ownerUsername, item.ownerFullName, item.displayUrl,
+ *              item.url, item.hashtags[]  (string array)
  *
  * Requires APIFY_API_TOKEN environment secret.
  */
 
 const APIFY_BASE = "https://api.apify.com/v2";
-const ACTOR_TIMEOUT_SECS = 55;          // max run time for the actor
-const HTTP_TIMEOUT_MS    = 75_000;      // AbortSignal timeout (actor + overhead)
+const ACTOR_TIMEOUT_SECS = 55;
+const HTTP_TIMEOUT_MS    = 75_000;
 
 export type ApifyResult = {
   caption:              string | null;
@@ -38,7 +45,6 @@ async function runApifyActor(
     return null;
   }
 
-  // Actor IDs in URLs use ~ instead of /
   const actorId = actorSlug.replace("/", "~");
   const endpoint = `${APIFY_BASE}/acts/${actorId}/run-sync-get-dataset-items` +
     `?token=${token}&timeout=${ACTOR_TIMEOUT_SECS}&memory=256`;
@@ -64,9 +70,18 @@ async function runApifyActor(
 
     const items = await res.json();
     const count = Array.isArray(items) ? items.length : "non-array";
-    console.log(`[Apify] Response received (${elapsed}ms): ${count} items`);
+    console.log(`[Apify] Response received (${elapsed}ms): ${count} item(s)`);
 
-    return Array.isArray(items) && items.length > 0 ? items : null;
+    if (!Array.isArray(items) || items.length === 0) return null;
+
+    // Check for actor-level errors
+    const first = items[0] as Record<string, unknown>;
+    if (first.error) {
+      console.log(`[Apify] Actor ${actorSlug} returned error: ${first.error} — ${first.errorDescription ?? first.errorCode ?? ""}`);
+      return null;
+    }
+
+    return items;
   } catch (err: unknown) {
     const elapsed = Date.now() - t0;
     const msg = err instanceof Error ? err.message : String(err);
@@ -75,32 +90,110 @@ async function runApifyActor(
   }
 }
 
+// ─── TikTok ──────────────────────────────────────────────────────────────────
+// Verified working: clockworks/free-tiktok-scraper with postURLs
+// Confirmed field shapes from live actor responses (2025-06-01)
+
+export async function fetchTikTokApify(url: string): Promise<ApifyResult | null> {
+  console.log(`[Apify] TikTok: starting actor run for ${url}`);
+
+  const items = await runApifyActor("clockworks/free-tiktok-scraper", {
+    postURLs:             [url],
+    maxPostsPerQuery:     1,
+    shouldDownloadVideos: false,
+    shouldDownloadCovers: false,
+  });
+
+  if (!items?.length) return null;
+
+  const item = items[0] as Record<string, unknown>;
+  const authorMeta = (item.authorMeta ?? {}) as Record<string, unknown>;
+  const videoMeta  = (item.videoMeta  ?? {}) as Record<string, unknown>;
+
+  const caption   = strOrNull(item.text);
+  const username  = strOrNull(authorMeta.name);        // handle/login name e.g. "gordonramsayofficial"
+  const nickname  = strOrNull(authorMeta.nickName);    // display name e.g. "Gordon Ramsay"
+  const profileUrl = strOrNull(authorMeta.profileUrl) ??
+    (username ? `https://www.tiktok.com/@${username}` : null);
+  const thumbnail = strOrNull(videoMeta.coverUrl);
+
+  const hashtags: string[] = Array.isArray(item.hashtags)
+    ? (item.hashtags as Array<Record<string, unknown>>)
+        .map((h) => strOrNull(h.name) ?? "")
+        .filter(Boolean)
+    : [];
+
+  const result: ApifyResult = {
+    caption,
+    creator_username:    username,
+    creator_fullname:    nickname,
+    creator_profile_url: profileUrl,
+    thumbnail,
+    hashtags,
+    title:        null,
+    original_url: strOrNull(item.webVideoUrl) ?? url,
+  };
+
+  console.log(
+    `[Apify] TikTok: ` +
+    `caption_len=${caption?.length ?? 0} ` +
+    `creator=${JSON.stringify(nickname ?? username)} ` +
+    `hashtags=${hashtags.length} ` +
+    `thumbnail=${!!thumbnail}`,
+  );
+  if (caption) {
+    console.log(`[Apify] TikTok caption (first 300): ${JSON.stringify(caption.slice(0, 300))}`);
+  }
+
+  return caption ? result : null;
+}
+
 // ─── Instagram ───────────────────────────────────────────────────────────────
+// Limitation: apify/instagram-scraper returns "restricted_page" for direct reel
+// URLs on the free plan (requires user-provided login cookies to bypass).
+// Workaround: extract the post shortcode from the URL, then try via multiple approaches.
+// Confirmed field shapes from profile-based scraping (2025-06-01):
+//   item.caption, item.ownerUsername, item.ownerFullName, item.displayUrl,
+//   item.url, item.hashtags[] (string[])
 
 export async function fetchInstagramApify(url: string): Promise<ApifyResult | null> {
   console.log(`[Apify] Instagram: starting actor run for ${url}`);
 
+  // Extract the shortcode from the URL to build a clean scrape request
+  const shortcodeMatch = url.match(/\/(reel|p|tv)\/([A-Za-z0-9_-]+)/);
+  const shortcode = shortcodeMatch?.[2] ?? null;
+
+  if (!shortcode) {
+    console.log(`[Apify] Instagram: could not extract shortcode from URL — skipping`);
+    return null;
+  }
+
+  const canonicalUrl = `https://www.instagram.com/p/${shortcode}/`;
+
   const items = await runApifyActor("apify/instagram-scraper", {
-    directUrls:    [url],
+    directUrls:    [canonicalUrl],
     resultsType:   "posts",
     resultsLimit:  1,
-    addParentData: false,
+    proxy: {
+      useApifyProxy:       true,
+      apifyProxyGroups:    ["RESIDENTIAL"],
+    },
   });
 
   if (!items?.length) {
-    console.log(`[Apify] Instagram: no items returned`);
+    console.log(`[Apify] Instagram: actor returned null/empty — direct reel URLs require authenticated cookies on Apify free plan`);
     return null;
   }
 
   const item = items[0] as Record<string, unknown>;
 
-  // Field extraction — be defensive, each field may be missing
-  const caption      = strOrNull(item.caption);
-  const username     = strOrNull(item.ownerUsername);
-  const fullname     = strOrNull(item.ownerFullName);
-  const thumbnail    = strOrNull(item.displayUrl) ?? strOrNull(item.thumbnailSrc);
-  const originalUrl  = strOrNull(item.url) ?? url;
+  const caption  = strOrNull(item.caption);
+  const username = strOrNull(item.ownerUsername);
+  const fullname = strOrNull(item.ownerFullName);
+  const thumbnail = strOrNull(item.displayUrl);
+  const originalUrl = strOrNull(item.url) ?? url;
 
+  // hashtags comes as string[] in instagram-scraper
   const hashtags: string[] = Array.isArray(item.hashtags)
     ? (item.hashtags as unknown[])
         .filter((h): h is string => typeof h === "string")
@@ -127,72 +220,7 @@ export async function fetchInstagramApify(url: string): Promise<ApifyResult | nu
     `thumbnail=${!!thumbnail}`,
   );
   if (caption) {
-    console.log(`[Apify] Instagram caption (first 200): ${JSON.stringify(caption.slice(0, 200))}`);
-  }
-
-  return caption ? result : null;
-}
-
-// ─── TikTok ──────────────────────────────────────────────────────────────────
-
-export async function fetchTikTokApify(url: string): Promise<ApifyResult | null> {
-  console.log(`[Apify] TikTok: starting actor run for ${url}`);
-
-  const items = await runApifyActor("clockworks/tiktok-scraper", {
-    postURLs:                    [url],
-    maxPostsPerQuery:            1,
-    shouldDownloadVideos:        false,
-    shouldDownloadCovers:        false,
-    shouldDownloadSubtitles:     false,
-    shouldDownloadSlideshowImages: false,
-  });
-
-  if (!items?.length) {
-    console.log(`[Apify] TikTok: no items returned`);
-    return null;
-  }
-
-  const item = items[0] as Record<string, unknown>;
-
-  // TikTok scraper fields
-  const caption = strOrNull(item.text);
-
-  const authorMeta = (item.authorMeta ?? {}) as Record<string, unknown>;
-  const creatorName = strOrNull(authorMeta.name);
-  const creatorNick = strOrNull(authorMeta.nickName ?? authorMeta.nickname);
-
-  const covers    = (item.covers ?? {}) as Record<string, unknown>;
-  const thumbnail = strOrNull(covers.default ?? covers.medium ?? covers.origin);
-
-  const hashtags: string[] = Array.isArray(item.hashtags)
-    ? (item.hashtags as Array<Record<string, unknown>>)
-        .map((h) => strOrNull(h.name) ?? "")
-        .filter(Boolean)
-        .map((h) => h.replace(/^#/, "").trim())
-    : [];
-
-  const videoUrl = strOrNull(item.webVideoUrl) ?? strOrNull(item.shareUrl) ?? url;
-
-  const result: ApifyResult = {
-    caption,
-    creator_username:    creatorNick,
-    creator_fullname:    creatorName,
-    creator_profile_url: creatorNick ? `https://www.tiktok.com/@${creatorNick}` : null,
-    thumbnail,
-    hashtags,
-    title:        null,
-    original_url: videoUrl,
-  };
-
-  console.log(
-    `[Apify] TikTok: ` +
-    `caption_len=${caption?.length ?? 0} ` +
-    `creator=${JSON.stringify(creatorName ?? creatorNick)} ` +
-    `hashtags=${hashtags.length} ` +
-    `thumbnail=${!!thumbnail}`,
-  );
-  if (caption) {
-    console.log(`[Apify] TikTok caption (first 200): ${JSON.stringify(caption.slice(0, 200))}`);
+    console.log(`[Apify] Instagram caption (first 300): ${JSON.stringify(caption.slice(0, 300))}`);
   }
 
   return caption ? result : null;

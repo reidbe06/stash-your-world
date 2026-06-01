@@ -1,18 +1,29 @@
 ---
 name: yt-dlp platform reality
-description: Which video platforms yt-dlp can access from Replit's server environment (datacenter IP).
+description: Which video platforms yt-dlp and Apify can access from Replit's server environment.
 ---
 
 ## Rule
-yt-dlp only works reliably for YouTube from Replit's server environment. Instagram and TikTok fail at the network/auth level.
+From Replit's datacenter IP:
+
+**yt-dlp:**
+- YouTube: ✅ Full metadata + subtitle tracks (json3/vtt) + description
+- TikTok: ✅ Works for SOME videos (returns description) — IP not universally blocked
+- Instagram: ❌ Requires login cookies — always returns "empty media response"
+
+**Apify free plan:**
+- TikTok: ✅ `clockworks/free-tiktok-scraper` with `postURLs` works reliably (verified 2025-06-01)
+  - Fields: `item.text`, `item.authorMeta.{name, nickName, profileUrl}`, `item.hashtags[].name`, `item.videoMeta.coverUrl`, `item.webVideoUrl`
+- Instagram: ❌ `apify/instagram-scraper` returns "restricted_page" for direct reel URLs even with residential proxy
+  - Requires user-provided login cookies for direct post/reel URLs
+  - Works for profile/username scraping but NOT direct reel URLs on free plan
 
 **Why:**
-- Replit servers have datacenter IPs. TikTok actively blocks datacenter IP requests ("Your IP address is blocked").
-- Instagram now requires authenticated cookies for ALL content, even public posts ("Instagram API is not granting access / Instagram sent an empty media response").
-- YouTube works perfectly: returns full metadata, subtitle track URLs (json3/vtt formats), description, uploader, tags, thumbnail.
+- Instagram blocks all server-side anonymous access (even residential proxies) since ~2024 crackdown
+- TikTok's datacenter blocking is inconsistent — yt-dlp works for older/less-popular videos, Apify fills the gap
+- The "60% success" figure for Instagram was for residential IPs with user sessions — not applicable here
 
 **How to apply:**
-- For Instagram extraction: yt-dlp is Tier 1 but will always fail → Firecrawl (also 403) → og:description scrape → needs_user_context. Next real tier is Apify.
-- For TikTok extraction: yt-dlp is Tier 1 but always fails → page scrape (user-agent rotation) → Firecrawl.
-- For YouTube: yt-dlp is Tier 1 and succeeds. The `automatic_captions.en` json3 track gives clean subtitle text. Also extracts description, uploader, tags, thumbnail.
-- Never report yt-dlp as "Tier 1 with 60% success" for Instagram — that figure applies to residential IPs only.
+- Pipeline order for TikTok: yt-dlp → Apify free-tiktok-scraper → page scrape → Firecrawl
+- Pipeline order for Instagram: yt-dlp → Apify instagram-scraper (will fail, logs reason) → Firecrawl (403) → page scrape → needs_user_context
+- To unlock Instagram: need APIFY_INSTAGRAM_COOKIES env var with logged-in session cookies from a real browser
