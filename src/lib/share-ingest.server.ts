@@ -20,6 +20,37 @@ const CATEGORIES = [
   "Videos", "Education", "Uncategorized", "Needs Review", "Other",
 ] as const;
 
+const CONTENT_TYPES = [
+  "Recipe", "Product", "Fashion / Outfit", "Home Idea", "Travel Idea",
+  "Tutorial", "Fitness / Workout", "Beauty", "Parenting", "Business Idea",
+  "Entertainment", "Other",
+] as const;
+
+function contentTypeFromCategory(category: string): string {
+  const map: Record<string, string> = {
+    "Recipes": "Recipe",
+    "Products": "Product",
+    "Shopping Deals": "Product",
+    "Fashion": "Fashion / Outfit",
+    "Home": "Home Idea",
+    "Travel": "Travel Idea",
+    "Fitness": "Fitness / Workout",
+    "Beauty": "Beauty",
+    "Parenting": "Parenting",
+    "Business Ideas": "Business Idea",
+    "Entertainment": "Entertainment",
+    "Videos": "Entertainment",
+    "Education": "Tutorial",
+  };
+  return map[category] ?? "Other";
+}
+
+function platformToMediaFormat(platform: SourcePlatform): string {
+  if (platform === "tiktok" || platform === "youtube" || platform === "youtube_short" || platform === "vimeo" || platform === "video") return "Video";
+  if (platform === "instagram_reel" || platform === "instagram" || platform === "pinterest") return "Social Post";
+  return "Webpage";
+}
+
 export type SourcePlatform =
   | "tiktok"
   | "instagram_reel"
@@ -118,12 +149,20 @@ async function aiCategorize(input: {
     messages: [
       { role: "system", content: `You categorize saved web/video items for STASHd.
 Categories must be one of: ${CATEGORIES.join(", ")}.
+content_type is the PURPOSE of the content (what it's ABOUT), not the media format.
+  - A recipe video → content_type "Recipe", NOT "Video"
+  - A fashion TikTok → content_type "Fashion / Outfit"
+  - A product demo → content_type "Product"
+  - A YouTube tutorial → content_type "Tutorial"
+  content_type must be one of: ${CONTENT_TYPES.join(", ")}.
+media_format is the TECHNICAL DELIVERY (how it's delivered):
+  - Video, Article, Webpage, Social Post, Product Page, Image.
 Subcategory specific (e.g. "Dinner > Chicken"). Tags: 3-6 lowercase short tags.
 
 CRITICAL ANTI-HALLUCINATION RULES:
 - Only use facts present in the provided fields (Title/Caption/Description/Transcript/User hint/Notes/URL). Never invent specific dishes, products, brands, ingredients, locations, or topics that aren't explicitly mentioned.
 - If transcript or caption is present, prefer it as the source of truth.
-- If the provided content is empty/generic or only a bare video ID with no caption/transcript/hint, DO NOT guess. Use category "Uncategorized", a generic title like "<Platform> video", generic neutral summary, empty arrays for recipe/product/travel fields, and a low confidence_score (<= 0.3).
+- If the provided content is empty/generic or only a bare video ID with no caption/transcript/hint, DO NOT guess. Use category "Uncategorized", content_type "Other", a generic title like "<Platform> video", generic neutral summary, empty arrays for recipe/product/travel fields, and a low confidence_score (<= 0.3).
 - generated_title: clean user-facing title (max 90 chars). Prefer the exact provided Title/Caption. Never use placeholder text like "Auto-filled".
 - summary: one sentence, max 160 chars, grounded strictly in provided text.
 - key_takeaways: 0-5 short bullets (max 120 chars each) ONLY when the content clearly teaches/recommends something.
@@ -145,6 +184,8 @@ ${collectionsHint}` },
           type: "object",
           properties: {
             category: { type: "string", enum: [...CATEGORIES] },
+            content_type: { type: "string", enum: [...CONTENT_TYPES], description: "Content PURPOSE — what is this about? NOT the media format." },
+            media_format: { type: "string", enum: ["Video", "Article", "Webpage", "Social Post", "Product Page", "Image"], description: "Technical delivery format." },
             generated_title: { type: "string" },
             subcategory: { type: "string" },
             tags: { type: "array", items: { type: "string" } },
@@ -166,7 +207,7 @@ ${collectionsHint}` },
             confidence_score: { type: "number" },
           },
           required: [
-            "category", "generated_title", "subcategory", "tags",
+            "category", "content_type", "media_format", "generated_title", "subcategory", "tags",
             "summary", "notes", "suggested_collection",
             "key_takeaways", "recipe_ingredients", "recipe_steps",
             "product_names", "confidence_score",
@@ -371,6 +412,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
       : [];
 
   let category: string;
+  let contentType: string;
+  let mediaFormat: string;
   let tags: string[];
   let keyTakeaways: string[];
   let recipeIngredients: string[];
@@ -387,6 +430,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     // Save a stub that tells the UI the item needs the user to add context.
     console.log(`[INGEST] Skipping AI — no extractable content for ${platform}`);
     category = "Needs Review";
+    contentType = "Other";
+    mediaFormat = platformToMediaFormat(platform);
     tags = [platform.replace(/_/g, "-")];
     keyTakeaways = [];
     recipeIngredients = [];
@@ -428,6 +473,12 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     console.log(`[INGEST] OpenAI tags: ${JSON.stringify(ai?.tags)}`);
 
     category = ai?.category && (CATEGORIES as readonly string[]).includes(ai.category) ? ai.category : "Uncategorized";
+    contentType = ai?.content_type && (CONTENT_TYPES as readonly string[]).includes(ai.content_type)
+      ? ai.content_type
+      : contentTypeFromCategory(category);
+    mediaFormat = typeof ai?.media_format === "string" && ai.media_format.length > 0
+      ? ai.media_format
+      : (meta?.media_format ?? platformToMediaFormat(platform));
     tags = cleanArr(ai?.tags, 8, 60).map((t) => t.toLowerCase());
     keyTakeaways = cleanArr(ai?.key_takeaways, 6, 240);
     recipeIngredients = cleanArr(ai?.recipe_ingredients, 40, 200);
@@ -468,7 +519,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     description: description || null,
     image_url: image,
     source: source || null,
-    type: meta?.type ?? (isVideoPlatform(platform) ? "video" : "link"),
+    type: contentType,
+    media_format: mediaFormat,
     tags,
     category,
     subcategory,
@@ -637,8 +689,13 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
   const summary = ai?.summary ? String(ai.summary).slice(0, 240) : null;
   const aiTitle = ai?.generated_title ? String(ai.generated_title).trim() : "";
 
+  const recategorizeContentType = ai?.content_type && (CONTENT_TYPES as readonly string[]).includes(ai.content_type)
+    ? ai.content_type
+    : contentTypeFromCategory(category);
+
   // Build update payload
   const updatePayload: Record<string, any> = {
+    type: recategorizeContentType,
     category,
     subcategory,
     tags,

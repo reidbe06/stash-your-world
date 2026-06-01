@@ -43,13 +43,16 @@ type SortKey = "newest" | "oldest" | "category";
 
 const CATEGORY_CHIPS = [
   { key: "all", label: "All" },
-  { key: "link", label: "Links" },
-  { key: "recipe", label: "Recipes" },
-  { key: "video", label: "Videos" },
-  { key: "product", label: "Products" },
-  { key: "fashion", label: "Fashion" },
-  { key: "idea", label: "Ideas" },
-  { key: "article", label: "Articles" },
+  { key: "Recipe", label: "Recipes" },
+  { key: "Product", label: "Products" },
+  { key: "Fashion / Outfit", label: "Fashion" },
+  { key: "Home Idea", label: "Home" },
+  { key: "Travel Idea", label: "Travel" },
+  { key: "Tutorial", label: "Tutorials" },
+  { key: "Fitness / Workout", label: "Fitness" },
+  { key: "Beauty", label: "Beauty" },
+  { key: "Entertainment", label: "Entertainment" },
+  { key: "Other", label: "Other" },
 ];
 
 type ItemWithCollection = Item & { collection?: { id: string; name: string } | null };

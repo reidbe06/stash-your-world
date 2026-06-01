@@ -77,6 +77,7 @@ export type Database = {
           source_platform: string | null
           subcategory: string | null
           tags: string[]
+          media_format: string | null
           title: string
           transcript: string | null
           travel_details: Json | null
@@ -111,6 +112,7 @@ export type Database = {
           source_platform?: string | null
           subcategory?: string | null
           tags?: string[]
+          media_format?: string | null
           title: string
           transcript?: string | null
           travel_details?: Json | null
@@ -145,6 +147,7 @@ export type Database = {
           source_platform?: string | null
           subcategory?: string | null
           tags?: string[]
+          media_format?: string | null
           title?: string
           transcript?: string | null
           travel_details?: Json | null

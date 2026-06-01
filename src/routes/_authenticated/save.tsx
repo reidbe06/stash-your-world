@@ -4,7 +4,7 @@ import { z } from "zod";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Link2, UtensilsCrossed, Video, ShoppingBag, Shirt, Lightbulb, FileText, Bookmark, ImageIcon, Loader2, Sparkles, Wand2, Plus, Check } from "lucide-react";
+import { ArrowLeft, UtensilsCrossed, Video, ShoppingBag, Shirt, Home, Plane, BookOpen, Dumbbell, Sparkles, Bookmark, ImageIcon, Loader2, Wand2, Plus, Check } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -37,13 +37,16 @@ const schema = z.object({
 });
 
 const TYPES: { key: string; label: string; icon: LucideIcon }[] = [
-  { key: "link", label: "Link", icon: Link2 },
-  { key: "recipe", label: "Recipe", icon: UtensilsCrossed },
-  { key: "video", label: "Video", icon: Video },
-  { key: "product", label: "Product", icon: ShoppingBag },
-  { key: "fashion", label: "Fashion", icon: Shirt },
-  { key: "idea", label: "Idea", icon: Lightbulb },
-  { key: "article", label: "Article", icon: FileText },
+  { key: "Recipe", label: "Recipe", icon: UtensilsCrossed },
+  { key: "Product", label: "Product", icon: ShoppingBag },
+  { key: "Fashion / Outfit", label: "Fashion", icon: Shirt },
+  { key: "Home Idea", label: "Home Idea", icon: Home },
+  { key: "Travel Idea", label: "Travel", icon: Plane },
+  { key: "Tutorial", label: "Tutorial", icon: BookOpen },
+  { key: "Fitness / Workout", label: "Fitness", icon: Dumbbell },
+  { key: "Beauty", label: "Beauty", icon: Sparkles },
+  { key: "Entertainment", label: "Entertainment", icon: Video },
+  { key: "Other", label: "Other", icon: Bookmark },
 ];
 
 const HELP_OPTIONS = [
@@ -127,7 +130,7 @@ function SavePage() {
     url: "",
     image_url: "",
     description: "",
-    type: "link",
+    type: "Other",
     tags: "",
     collection_id: collection,
     category: "",
@@ -180,7 +183,7 @@ function SavePage() {
           title: f.title || meta.title || "",
           image_url: f.image_url || meta.image || "",
           description: f.description || meta.description || "",
-          type: f.type === "link" && meta.type ? meta.type : f.type,
+          type: f.type,
         }));
         setMetaLoaded(true);
         if (isSocialVideoUrl(url) && !hasUsefulSocialMetadata({
@@ -217,7 +220,6 @@ function SavePage() {
       setForm((cur) => ({
         ...cur,
         category: "Needs Review",
-        type: cur.type === "link" ? "video" : cur.type,
         ai_summary: "",
       }));
       setSaveStatus("needs_info");
@@ -253,6 +255,7 @@ function SavePage() {
         ...cur,
         title: cur.title || ai.generated_title || "",
         category: ai.category,
+        type: ai.content_type || cur.type,
         subcategory: cur.subcategory || ai.subcategory,
         ai_summary: ai.summary || cur.ai_summary,
         description: cur.description || ai.notes || ai.summary || "",

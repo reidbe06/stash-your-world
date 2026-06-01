@@ -23,13 +23,13 @@ type Category = {
 
 const CATEGORIES: Category[] = [
   { key: "all", label: "All Saves", icon: Bookmark, tint: "bg-rose-100", fg: "text-rose-600", match: () => true },
-  { key: "recipe", label: "Recipes", icon: UtensilsCrossed, tint: "bg-orange-100", fg: "text-orange-600", match: (it) => it.type === "recipe" },
-  { key: "fashion", label: "Fashion", icon: Shirt, tint: "bg-violet-100", fg: "text-violet-600", match: (it) => it.type === "fashion" },
-  { key: "home", label: "Home & Decor", icon: HomeIcon, tint: "bg-amber-100", fg: "text-amber-700", match: (it) => it.tags.some((t) => /home|decor|interior/i.test(t)) },
-  { key: "beauty", label: "Beauty", icon: Sparkles, tint: "bg-pink-100", fg: "text-pink-600", match: (it) => it.tags.some((t) => /beauty|makeup|skincare/i.test(t)) },
-  { key: "workouts", label: "Workouts", icon: Dumbbell, tint: "bg-sky-100", fg: "text-sky-600", match: (it) => it.tags.some((t) => /workout|fitness|gym/i.test(t)) },
-  { key: "travel", label: "Travel", icon: Plane, tint: "bg-emerald-100", fg: "text-emerald-600", match: (it) => it.tags.some((t) => /travel|trip|vacation/i.test(t)) },
-  { key: "tech", label: "Tech", icon: Laptop, tint: "bg-indigo-100", fg: "text-indigo-600", match: (it) => it.tags.some((t) => /tech|gadget|app/i.test(t)) },
+  { key: "Recipe", label: "Recipes", icon: UtensilsCrossed, tint: "bg-orange-100", fg: "text-orange-600", match: (it) => it.type === "Recipe" },
+  { key: "Fashion / Outfit", label: "Fashion", icon: Shirt, tint: "bg-violet-100", fg: "text-violet-600", match: (it) => it.type === "Fashion / Outfit" },
+  { key: "Home Idea", label: "Home & Decor", icon: HomeIcon, tint: "bg-amber-100", fg: "text-amber-700", match: (it) => it.type === "Home Idea" || it.tags.some((t) => /home|decor|interior/i.test(t)) },
+  { key: "Beauty", label: "Beauty", icon: Sparkles, tint: "bg-pink-100", fg: "text-pink-600", match: (it) => it.type === "Beauty" || it.tags.some((t) => /beauty|makeup|skincare/i.test(t)) },
+  { key: "Fitness / Workout", label: "Workouts", icon: Dumbbell, tint: "bg-sky-100", fg: "text-sky-600", match: (it) => it.type === "Fitness / Workout" || it.tags.some((t) => /workout|fitness|gym/i.test(t)) },
+  { key: "Travel Idea", label: "Travel", icon: Plane, tint: "bg-emerald-100", fg: "text-emerald-600", match: (it) => it.type === "Travel Idea" || it.tags.some((t) => /travel|trip|vacation/i.test(t)) },
+  { key: "Tutorial", label: "Tutorials", icon: Laptop, tint: "bg-indigo-100", fg: "text-indigo-600", match: (it) => it.type === "Tutorial" || it.tags.some((t) => /tutorial|how.?to|guide/i.test(t)) },
 ];
 
 function Library() {

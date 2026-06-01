@@ -4,6 +4,7 @@ export type UrlMetadata = {
   image: string | null;
   source: string | null;
   type: string | null;
+  media_format: string | null;
 };
 
 const BLOCKED_OR_PLACEHOLDER = /^(auto-filled from the page.*|untitled|title|description|notes?|thumbnail image url|robot or human\??|are you a robot\??|access denied|just a moment|attention required|pardon our interruption|captcha|cloudflare)$/i;
@@ -180,6 +181,17 @@ function inferType(url: string, ogType: string | null): string {
   if (ogType === "product" || ogType?.startsWith("product")) return "product";
   if (ogType === "article") return "article";
   return "link";
+}
+
+function inferMediaFormat(url: string, ogType: string | null): string {
+  const u = url.toLowerCase();
+  if (/youtube\.com|youtu\.be|vimeo\.com|tiktok\.com/.test(u)) return "Video";
+  if (/instagram\.com|pinterest\.com/.test(u)) return "Social Post";
+  if (/amazon\.|shopify|etsy|ebay|walmart|target\.com/.test(u)) return "Product Page";
+  if (ogType === "video" || ogType?.startsWith("video.")) return "Video";
+  if (ogType === "product" || ogType?.startsWith("product")) return "Product Page";
+  if (ogType === "article") return "Article";
+  return "Webpage";
 }
 
 function isBlockedPage(body: string): boolean {
@@ -415,6 +427,7 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
     image: absolutizeImage(image || oembed?.image, target),
     source: siteName || oembed?.source || hostSource,
     type: inferType(target.toString(), ogType),
+    media_format: inferMediaFormat(target.toString(), ogType),
   };
   result.title = isMeaningfulTitle(ogTitle, target) ? ogTitle : isMeaningfulTitle(jsonLd.title, target) ? jsonLd.title! : isMeaningfulTitle(docTitle, target) ? docTitle : oembed?.title || bestTitleFromUrl(target.toString());
 
@@ -449,5 +462,6 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
     image: result.image || null,
     source: result.source || hostSource,
     type: result.type || "link",
+    media_format: result.media_format || "Webpage",
   };
 }

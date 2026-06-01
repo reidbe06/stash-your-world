@@ -20,9 +20,21 @@ export const CATEGORIES = [
   "Other",
 ] as const;
 
+export const CONTENT_TYPES = [
+  "Recipe", "Product", "Fashion / Outfit", "Home Idea", "Travel Idea",
+  "Tutorial", "Fitness / Workout", "Beauty", "Parenting", "Business Idea",
+  "Entertainment", "Other",
+] as const;
+
+export const MEDIA_FORMATS = [
+  "Video", "Article", "Webpage", "Social Post", "Product Page", "Image",
+] as const;
+
 export type AiCategorization = {
   generated_title: string;
   category: string;
+  content_type: string;
+  media_format: string;
   subcategory: string;
   tags: string[];
   summary: string;
@@ -95,6 +107,8 @@ ${collectionsHint}`;
               type: "object",
               properties: {
                 category: { type: "string", enum: [...CATEGORIES] },
+                content_type: { type: "string", enum: [...CONTENT_TYPES], description: "Content purpose — what is this about? (Recipe, Product, Tutorial, etc.) NOT the media format." },
+                media_format: { type: "string", enum: [...MEDIA_FORMATS], description: "Technical delivery format (Video, Article, Webpage, Social Post, Product Page, Image)." },
                 generated_title: { type: "string" },
                 subcategory: { type: "string" },
                 tags: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 8 },
@@ -103,7 +117,7 @@ ${collectionsHint}`;
                 suggested_collection: { type: "string" },
                 suggested_collections: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
               },
-              required: ["category", "generated_title", "subcategory", "tags", "summary", "notes", "suggested_collection", "suggested_collections"],
+              required: ["category", "content_type", "media_format", "generated_title", "subcategory", "tags", "summary", "notes", "suggested_collection", "suggested_collections"],
               additionalProperties: false,
             },
           },
@@ -155,9 +169,18 @@ ${collectionsHint}`;
       if (merged.length >= 5) break;
     }
 
+    const contentType = (CONTENT_TYPES as readonly string[]).includes(parsed.content_type)
+      ? parsed.content_type
+      : "Other";
+    const mediaFormat = (MEDIA_FORMATS as readonly string[]).includes(parsed.media_format)
+      ? parsed.media_format
+      : "Webpage";
+
     return {
       generated_title: (parsed.generated_title || parsed.summary || data.title || "Saved link").slice(0, 120),
       category,
+      content_type: contentType,
+      media_format: mediaFormat,
       subcategory: (parsed.subcategory || "").slice(0, 200),
       tags: Array.isArray(parsed.tags)
         ? parsed.tags.map((t) => String(t).toLowerCase().replace(/^#/, "").trim()).filter(Boolean).slice(0, 8)

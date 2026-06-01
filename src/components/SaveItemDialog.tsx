@@ -24,7 +24,7 @@ interface Props { open: boolean; onOpenChange: (v: boolean) => void; defaultColl
 export function SaveItemDialog({ open, onOpenChange, defaultCollection }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const [form, setForm] = useState({ title: "", url: "", description: "", type: "link", tags: "", collection_id: defaultCollection ?? "" });
+  const [form, setForm] = useState({ title: "", url: "", description: "", type: "Other", tags: "", collection_id: defaultCollection ?? "" });
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -65,7 +65,7 @@ export function SaveItemDialog({ open, onOpenChange, defaultCollection }: Props)
       toast.success("Saved!");
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["collection-items"] });
-      setForm({ title: "", url: "", description: "", type: "link", tags: "", collection_id: defaultCollection ?? "" });
+      setForm({ title: "", url: "", description: "", type: "Other", tags: "", collection_id: defaultCollection ?? "" });
       onOpenChange(false);
     } catch (err: any) { toast.error(err.message); } finally { setBusy(false); }
   };
@@ -89,7 +89,7 @@ export function SaveItemDialog({ open, onOpenChange, defaultCollection }: Props)
               <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
                 <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {["link", "recipe", "video", "product", "fashion", "idea", "article"].map((t) => (
+                  {["Recipe", "Product", "Fashion / Outfit", "Home Idea", "Travel Idea", "Tutorial", "Fitness / Workout", "Beauty", "Entertainment", "Other"].map((t) => (
                     <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
                 </SelectContent>
