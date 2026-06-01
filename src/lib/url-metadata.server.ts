@@ -14,12 +14,12 @@ const GENERIC_TITLES = /^(instagram|tiktok|pinterest|facebook|x|twitter|youtube|
 
 const IMAGE_REJECT_RE = /(\b|[._\-/])(icon|favicon|logo|logotype|avatar|profile[-_]?pic|profile[-_]?photo|author|gravatar|header|footer|nav|sprite|spacer|placeholder|transparent|blank|pixel|1x1|tracking|badge|star[_-]?rating|separator|bullet|arrow|divider|decoration|banner|newsletter|ad[_-]|affiliate|checkout|cart|button|social[-_]?(icon|logo)|share[-_](icon|button))(\b|[._\-/])|\.gif(\?|$)/i;
 
-function isRejectedImageUrl(url: string): boolean {
+export function isRejectedImageUrl(url: string): boolean {
   if (!url) return true;
   return IMAGE_REJECT_RE.test(url);
 }
 
-function scoreImageCandidate(src: string, attrs: Record<string, string> = {}): number {
+export function scoreImageCandidate(src: string, attrs: Record<string, string> = {}): number {
   if (!src) return -9999;
   if (isRejectedImageUrl(src)) return -9999;
 
@@ -207,7 +207,7 @@ const JSON_LD_TYPE_PRIORITY: string[][] = [
   ["WebPage", "ItemPage", "CollectionPage", "AboutPage"],
 ];
 
-function pickJsonLd(html: string): Partial<UrlMetadata & { _method: string }> {
+export function pickJsonLd(html: string): Partial<UrlMetadata & { _method: string }> {
   const nodes = parseJsonLd(html);
   if (!nodes.length) return {};
 
@@ -257,7 +257,7 @@ function pickJsonLd(html: string): Partial<UrlMetadata & { _method: string }> {
 
 // ─── HTML image extraction (score-based) ─────────────────────────────────────
 
-function pickImageFromHtml(html: string, target: URL): string | null {
+export function pickImageFromHtml(html: string, target: URL): string | null {
   const candidates: { url: string; score: number; method: string }[] = [];
 
   const push = (src: string | undefined, baseScore: number, attrs: Record<string, string>, method: string) => {
@@ -338,7 +338,7 @@ function pickImageFromHtml(html: string, target: URL): string | null {
 
 // ─── Type / format inference ──────────────────────────────────────────────────
 
-function inferType(url: string, ogType: string | null): string {
+export function inferType(url: string, ogType: string | null): string {
   const u = url.toLowerCase();
   if (/youtube\.com|youtu\.be|vimeo\.com|tiktok\.com/.test(u)) return "video";
   if (/instagram\.com|pinterest\.com/.test(u)) return "social";

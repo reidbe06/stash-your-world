@@ -1,3 +1,6 @@
-- [Three-level taxonomy](taxonomy.md) — Type > Subcategory > Tags system; SUBCATEGORY_TAXONOMY defined in ai-categorize.functions.ts & share-ingest.server.ts must stay in sync.
+- [Three-level taxonomy](taxonomy.md) — Type > Subcategory > Tags; SUBCATEGORY_TAXONOMY now lives in taxonomy.ts (single source of truth).
 - [Type name simplification](type-names.md) — Canonical DB type values are simplified: Fashion, Home, Travel, Fitness, Business (not "Fashion / Outfit" etc.); all code must match.
 - [Image extraction pipeline](image-extraction.md) — score-based image selection; isRejectedImageUrl + scoreImageCandidate; JSON-LD type-priority order.
+- [Test architecture](test-architecture.md) — taxonomy.ts + content-type-utils.ts are the pure-logic layer; tests import only from these + url-metadata.server.ts
+- [Bun test quirks](bun-test-quirks.md) — bun test reporter limitations and path alias behavior
+- [SUBCATEGORY_PATTERNS first-match](subcategory-first-match.md) — detectSubcategory returns the FIRST pattern in the array that matches, not the most specific

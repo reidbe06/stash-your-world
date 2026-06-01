@@ -4,6 +4,12 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { bestTitleFromUrl, fetchMetadata, isMeaningfulMetadataValue, type UrlMetadata } from "./url-metadata.server";
 import { fetchTranscript } from "./transcript.server";
+import { CATEGORIES, CONTENT_TYPES, SUBCATEGORY_TAXONOMY } from "./taxonomy";
+import {
+  contentTypeFromCategory, platformToMediaFormat, detectPlatform, isVideoPlatform,
+  type SourcePlatform,
+} from "./content-type-utils";
+export type { SourcePlatform } from "./content-type-utils";
 
 export const SHARE_SOURCES = [
   "web",
@@ -14,71 +20,9 @@ export const SHARE_SOURCES = [
 ] as const;
 export type ShareSource = (typeof SHARE_SOURCES)[number];
 
-const CATEGORIES = [
-  "Products", "Fashion", "Beauty", "Home", "Recipes", "Travel", "Fitness",
-  "Parenting", "Business Ideas", "Shopping Deals", "Entertainment",
-  "Videos", "Education", "Uncategorized", "Needs Review", "Other",
-] as const;
-
-const CONTENT_TYPES = [
-  "Recipe", "Fashion", "Product", "Home", "Travel",
-  "Tutorial", "Fitness", "Beauty", "Parenting", "Business",
-  "Entertainment", "Other",
-] as const;
-
-const SUBCATEGORY_TAXONOMY: Record<string, string[]> = {
-  Recipe:       ["Breakfast", "Lunch", "Dinner", "Dessert", "Snacks", "Drinks", "Meal Prep", "Salad", "Soup", "Baking", "Sides"],
-  Fashion:      ["Dresses", "Tops & Shirts", "Pants & Jeans", "Shoes", "Accessories", "Workwear", "Casual", "Vacation", "Activewear", "Jewelry"],
-  Product:      ["Electronics", "Kitchen", "Beauty & Skincare", "Home & Decor", "Fitness", "Clothing", "Gifts"],
-  Travel:       ["Mexico", "Europe", "Asia", "Caribbean", "Beach & Resorts", "Weekend Trips", "Restaurants", "Activities", "Budget", "Luxury", "Destinations"],
-  Home:         ["Living Room", "Bedroom", "Kitchen", "Bathroom", "Outdoor", "Organization", "DIY", "Lighting", "Furniture", "Decor & Styling"],
-  Tutorial:     ["Cooking", "Makeup & Beauty", "DIY & Crafts", "Tech", "Fitness", "Fashion", "Photography & Film", "How-To"],
-  Fitness:      ["Strength Training", "Cardio", "Yoga", "HIIT", "Running", "Pilates", "Stretching", "Nutrition", "Workouts"],
-  Beauty:       ["Skincare", "Makeup", "Hair", "Nails", "Fragrance", "Body Care", "Tools & Gadgets"],
-  Parenting:    ["Baby", "Toddler", "School Age", "Teen", "Pregnancy", "Feeding", "Sleep", "Kids & Family"],
-  Business:     ["Marketing", "Finance", "Productivity", "Side Hustle", "E-commerce", "Social Media", "Branding", "Entrepreneurship"],
-  Entertainment:["Movies & TV", "Music", "Gaming", "Books", "Podcasts", "Comedy"],
-};
-
 const SUBCATEGORY_HINT = Object.entries(SUBCATEGORY_TAXONOMY)
   .map(([type, subs]) => `  ${type}: ${subs.join(", ")}`)
   .join("\n");
-
-function contentTypeFromCategory(category: string): string {
-  const map: Record<string, string> = {
-    "Recipes": "Recipe",
-    "Products": "Product",
-    "Shopping Deals": "Product",
-    "Fashion": "Fashion",
-    "Home": "Home",
-    "Travel": "Travel",
-    "Fitness": "Fitness",
-    "Beauty": "Beauty",
-    "Parenting": "Parenting",
-    "Business Ideas": "Business",
-    "Entertainment": "Entertainment",
-    "Videos": "Entertainment",
-    "Education": "Tutorial",
-  };
-  return map[category] ?? "Other";
-}
-
-function platformToMediaFormat(platform: SourcePlatform): string {
-  if (platform === "tiktok" || platform === "youtube" || platform === "youtube_short" || platform === "vimeo" || platform === "video") return "Video";
-  if (platform === "instagram_reel" || platform === "instagram" || platform === "pinterest") return "Social Post";
-  return "Webpage";
-}
-
-export type SourcePlatform =
-  | "tiktok"
-  | "instagram_reel"
-  | "instagram"
-  | "youtube_short"
-  | "youtube"
-  | "vimeo"
-  | "pinterest"
-  | "video"
-  | "web";
 
 export type ProcessingStatus =
   | "pending"
@@ -87,33 +31,6 @@ export type ProcessingStatus =
   | "ai_processed"
   | "needs_user_context"
   | "failed";
-
-function detectPlatform(rawUrl: string): SourcePlatform {
-  try {
-    const u = new URL(rawUrl);
-    const host = u.hostname.replace(/^www\./, "").toLowerCase();
-    const path = u.pathname.toLowerCase();
-    if (host.endsWith("tiktok.com")) return "tiktok";
-    if (host.endsWith("instagram.com")) {
-      if (/\/(reel|reels)\//.test(path)) return "instagram_reel";
-      return "instagram";
-    }
-    if (host.endsWith("youtube.com") || host === "youtu.be") {
-      if (/\/shorts\//.test(path)) return "youtube_short";
-      return "youtube";
-    }
-    if (host.endsWith("vimeo.com")) return "vimeo";
-    if (host.endsWith("pinterest.com")) return "pinterest";
-    if (/\.(mp4|mov|webm|m3u8)(\?|$)/.test(path)) return "video";
-    return "web";
-  } catch {
-    return "web";
-  }
-}
-
-function isVideoPlatform(p: SourcePlatform): boolean {
-  return p === "tiktok" || p === "instagram_reel" || p === "youtube_short" || p === "youtube" || p === "vimeo" || p === "video";
-}
 
 // Best-effort creator handle extraction from URL path (e.g. /@username/video/123)
 function creatorFromUrl(rawUrl: string, platform: SourcePlatform): string | null {

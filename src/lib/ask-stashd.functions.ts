@@ -2,6 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {
+  isBrowseQuery, detectContentType, detectSubcategory, extractTopicKeywords,
+} from "./content-type-utils";
 
 const EMBED_MODEL = "text-embedding-3-small";
 const CHAT_MODEL = "gpt-4o-mini";
@@ -23,106 +26,6 @@ async function embedQuery(text: string): Promise<number[]> {
   const vec = json.data?.[0]?.embedding;
   if (!Array.isArray(vec)) throw new Error("No embedding returned");
   return vec;
-}
-
-// ─── Intent Classification ────────────────────────────────────────────────────
-
-const BROWSE_PATTERNS = [
-  /\b(recipe|recipes|food|meal|meals|dish|dishes|cook|cooking)\b/i,
-  /\b(outfit|outfits|fashion|style|looks?|wear|clothing|clothes)\b/i,
-  /\b(product|products|buy|purchase|shop|shopping)\b/i,
-  /\b(home\s+idea|home\s+decor|decor|interior|furniture|room)\b/i,
-  /\b(travel\s+idea|travel|trip|vacation|destination)\b/i,
-  /\b(tutorial|guide|how\s*to|how-to|lesson)\b/i,
-  /\bideas?\b/i,
-  /\b(fitness|workout|exercise|gym)\b/i,
-  /\b(beauty|skincare|makeup)\b/i,
-  /\b(entertainment|video|videos)\b/i,
-  /\b(business|startup)\b/i,
-  /\b(parenting|kids|baby|children)\b/i,
-  /\bshow\s+(me\s+)?(all|every|my)/i,
-  /\bfind\s+(all|every|my)/i,
-  /\blist\s+(all|my|every)/i,
-  /\bwhat\s+.*(have\s+i\s+saved|i'?ve?\s+saved|saved)/i,
-  /\ball\s+my\b/i,
-];
-
-function isBrowseQuery(question: string): boolean {
-  return BROWSE_PATTERNS.some((p) => p.test(question));
-}
-
-// ─── Content-Type Detection ───────────────────────────────────────────────────
-
-const TYPE_KEYWORD_MAP: Record<string, string> = {
-  recipe: "Recipe", recipes: "Recipe", food: "Recipe", meal: "Recipe", meals: "Recipe",
-  dish: "Recipe", dishes: "Recipe", cooking: "Recipe",
-  outfit: "Fashion", outfits: "Fashion", fashion: "Fashion",
-  style: "Fashion", clothing: "Fashion", clothes: "Fashion",
-  product: "Product", products: "Product", buy: "Product", purchase: "Product",
-  shopping: "Product", shop: "Product",
-  "home idea": "Home", "home decor": "Home", decor: "Home",
-  interior: "Home", furniture: "Home", "home design": "Home",
-  travel: "Travel", trip: "Travel", vacation: "Travel", destination: "Travel",
-  tutorial: "Tutorial", guide: "Tutorial",
-  fitness: "Fitness", workout: "Fitness", exercise: "Fitness", gym: "Fitness",
-  beauty: "Beauty", skincare: "Beauty", makeup: "Beauty",
-  entertainment: "Entertainment",
-  business: "Business", startup: "Business",
-  parenting: "Parenting", kids: "Parenting", baby: "Parenting",
-};
-
-function detectContentType(question: string): string | null {
-  const lower = question.toLowerCase();
-  for (const [kw, type] of Object.entries(TYPE_KEYWORD_MAP)) {
-    if (kw.includes(" ")) {
-      if (lower.includes(kw)) return type;
-    }
-  }
-  for (const [kw, type] of Object.entries(TYPE_KEYWORD_MAP)) {
-    if (!kw.includes(" ") && new RegExp(`\\b${kw}\\b`).test(lower)) return type;
-  }
-  return null;
-}
-
-// ─── Subcategory Detection ────────────────────────────────────────────────────
-
-const SUBCATEGORY_PATTERNS: Record<string, string[]> = {
-  Recipe:       ["breakfast", "lunch", "dinner", "dessert", "snack", "drink", "smoothie", "meal prep", "salad", "soup", "baking", "sides"],
-  Fashion:      ["dress", "dresses", "shoe", "shoes", "workwear", "work outfit", "vacation outfit", "beach outfit", "activewear", "jewelry", "accessories", "jeans", "pants", "tops", "casual"],
-  Product:      ["electronics", "kitchen", "appliance", "skincare", "home decor", "fitness gear", "clothing", "gifts"],
-  Travel:       ["mexico", "europe", "asia", "caribbean", "beach", "resort", "weekend trip", "restaurant", "activities"],
-  Fitness:      ["strength", "cardio", "yoga", "hiit", "running", "pilates", "stretching", "nutrition"],
-  Beauty:       ["skincare", "makeup", "hair", "nails", "fragrance", "body care"],
-  Business:     ["marketing", "finance", "productivity", "side hustle", "ecommerce", "social media", "branding"],
-};
-
-function detectSubcategory(question: string, contentType: string | null): string | null {
-  if (!contentType) return null;
-  const lower = question.toLowerCase();
-  const patterns = SUBCATEGORY_PATTERNS[contentType] ?? [];
-  for (const pat of patterns) {
-    if (lower.includes(pat)) return pat;
-  }
-  return null;
-}
-
-// ─── Topic Keyword Extraction ─────────────────────────────────────────────────
-
-const STOP_WORDS = new Set([
-  "what", "have", "ive", "i've", "saved", "show", "me", "find", "all", "my", "the", "a",
-  "an", "for", "with", "about", "items", "things", "do", "get", "is", "are", "was", "in",
-  "on", "at", "to", "of", "and", "or", "that", "this", "from", "by", "any", "some", "most",
-  "more", "which", "can", "could", "would", "should", "using", "use", "save", "stash",
-  "ideas", "idea", "saved", "ever", "list", "every", "each", "across",
-]);
-
-function extractTopicKeywords(question: string): string[] {
-  const typeWords = new Set(Object.keys(TYPE_KEYWORD_MAP).filter((k) => !k.includes(" ")));
-  return question
-    .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, " ")
-    .split(/\s+/)
-    .filter((w) => w.length > 2 && !STOP_WORDS.has(w) && !typeWords.has(w));
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
