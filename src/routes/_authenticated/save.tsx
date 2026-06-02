@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { categorizeItem, CATEGORIES } from "@/lib/ai-categorize.functions";
+import { fetchSocialCaption } from "@/lib/social-caption.functions";
 import { embedItem } from "@/lib/semantic-search.functions";
 import { cn } from "@/lib/utils";
 
@@ -125,6 +126,7 @@ function SavePage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const runCategorize = useServerFn(categorizeItem);
+  const fetchSocialCaptionFn = useServerFn(fetchSocialCaption);
   const embedItemFn = useServerFn(embedItem);
 
   const [form, setForm] = useState({
@@ -149,6 +151,9 @@ function SavePage() {
   const [categorizing, setCategorizing] = useState(false);
   const [metaLoaded, setMetaLoaded] = useState(false);
   const [aiLoaded, setAiLoaded] = useState(false);
+  const [extractedCaption, setExtractedCaption] = useState("");
+  const [extractedMethod, setExtractedMethod] = useState<string | null>(null);
+  const [extracting, setExtracting] = useState(false);
   const lastFetchedUrl = useRef<string>("");
   const lastAiKey = useRef<string>("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -165,6 +170,28 @@ function SavePage() {
       return data;
     },
   });
+
+  const runExtract = async (url: string) => {
+    if (!isSocialVideoUrl(url)) return;
+    const platform = url.includes("tiktok.com") ? "tiktok" : "instagram_reel";
+    console.log(`[SAVE] Extracting caption: platform=${platform}`);
+    setExtracting(true);
+    try {
+      const result = await fetchSocialCaptionFn({ data: { url, platform } });
+      const cap = result.caption?.trim() ?? "";
+      if (cap.length > 20) {
+        console.log(`[SAVE] Caption extracted: method=${result.method} len=${cap.length} preview=${JSON.stringify(cap.slice(0, 80))}`);
+        setExtractedCaption(cap);
+        setExtractedMethod(result.method);
+      } else {
+        console.log(`[SAVE] Caption extraction: nothing useful (len=${cap.length})`);
+      }
+    } catch (err: any) {
+      console.warn("[SAVE] Caption extraction failed:", err?.message ?? err);
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   const runMetaFetch = async (url: string) => {
     if (!isValidUrl(url) || url === lastFetchedUrl.current) return;
@@ -188,13 +215,18 @@ function SavePage() {
           type: f.type,
         }));
         setMetaLoaded(true);
-        if (isSocialVideoUrl(url) && !hasUsefulSocialMetadata({
-          title: meta.title || "",
-          description: meta.description || "",
-          image_url: meta.image || "",
-          url,
-        })) {
-          setSaveStatus("needs_info");
+        // For social video URLs always fire background caption extraction.
+        // The result updates extractedCaption → triggers AI re-run automatically.
+        if (isSocialVideoUrl(url)) {
+          runExtract(url);
+          if (!hasUsefulSocialMetadata({
+            title: meta.title || "",
+            description: meta.description || "",
+            image_url: meta.image || "",
+            url,
+          })) {
+            setSaveStatus("needs_info");
+          }
         }
       }
     } catch (err: any) {
@@ -210,20 +242,24 @@ function SavePage() {
     const url = f.url.trim();
     if (!isValidUrl(url)) return;
 
+    // captionForAi: prefer the live-extracted caption (og:description, yt-dlp, etc.) over
+    // the URL metadata description, which is often null for Instagram/TikTok.
+    const captionForAi = extractedCaption || f.description || "";
+
     // Opaque video: social platform with no extractable caption/description and no user note/hint.
-    // Firecrawl returns 403 for Instagram/TikTok — do NOT send empty content to OpenAI.
+    // If we extracted a caption > 100 chars, treat it as having real content — do NOT skip AI.
     const isOpaque = isSocialVideoUrl(url)
+      && captionForAi.trim().length <= 100
       && !hasUsefulSocialMetadata({ title: f.title, description: f.description, image_url: f.image_url, url })
       && !help.contextType
       && !help.note.trim();
 
     if (isOpaque) {
-      console.log(`[SAVE] Skipping AI — opaque ${getPlatform(url)} video: no caption/transcript/note extracted. Setting Needs Review.`);
-      setForm((cur) => ({
-        ...cur,
-        category: "Needs Review",
-        ai_summary: "",
-      }));
+      const stillExtracting = extracting;
+      console.log(
+        `[SAVE] Skipping AI — opaque ${getPlatform(url)} video: caption_len=${captionForAi.length} extracting=${stillExtracting}. Setting Needs Review.`,
+      );
+      setForm((cur) => ({ ...cur, category: "Needs Review", ai_summary: "" }));
       setSaveStatus("needs_info");
       setAiLoaded(false);
       return;
@@ -231,19 +267,24 @@ function SavePage() {
 
     let source = "";
     try { source = new URL(url).hostname.replace(/^www\./, ""); } catch {}
-    const key = JSON.stringify([url, f.title, f.description, help.contextType, help.note]);
+    const key = JSON.stringify([url, f.title, f.description, extractedCaption, help.contextType, help.note]);
     if (key === lastAiKey.current) return;
     lastAiKey.current = key;
     setCategorizing(true);
 
-    console.log(`[SAVE] Calling OpenAI: platform=${getPlatform(url)} title=${JSON.stringify(f.title)} desc=${JSON.stringify(f.description?.slice(0, 80))} note=${JSON.stringify(help.note)} hint=${JSON.stringify(help.contextType)}`);
+    console.log(
+      `[SAVE] Calling OpenAI: platform=${getPlatform(url)} ` +
+      `title=${JSON.stringify(f.title)} caption_len=${captionForAi.length} ` +
+      `caption_preview=${JSON.stringify(captionForAi.slice(0, 80))} ` +
+      `note=${JSON.stringify(help.note)} hint=${JSON.stringify(help.contextType)}`,
+    );
 
     try {
       const ai = await runCategorize({
         data: {
           url,
           title: f.title || "",
-          description: f.description || "",
+          description: captionForAi,
           notes: help.note,
           contextType: help.contextType,
           source,
@@ -251,7 +292,10 @@ function SavePage() {
         },
       });
 
-      console.log(`[SAVE] OpenAI returned: category=${ai.category} title=${JSON.stringify(ai.generated_title)}`);
+      console.log(
+        `[SAVE] OpenAI returned: category=${ai.category} content_type=${ai.content_type} ` +
+        `subcategory=${ai.subcategory} tags=${ai.tags.join(",")} title=${JSON.stringify(ai.generated_title)}`,
+      );
 
       setForm((cur) => ({
         ...cur,
@@ -289,14 +333,22 @@ function SavePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.url]);
 
-  // Auto-run AI shortly after metadata fills in (or URL alone is valid)
+  // Auto-run AI shortly after metadata fills in (or URL alone is valid).
+  // Also re-runs when extractedCaption changes (i.e. after background caption extraction completes).
   useEffect(() => {
     if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
     if (!isValidUrl(form.url)) return;
     aiDebounceRef.current = setTimeout(() => { runAi(); }, 1200);
     return () => { if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.url, form.title, form.description, help.contextType, help.note]);
+  }, [form.url, form.title, form.description, extractedCaption, help.contextType, help.note]);
+
+  // Reset extraction state when the URL changes
+  useEffect(() => {
+    setExtractedCaption("");
+    setExtractedMethod(null);
+    setExtracting(false);
+  }, [form.url]);
 
   const acceptCollection = async (rawName: string) => {
     const name = rawName.trim();
@@ -338,7 +390,16 @@ function SavePage() {
       const finalCategory = form.category || "Uncategorized";
       const finalDescription = form.description || help.note || null;
       const processingStatus = aiLoaded ? "ai_processed" : saveStatus === "needs_info" ? "needs_user_context" : "pending";
-      console.log(`[SAVE] Submitting: category=${finalCategory} processing_status=${processingStatus} aiLoaded=${aiLoaded}`);
+      const sourcePlatform = isSocialVideoUrl(form.url)
+        ? (form.url.includes("tiktok.com") ? "tiktok" : "instagram_reel")
+        : null;
+      const captionToStore = extractedCaption || null;
+      console.log(
+        `[SAVE] Submitting: category=${finalCategory} subcategory=${form.subcategory || "none"} ` +
+        `tags=${tags.join(",")} processing_status=${processingStatus} ` +
+        `source_platform=${sourcePlatform ?? "none"} caption_len=${captionToStore?.length ?? 0} ` +
+        `aiLoaded=${aiLoaded} extraction_method=${extractedMethod ?? "none"}`,
+      );
 
       const { data: inserted, error } = await supabase.from("items").insert({
         user_id: user.id,
@@ -354,6 +415,11 @@ function SavePage() {
         subcategory: form.subcategory || null,
         ai_summary: form.ai_summary || null,
         processing_status: processingStatus,
+        source_platform: sourcePlatform,
+        transcript: captionToStore,
+        original_caption: captionToStore,
+        ai_subcategory: form.subcategory || null,
+        ai_tags: tags,
       }).select("id").single();
       if (error) throw error;
       const finalStatusMessage = finalCategory === "Uncategorized" ? "Saved as Uncategorized" : "AI organized this save";
@@ -373,7 +439,9 @@ function SavePage() {
   };
 
   const hasHelp = !!help.contextType || !!help.note.trim();
-  const showHelpPrompt = isSocialVideoUrl(form.url) && !hasUsefulSocialMetadata(form) && saveStatus !== "organized" && (!hasHelp || saveStatus === "needs_info");
+  // Don't show help prompt if we extracted a real caption (>100 chars) — AI can categorize it.
+  const captionExtracted = extractedCaption.trim().length > 100;
+  const showHelpPrompt = isSocialVideoUrl(form.url) && !hasUsefulSocialMetadata(form) && !captionExtracted && saveStatus !== "organized" && (!hasHelp || saveStatus === "needs_info");
   const displayStatus = showHelpPrompt && saveStatus === "idle" ? "needs_info" : saveStatus;
   const statusMessage = displayStatus === "organized"
     ? "AI organized this save"
