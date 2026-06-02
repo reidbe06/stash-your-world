@@ -510,10 +510,44 @@ async function fetchCaptionViaFirecrawl(
   }
 }
 
+// ─── Retry helper ─────────────────────────────────────────────────────────────
+
+/**
+ * Runs fn up to maxAttempts times.
+ * Backoff: wait 2 s after attempt 1, then 5 s after attempt 2.
+ * Returns the first non-null result, or null if all attempts are exhausted.
+ */
+async function withRetry<T>(
+  fn: () => Promise<T | null>,
+  maxAttempts: number,
+  label: string,
+): Promise<{ result: T; attempts: number } | null> {
+  const backoffMs = [2_000, 5_000];
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    console.log(`[transcript] ${label}: attempt ${attempt}/${maxAttempts}`);
+    try {
+      const result = await fn();
+      if (result !== null) {
+        console.log(`[transcript] ${label}: SUCCESS on attempt ${attempt}`);
+        return { result, attempts: attempt };
+      }
+      console.log(`[transcript] ${label}: attempt ${attempt} returned null`);
+    } catch (err) {
+      console.log(`[transcript] ${label}: attempt ${attempt} threw: ${err}`);
+    }
+    if (attempt < maxAttempts) {
+      const wait = backoffMs[attempt - 1] ?? 5_000;
+      console.log(`[transcript] ${label}: backing off ${wait}ms before retry…`);
+      await new Promise(r => setTimeout(r, wait));
+    }
+  }
+  console.log(`[transcript] ${label}: all ${maxAttempts} attempts exhausted — null`);
+  return null;
+}
+
 // ─── Instagram ────────────────────────────────────────────────────────────────
 
 async function fetchInstagramPageCaption(url: string): Promise<TranscriptResult | null> {
-  // Instagram aggressively blocks bots; facebookexternalhit sometimes gets og:description
   for (const ua of [
     "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
     "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
@@ -528,76 +562,120 @@ async function fetchInstagramPageCaption(url: string): Promise<TranscriptResult 
         },
         redirect: "follow",
       });
-      if (!res.ok) continue;
+      if (!res.ok) {
+        console.log(`[transcript] Instagram/og:desc: HTTP ${res.status} for UA=${ua.slice(0, 30)}…`);
+        continue;
+      }
       const html = await res.text();
 
-      // og:description on Instagram often contains the caption (truncated to ~100 chars)
-      const patterns = [
+      const ogDescPatterns = [
         html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]+)"/i),
         html.match(/content="([^"]+)"[^>]+property="og:description"/i),
         html.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i),
       ];
-      for (const m of patterns) {
+      for (const m of ogDescPatterns) {
         if (!m?.[1]) continue;
         const text = decodeHtmlEntities(m[1]).trim();
-        // Skip generic Instagram responses
         if (
           text.length > 20 &&
           !/^(instagram|log in|sign in|see.*instagram|create.*account|explore|reel|video)/i.test(text)
         ) {
           const { text: t, isPartial } = trunc(text);
+          console.log(`[transcript] Instagram/og:desc: extracted ${t.length} chars via ${ua.slice(0, 30)}…`);
           return { text: t, method: "instagram_og_desc", isPartial: isPartial || text.length < 150 };
+        } else {
+          console.log(
+            `[transcript] Instagram/og:desc: meta found but rejected — ` +
+            `len=${text.length} starts="${text.slice(0, 50)}"`,
+          );
         }
       }
-    } catch {}
+      console.log(
+        `[transcript] Instagram/og:desc: no usable og:description in HTML ` +
+        `(html_size=${html.length}) for UA=${ua.slice(0, 30)}…`,
+      );
+    } catch (err) {
+      console.log(`[transcript] Instagram/og:desc: fetch error for UA=${ua.slice(0, 30)}… — ${err}`);
+    }
   }
   return null;
 }
 
 async function fetchInstagramCaption(url: string): Promise<TranscriptResult | null> {
-  // ── Tier 1: yt-dlp ─────────────────────────────────────────────────────────
-  // Instagram requires login cookies — will fail and fall through.
-  console.log(`[transcript] Instagram: trying yt-dlp (Tier 1)…`);
-  const ytdlp = await fetchYtDlpData(url);
-  if (ytdlp?.description && ytdlp.description.length > 20) {
-    const { text: t, isPartial } = trunc(ytdlp.description);
-    console.log(`[transcript] Instagram: yt-dlp SUCCESS caption_len=${t.length}`);
-    return { text: t, method: "instagram_ytdlp", isPartial, ytdlp: ytdlpEnrichment(ytdlp) };
+  // ── Priority 1: og:description page scrape (most reliable, no auth needed) ──
+  // Diagnostic confirmed: both facebookexternalhit and Googlebot return 471-char captions
+  // for public reels. This is moved to first position because it is the most consistent source.
+  console.log(`[transcript] Instagram: Priority 1 — og:description page scrape (up to 3 attempts)…`);
+  const p1 = await withRetry(() => fetchInstagramPageCaption(url), 3, "Instagram/og:desc");
+  if (p1) {
+    console.log(
+      `[transcript] Instagram: FINAL source=og:desc method=${p1.result.method} ` +
+      `caption_len=${p1.result.text.length} attempt=${p1.attempts}`,
+    );
+    return p1.result;
   }
-  console.log(`[transcript] Instagram: yt-dlp failed (requires login cookies) — falling through`);
+  console.log(`[transcript] Instagram: og:description exhausted all retries — moving to Priority 2`);
 
-  // ── Tier 2: Apify instagram-scraper ────────────────────────────────────────
-  console.log(`[transcript] Instagram: trying Apify (Tier 2)…`);
+  // ── Priority 2: yt-dlp ───────────────────────────────────────────────────────
+  // Works without cookies for many public reels but is inconsistent — hence retries.
+  console.log(`[transcript] Instagram: Priority 2 — yt-dlp (up to 3 attempts)…`);
+  const p2 = await withRetry(
+    async () => {
+      const ytdlp = await fetchYtDlpData(url);
+      if (ytdlp?.description && ytdlp.description.length > 20) {
+        const { text: t, isPartial } = trunc(ytdlp.description);
+        return { text: t, method: "instagram_ytdlp", isPartial, ytdlp: ytdlpEnrichment(ytdlp) } as TranscriptResult;
+      }
+      console.log(
+        `[transcript] Instagram/yt-dlp: no description returned ` +
+        `(desc_len=${ytdlp?.description?.length ?? 0})`,
+      );
+      return null;
+    },
+    3,
+    "Instagram/yt-dlp",
+  );
+  if (p2) {
+    console.log(
+      `[transcript] Instagram: FINAL source=yt-dlp method=${p2.result.method} ` +
+      `caption_len=${p2.result.text.length} attempt=${p2.attempts}`,
+    );
+    return p2.result;
+  }
+  console.log(`[transcript] Instagram: yt-dlp exhausted all retries — moving to Priority 3`);
+
+  // ── Priority 3: Apify instagram-scraper ─────────────────────────────────────
+  console.log(`[transcript] Instagram: Priority 3 — Apify instagram-scraper…`);
   const apify = await fetchInstagramApify(url);
   if (apify?.caption && apify.caption.length > 10) {
     const { text: t, isPartial } = trunc(apify.caption);
-    console.log(`[transcript] Instagram: Apify SUCCESS caption_len=${t.length} creator=${JSON.stringify(apify.creator_username)} hashtags=${apify.hashtags.length}`);
+    console.log(
+      `[transcript] Instagram: FINAL source=apify method=instagram_apify ` +
+      `caption_len=${t.length} creator=${JSON.stringify(apify.creator_username)} ` +
+      `hashtags=${apify.hashtags.length}`,
+    );
     console.log(`[transcript] Instagram Apify caption (first 300): ${JSON.stringify(t.slice(0, 300))}`);
     return { text: t, method: "instagram_apify", isPartial, ytdlp: apifyToEnrichment(apify) };
   }
-  console.log(`[transcript] Instagram: Apify returned null — falling through to Firecrawl`);
+  console.log(`[transcript] Instagram: Apify returned null — moving to Priority 4`);
 
-  // ── Tier 3: Firecrawl ───────────────────────────────────────────────────────
+  // ── Priority 4: Firecrawl ────────────────────────────────────────────────────
   const hasApiKey = !!process.env.FIRECRAWL_API_KEY;
   if (hasApiKey) {
-    console.log(`[transcript] Instagram: trying Firecrawl (Tier 3)…`);
+    console.log(`[transcript] Instagram: Priority 4 — Firecrawl…`);
     const firecrawlResult = await fetchCaptionViaFirecrawl(url, "instagram");
     if (firecrawlResult) {
-      console.log(`[transcript] Instagram: Firecrawl SUCCESS len=${firecrawlResult.text.length}`);
+      console.log(
+        `[transcript] Instagram: FINAL source=firecrawl method=${firecrawlResult.method} ` +
+        `caption_len=${firecrawlResult.text.length}`,
+      );
       return firecrawlResult;
     }
-    console.log(`[transcript] Instagram: Firecrawl returned null (platform blocks with 403)`);
+    console.log(`[transcript] Instagram: Firecrawl returned null (Instagram blocks datacenter IPs)`);
   }
 
-  // ── Tier 4: direct og:description scrape ───────────────────────────────────
-  console.log(`[transcript] Instagram: trying direct page scrape (Tier 4)…`);
-  const pageResult = await fetchInstagramPageCaption(url);
-  if (pageResult) {
-    console.log(`[transcript] Instagram: page scrape SUCCESS len=${pageResult.text.length}`);
-  } else {
-    console.log(`[transcript] Instagram: all tiers exhausted — no caption extracted`);
-  }
-  return pageResult;
+  console.log(`[transcript] Instagram: all priorities exhausted after retries — no caption extracted`);
+  return null;
 }
 
 // ─── Main Export ──────────────────────────────────────────────────────────────
