@@ -86,14 +86,19 @@ export const askStashd = createServerFn({ method: "POST" })
     const detectedSub = detectSubcategory(data.question, detectedType);
     const topicKeywords = extractTopicKeywords(data.question);
 
-    console.log(`[ASK] intent=${isBrowse ? "browse" : "specific"} type=${detectedType ?? "none"} sub=${detectedSub ?? "none"} keywords=${topicKeywords.join(",")}`);
+    const filtersApplied: string[] = [];
+    if (detectedType) filtersApplied.push(`type=${detectedType}`);
+    if (detectedSub) filtersApplied.push(`sub=${detectedSub}`);
+    if (topicKeywords.length) filtersApplied.push(`keywords=${topicKeywords.join(",")}`);
+
+    console.log(`[ASK] intent=${isBrowse ? "browse" : "specific"} ${filtersApplied.join(" ") || "no-filters"}`);
 
     // ── 1a. Embed query ───────────────────────────────────────────────────────
     const { supabase } = context;
     const vec = await embedQuery(data.question);
 
-    // ── 1b. Semantic search ───────────────────────────────────────────────────
-    const matchCount = isBrowse ? 150 : 20;
+    // ── 1b. Semantic search (starts in parallel with structured) ──────────────
+    const matchCount = isBrowse ? 150 : 30;
     const minSim = isBrowse ? 0.05 : 0.1;
 
     const semanticPromise = supabase.rpc("search_items_semantic", {
@@ -102,31 +107,75 @@ export const askStashd = createServerFn({ method: "POST" })
       min_similarity: minSim,
     });
 
-    // ── 1c. Structured DB search (browse queries only) ────────────────────────
-    let structuredIds: string[] = [];
-    if (isBrowse) {
-      let q = supabaseAdmin.from("items").select("id").eq("user_id", userId);
+    // ── 1c. Structured keyword search (runs for ALL queries) ──────────────────
+    // Searches: tags (exact overlap) + title/subcategory/ai_subcategory/ai_summary (substring)
+    // For browse: comprehensive — type + subcategory/keywords
+    // For specific: strict — topic keywords filter first, embeddings are fallback only
+    let keywordTagIds: string[] = [];
+    let keywordTextIds: string[] = [];
 
-      if (detectedType) {
-        q = q.eq("type", detectedType);
-      }
+    const hasKeywords = topicKeywords.length > 0;
+    const hasTypeFilter = !!detectedType;
 
-      if (detectedSub) {
-        q = q.ilike("subcategory", `%${detectedSub}%`);
-      } else if (topicKeywords.length > 0) {
+    if (hasKeywords || hasTypeFilter) {
+      // Tag array search (exact keyword overlap in tags / ai_tags)
+      const tagSearchPromise = hasKeywords
+        ? Promise.all([
+            supabaseAdmin.from("items").select("id").eq("user_id", userId)
+              .overlaps("tags", topicKeywords).limit(300),
+            supabaseAdmin.from("items").select("id").eq("user_id", userId)
+              .overlaps("ai_tags", topicKeywords).limit(300),
+          ])
+        : Promise.resolve([{ data: [] as any[] }, { data: [] as any[] }]);
+
+      // Text field search (title, subcategory, ai_subcategory, ai_summary, category)
+      let textQ = supabaseAdmin.from("items").select("id").eq("user_id", userId);
+      if (detectedType) textQ = textQ.eq("type", detectedType);
+
+      if (isBrowse) {
+        if (detectedSub) {
+          textQ = textQ.ilike("subcategory", `%${detectedSub}%`);
+        } else if (hasKeywords) {
+          const orParts = topicKeywords.flatMap((kw) => [
+            `title.ilike.%${kw}%`,
+            `ai_summary.ilike.%${kw}%`,
+            `subcategory.ilike.%${kw}%`,
+            `ai_subcategory.ilike.%${kw}%`,
+            `category.ilike.%${kw}%`,
+          ]);
+          textQ = textQ.or(orParts.join(","));
+        }
+      } else if (hasKeywords) {
+        // Specific query — keyword filter across all relevant text columns
         const orParts = topicKeywords.flatMap((kw) => [
           `title.ilike.%${kw}%`,
-          `ai_summary.ilike.%${kw}%`,
           `subcategory.ilike.%${kw}%`,
-          `category.ilike.%${kw}%`,
+          `ai_subcategory.ilike.%${kw}%`,
+          `ai_summary.ilike.%${kw}%`,
         ]);
-        q = q.or(orParts.join(","));
+        textQ = textQ.or(orParts.join(","));
       }
+      // If specific + no keywords but has type filter, the type eq() above is enough
 
-      const { data: sRows } = await q.limit(500);
-      structuredIds = sRows?.map((r: any) => r.id) ?? [];
-      console.log(`[ASK] structured search returned ${structuredIds.length} rows`);
+      const [textResult, [tagsResult, aiTagsResult]] = await Promise.all([
+        textQ.limit(500),
+        tagSearchPromise,
+      ]);
+
+      keywordTextIds = textResult.data?.map((r: any) => r.id) ?? [];
+      keywordTagIds = [
+        ...new Set([
+          ...(tagsResult.data?.map((r: any) => r.id) ?? []),
+          ...(aiTagsResult.data?.map((r: any) => r.id) ?? []),
+        ]),
+      ];
+
+      console.log(`[ASK] keyword filter — text: ${keywordTextIds.length} items | tags: ${keywordTagIds.length} items`);
     }
+
+    // tag matches rank highest → text matches next (tags already deduped inside Set)
+    const allKeywordIds = [...new Set([...keywordTagIds, ...keywordTextIds])];
+    console.log(`[ASK] matched before embeddings: ${allKeywordIds.length}`);
 
     // ── 1d. Fallback JS cosine if semantic returns nothing ─────────────────────
     const { data: semanticMatches } = await semanticPromise;
@@ -161,14 +210,23 @@ export const askStashd = createServerFn({ method: "POST" })
       }
     }
 
-    console.log(`[ASK] semantic search returned ${semanticIds.length} ids`);
+    console.log(`[ASK] matched after embeddings (semantic): ${semanticIds.length}`);
 
     // ── 1e. Merge ─────────────────────────────────────────────────────────────
-    const mergedIds = isBrowse
-      ? [...new Set([...structuredIds, ...semanticIds])]
-      : semanticIds;
+    // Browse: combine all sources for comprehensive coverage
+    // Specific + keyword hits: use keyword results only — avoid polluting context
+    //   with semantically-similar-but-wrong items (e.g. makeup tutorials for "dance tutorials")
+    // Specific + no keyword hits: fall back to semantic
+    let mergedIds: string[];
+    if (isBrowse) {
+      mergedIds = [...new Set([...allKeywordIds, ...semanticIds])];
+    } else if (allKeywordIds.length > 0) {
+      mergedIds = allKeywordIds;
+    } else {
+      mergedIds = semanticIds;
+    }
 
-    console.log(`[ASK] merged total: ${mergedIds.length} unique items`);
+    console.log(`[ASK] merged total: ${mergedIds.length} unique items (strategy=${isBrowse ? "browse-union" : allKeywordIds.length > 0 ? "keyword-strict" : "semantic-fallback"})`);
 
     if (mergedIds.length === 0) {
       return {
@@ -194,7 +252,7 @@ export const askStashd = createServerFn({ method: "POST" })
       chunks.map((chunk) =>
         supabaseAdmin
           .from("items")
-          .select("id,user_id,title,url,image_url,source,type,subcategory,category,ai_summary,description,tags,collection_id")
+          .select("id,user_id,title,url,image_url,source,type,subcategory,ai_subcategory,category,ai_summary,description,tags,ai_tags,collection_id")
           .in("id", chunk)
           .eq("user_id", userId),
       ),
@@ -238,14 +296,19 @@ export const askStashd = createServerFn({ method: "POST" })
         if (opaque) {
           return `[${i + 1}] id=${it.id} | title: ${it.title || "(untitled)"} | NOTE: opaque social link — unknown content`;
         }
+        const subcat = it.subcategory || it.ai_subcategory || null;
         const hierarchy = it.type
-          ? `${it.type}${it.subcategory ? ` > ${it.subcategory}` : ""}`
+          ? `${it.type}${subcat ? ` > ${subcat}` : ""}`
           : null;
+        const allTags = [
+          ...(it.tags || []),
+          ...(it.ai_tags || []).filter((t: string) => !(it.tags || []).includes(t)),
+        ];
         const parts = [
           `[${i + 1}] id=${it.id}`,
           it.title && `title: ${it.title}`,
           hierarchy && `type: ${hierarchy}`,
-          it.tags?.length ? `tags: ${it.tags.slice(0, 6).join(", ")}` : null,
+          allTags.length ? `tags: ${allTags.slice(0, 8).join(", ")}` : null,
           it.collection_id && collectionMap.get(it.collection_id)
             ? `collection: ${collectionMap.get(it.collection_id)}`
             : null,
@@ -267,13 +330,28 @@ export const askStashd = createServerFn({ method: "POST" })
         ? `\n\n(Showing first ${MAX_CONTEXT_ITEMS} of ${totalCount} total matching items.)`
         : "";
 
-    const browseInstruction = isBrowse
+    const keywordMatchCount = allKeywordIds.length;
+    const usedKeywordStrategy = !isBrowse && keywordMatchCount > 0;
+
+    const retrievalNote = usedKeywordStrategy
+      ? `RETRIEVAL: Found ${keywordMatchCount} item(s) via keyword/tag search (tags, title, subcategory, summary). Items are pre-filtered — do NOT treat them as a general sample.`
+      : !isBrowse && keywordMatchCount === 0
+        ? `RETRIEVAL: No exact keyword matches found. Results are from semantic similarity search only.`
+        : `RETRIEVAL: ${totalCount} item(s) matched via structured + semantic search.`;
+
+    const queryInstruction = isBrowse
       ? `This is a BROWSE/COLLECTION query. The user wants to know about ALL matching items. You MUST:
 1. State the exact total count: "${totalCount}" matching items found.
 2. Give a helpful summary of the collection (common themes, notable items, variety).
 3. In "item_ids", return up to 12 of the MOST interesting/representative items.
 4. Keep the answer conversational and useful — tell the user what's in their collection.`
-      : `In "answer", write a short, conversational reply (1-3 sentences) referencing relevant items naturally. In "item_ids", return the ids of items most relevant to the answer (max 8, in order of relevance).`;
+      : usedKeywordStrategy
+        ? `This is a SPECIFIC query answered by keyword/tag filtering. You MUST:
+1. Open with an exact count: e.g. "I found ${keywordMatchCount} dance tutorial(s) in your STASHd." (replace with the actual topic from the user's question).
+2. Briefly describe each matched item (title, type, key detail from summary/tags).
+3. If NONE of the items actually match the user's topic, say so plainly — do not stretch.
+4. In "item_ids", return the ids of the most relevant items (max 8, in order of relevance).`
+        : `This is a SPECIFIC query answered via semantic similarity (no exact keyword matches). Write a short, conversational reply (1-3 sentences) referencing relevant items naturally. In "item_ids", return the ids of items most relevant to the answer (max 8, in order of relevance).`;
 
     const systemPrompt = `You are "Ask My STASHd", a friendly assistant that ONLY answers using the user's saved STASHd items provided below. Never invent items, links, or facts. Never use general internet knowledge. You CANNOT open URLs or watch videos — only the fields shown below exist.
 
@@ -283,7 +361,9 @@ Rules:
 - For items marked "NOTE: opaque social link", do NOT guess the topic or content.
 - If saved items don't answer the question at all, say so plainly.
 
-${browseInstruction}
+${retrievalNote}
+
+${queryInstruction}
 In "collection_ids", return ids of relevant collections (max 4).
 Always call the answer tool.
 
