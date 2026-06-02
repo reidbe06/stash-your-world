@@ -51,6 +51,19 @@ function creatorFromUrl(rawUrl: string, platform: SourcePlatform): string | null
   }
 }
 
+// Strip Instagram og:description engagement header, returning only the caption text.
+// "138K likes, 12K comments - @handle on Date: "caption text"" → "caption text"
+function extractCaptionText(raw: string): string {
+  if (/^\d/.test(raw.trimStart())) {
+    const m = raw.match(/[^:]+:\s*["""']([\s\S]+)/);
+    if (m) {
+      const inner = m[1].replace(/["""']$/, "").trim();
+      if (inner.length > 20) return inner;
+    }
+  }
+  return raw;
+}
+
 async function aiCategorize(input: {
   url: string; title: string; description: string; source: string;
   platform: SourcePlatform;
@@ -384,9 +397,17 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     // We have at least some content — call OpenAI.
     // Hashtags from yt-dlp (YouTube tags) or Apify (Instagram/TikTok hashtags)
     const enrichHashtags = ytEnrich?.tags?.length ? ytEnrich.tags.slice(0, 10) : [];
+    // If no explicit caption (Apify/description), derive a clean one from the transcript
+    // by stripping the Instagram engagement header: "138K likes ... on Date: "caption text""
+    const captionForAi = caption || (transcript ? extractCaptionText(transcript) : null);
+    console.log(`[INGEST] AI input: caption_src=${caption ? "explicit" : transcript ? "transcript_cleaned" : "none"} caption_len=${captionForAi?.length ?? 0} transcript_len=${transcript?.length ?? 0}`);
+    if (captionForAi) console.log(`[INGEST] Caption preview: ${JSON.stringify(captionForAi.slice(0, 150))}`);
+
     const aiInput = {
       url: input.url, title, description, source,
-      platform, creator, caption, transcript,
+      platform, creator,
+      caption: captionForAi,   // clean caption text sent to AI
+      transcript,               // raw og:description kept for DB storage
       hashtags: enrichHashtags.length ? enrichHashtags : undefined,
       notes: userNote,
       contextType,
@@ -396,8 +417,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
       `URL: ${input.url}`,
       `Platform: ${platform}`,
       creator && `Creator: ${creator}`,
-      caption && `Caption: ${caption.slice(0, 300)}`,
-      transcript && `Transcript (first 400): ${transcript.slice(0, 400)}`,
+      captionForAi && `Caption: ${captionForAi.slice(0, 400)}`,
       enrichHashtags.length && `Hashtags: ${enrichHashtags.map(h => `#${h}`).join(" ")}`,
       userNote && `Note: ${userNote}`,
       contextType && `Hint: ${contextType}`,

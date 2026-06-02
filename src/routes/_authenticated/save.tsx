@@ -101,6 +101,20 @@ function isUrlSlugTitle(title: string, url: string): boolean {
   return false;
 }
 
+// Strip Instagram og:description engagement header and return only the caption text.
+// Input: "138K likes, 12K comments - @handle on April 13, 2026: "actual caption text""
+// Output: "actual caption text"
+function extractCaptionText(raw: string): string {
+  if (/^\d/.test(raw.trimStart())) {
+    const m = raw.match(/[^:]+:\s*["""']([\s\S]+)/);
+    if (m) {
+      const inner = m[1].replace(/["""']$/, "").trim();
+      if (inner.length > 20) return inner;
+    }
+  }
+  return raw;
+}
+
 function hasUsefulSocialMetadata(f: { title: string; description: string; image_url: string; url: string }) {
   const platform = getPlatform(f.url).toLowerCase();
   const title = f.title.trim();
@@ -178,13 +192,18 @@ function SavePage() {
     setExtracting(true);
     try {
       const result = await fetchSocialCaptionFn({ data: { url, platform } });
-      const cap = result.caption?.trim() ?? "";
+      const rawCap = result.caption?.trim() ?? "";
+      // Strip "138K likes, N comments - @handle on Date: "caption"" prefix so AI gets clean text.
+      const cap = rawCap ? extractCaptionText(rawCap) : rawCap;
       if (cap.length > 20) {
-        console.log(`[SAVE] Caption extracted: method=${result.method} len=${cap.length} preview=${JSON.stringify(cap.slice(0, 80))}`);
+        console.log(`[SAVE] Caption extracted: method=${result.method} raw_len=${rawCap.length} clean_len=${cap.length} preview=${JSON.stringify(cap.slice(0, 100))}`);
         setExtractedCaption(cap);
         setExtractedMethod(result.method);
+        // Populate form.description with the clean caption so the user sees it in the Notes
+        // field and hasUsefulSocialMetadata returns true for subsequent AI runs.
+        setForm((f) => ({ ...f, description: f.description || cap }));
       } else {
-        console.log(`[SAVE] Caption extraction: nothing useful (len=${cap.length})`);
+        console.log(`[SAVE] Caption extraction: nothing useful (raw_len=${rawCap.length} clean_len=${cap.length})`);
       }
     } catch (err: any) {
       console.warn("[SAVE] Caption extraction failed:", err?.message ?? err);
@@ -441,9 +460,12 @@ function SavePage() {
   const hasHelp = !!help.contextType || !!help.note.trim();
   // Don't show help prompt if we extracted a real caption (>100 chars) — AI can categorize it.
   const captionExtracted = extractedCaption.trim().length > 100;
-  const showHelpPrompt = isSocialVideoUrl(form.url) && !hasUsefulSocialMetadata(form) && !captionExtracted && saveStatus !== "organized" && (!hasHelp || saveStatus === "needs_info");
+  // Hide the "AI needs more info" help prompt while caption extraction is still in progress.
+  const showHelpPrompt = isSocialVideoUrl(form.url) && !hasUsefulSocialMetadata(form) && !captionExtracted && !extracting && saveStatus !== "organized" && (!hasHelp || saveStatus === "needs_info");
   const displayStatus = showHelpPrompt && saveStatus === "idle" ? "needs_info" : saveStatus;
-  const statusMessage = displayStatus === "organized"
+  const statusMessage = extracting
+    ? "Extracting caption…"
+    : displayStatus === "organized"
     ? "AI organized this save"
     : displayStatus === "needs_info"
       ? "AI needs more info"
