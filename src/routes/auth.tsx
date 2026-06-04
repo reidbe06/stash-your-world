@@ -26,7 +26,17 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { if (user) navigate({ to: "/dashboard" }); }, [user, navigate]);
+  useEffect(() => {
+    if (user) {
+      const pending = sessionStorage.getItem("stashd_pending_share");
+      if (pending) {
+        sessionStorage.removeItem("stashd_pending_share");
+        navigate({ to: "/share", search: { url: pending } });
+      } else {
+        navigate({ to: "/dashboard" });
+      }
+    }
+  }, [user, navigate]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

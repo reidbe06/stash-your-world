@@ -184,6 +184,25 @@ ${collectionsHint}` },
   }
 }
 
+async function findOrCreateInboxCollection(
+  userId: string,
+  existingCols: { id: string; name: string }[],
+): Promise<string | null> {
+  const existing = existingCols.find((c) => c.name.toLowerCase() === "inbox");
+  if (existing) return existing.id;
+  try {
+    const { data } = await supabaseAdmin
+      .from("collections")
+      .insert({ user_id: userId, name: "Inbox" })
+      .select("id")
+      .single();
+    return data?.id ?? null;
+  } catch (err) {
+    console.warn("[INGEST] Could not create Inbox collection:", err);
+    return null;
+  }
+}
+
 async function embed(text: string): Promise<number[] | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
@@ -375,12 +394,13 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   let subcategory: string | null;
   let summary: string | null;
   let suggestedCollection: string | null = null;
+  let inboxCollectionId: string | null = null;
 
   if (opaqueVideo) {
-    // No real content to analyse — skip AI entirely to avoid hallucinated generic output.
-    // Save a stub that tells the UI the item needs the user to add context.
-    console.log(`[INGEST] Skipping AI — no extractable content for ${platform}`);
-    category = "Needs Review";
+    // No extractable content — save immediately to Inbox so nothing is lost.
+    console.log(`[INGEST] Opaque video — saving to Inbox without AI`);
+    inboxCollectionId = await findOrCreateInboxCollection(input.userId, cols ?? []);
+    category = "Uncategorized";
     contentType = "Other";
     mediaFormat = platformToMediaFormat(platform);
     tags = [platform.replace(/_/g, "-")];
@@ -391,8 +411,9 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     travelDetails = null;
     confidence = null;
     subcategory = null;
-    summary = `STASHd could not extract enough content from this ${platformDefault ?? "video"} to categorize it automatically.`;
-    processingStatus = "needs_user_context";
+    summary = null;
+    suggestedCollection = "Inbox";
+    processingStatus = "ai_processed";
   } else {
     // We have at least some content — call OpenAI.
     // Hashtags from yt-dlp (YouTube tags) or Apify (Instagram/TikTok hashtags)
@@ -471,7 +492,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
 
   const insertPayload: Record<string, any> = {
     user_id: input.userId,
-    collection_id: input.collection_id ?? null,
+    collection_id: inboxCollectionId ?? input.collection_id ?? null,
     title,
     url: input.url,
     description: description || null,
@@ -517,7 +538,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   try {
     let collectionName: string | null = null;
     if (inserted.collection_id) {
-      collectionName = cols?.find((c) => c.id === inserted.collection_id)?.name ?? null;
+      collectionName = cols?.find((c) => c.id === inserted.collection_id)?.name
+        ?? (opaqueVideo ? "Inbox" : null);
     }
     const text = [
       inserted.title && `Title: ${inserted.title}`,
@@ -543,7 +565,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   } catch (err) { console.warn("Embed failed", err); }
 
   const ai_status: "organized" | "needs_info" | "uncategorized" =
-    opaqueVideo ? "needs_info" : category !== "Uncategorized" ? "organized" : "uncategorized";
+    category !== "Uncategorized" ? "organized" : "uncategorized";
 
   return {
     item: {
@@ -553,7 +575,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     suggested_collection: suggestedCollection,
     fetched_metadata: !!meta,
     ai_status,
-    needs_info: opaqueVideo,
+    needs_info: false,
     processing_status: processingStatus,
   };
 }
