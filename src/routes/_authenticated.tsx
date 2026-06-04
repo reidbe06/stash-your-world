@@ -23,7 +23,17 @@ function AuthedLayout() {
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  useEffect(() => { if (!loading && !user) navigate({ to: "/auth" }); }, [user, loading, navigate]);
+  useEffect(() => {
+    if (!loading && !user) {
+      // Preserve a pending share URL in sessionStorage so auth.tsx can restore it after login.
+      if (typeof window !== "undefined" && window.location.pathname === "/share") {
+        const params = new URLSearchParams(window.location.search);
+        const pendingUrl = params.get("url");
+        if (pendingUrl) sessionStorage.setItem("stashd_pending_share", pendingUrl);
+      }
+      navigate({ to: "/auth" });
+    }
+  }, [user, loading, navigate]);
 
   if (loading || !user) {
     return <div className="flex min-h-screen items-center justify-center"><div className="h-8 w-8 animate-pulse rounded-full bg-brand-gradient" /></div>;

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
@@ -28,6 +29,11 @@ import { Route as ApiPublicItemsRecategorizeRouteImport } from './routes/api/pub
 import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/extension.save'
 import { Route as ApiPublicExtensionCollectionsRouteImport } from './routes/api/public/extension.collections'
 
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -125,6 +131,7 @@ const ApiPublicExtensionCollectionsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/setup': typeof SetupRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -144,6 +151,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/setup': typeof SetupRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/auth': typeof AuthRoute
+  '/setup': typeof SetupRoute
   '/_authenticated/ask': typeof AuthenticatedAskRoute
   '/_authenticated/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/setup'
     | '/ask'
     | '/collections'
     | '/dashboard'
@@ -205,6 +215,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/setup'
     | '/ask'
     | '/collections'
     | '/dashboard'
@@ -225,6 +236,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/setup'
     | '/_authenticated/ask'
     | '/_authenticated/collections'
     | '/_authenticated/dashboard'
@@ -246,6 +258,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
+  SetupRoute: typeof SetupRoute
   ShareSlugRoute: typeof ShareSlugRoute
   ApiPublicUrlMetadataRoute: typeof ApiPublicUrlMetadataRoute
   ApiPublicExtensionCollectionsRoute: typeof ApiPublicExtensionCollectionsRoute
@@ -256,6 +269,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -429,6 +449,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
+  SetupRoute: SetupRoute,
   ShareSlugRoute: ShareSlugRoute,
   ApiPublicUrlMetadataRoute: ApiPublicUrlMetadataRoute,
   ApiPublicExtensionCollectionsRoute: ApiPublicExtensionCollectionsRoute,
