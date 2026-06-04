@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Bookmark, Search, Share2, ArrowRight, Sparkles, Brain, Tag, Users, ShoppingBag, ShoppingCart, MapPin, Home } from "lucide-react";
+import { Bookmark, Search, Share2, ArrowRight, Sparkles, Brain, Zap, Users, ShoppingBag, ShoppingCart, MapPin, Home } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/lib/auth";
 import { joinWaitlist } from "@/lib/waitlist.functions";
@@ -37,9 +37,10 @@ const pillars = [
 ] as const;
 
 const extras = [
-  { icon: Brain, title: "AI that understands", desc: "Auto-categorizes and extracts the key info." },
-  { icon: Tag, title: "Organize with tags", desc: "Smart collections that build themselves." },
-  { icon: Users, title: "Collaborate", desc: "Build shared folders with friends." },
+  { icon: Bookmark, title: "Save Anything", desc: "Capture recipes, products, places, workouts, ideas, and inspiration." },
+  { icon: Brain, title: "Organize Automatically", desc: "AI sorts everything into collections without manual work." },
+  { icon: Zap, title: "Execute", desc: "Receive context-aware reminders when saved content becomes relevant." },
+  { icon: Users, title: "Share Collections", desc: "Share curated collections with friends and family." },
 ];
 
 const executeCards = [
@@ -252,18 +253,24 @@ function Landing() {
         </div>
       </section>
 
-      {/* EXTRAS */}
+      {/* WHY STASHd IS DIFFERENT */}
       <section className="border-t">
-        <div className="mx-auto grid max-w-6xl gap-6 px-6 py-16 md:grid-cols-3">
-          {extras.map((f) => (
-            <div key={f.title} className="rounded-2xl border bg-card p-6 shadow-card">
-              <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
-                <f.icon className="h-5 w-5" />
+        <div className="mx-auto max-w-6xl px-6 py-16">
+          <div className="mb-10">
+            <p className="text-xs font-semibold tracking-widest text-primary">THE DIFFERENCE</p>
+            <h2 className="mt-2 text-4xl font-extrabold tracking-tight md:text-5xl">WHY STASHd IS DIFFERENT</h2>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {extras.map((f) => (
+              <div key={f.title} className="rounded-2xl border bg-card p-6 shadow-card">
+                <div className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                  <f.icon className="h-5 w-5" />
+                </div>
+                <h3 className="font-bold">{f.title}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
               </div>
-              <h3 className="font-bold">{f.title}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{f.desc}</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
