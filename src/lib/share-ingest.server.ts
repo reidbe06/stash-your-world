@@ -490,49 +490,73 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
 
   console.log(`[INGEST] Final: title=${JSON.stringify(title)} category=${category} status=${processingStatus} image=${!!image}`);
 
-  const insertPayload: Record<string, any> = {
+  // Core fields — guaranteed to exist in the schema.
+  // Optional enrichment fields are spread on top; if a column is missing in the
+  // DB the fallback retry below will still save the item with just the core fields.
+  const corePayload: Record<string, any> = {
     user_id: input.userId,
     collection_id: inboxCollectionId ?? input.collection_id ?? null,
     title,
     url: input.url,
     description: description || null,
-    image_url: image,
+    image_url: image ?? null,
     source: source || null,
     type: contentType,
-    media_format: mediaFormat,
     tags,
     category,
     subcategory,
     ai_summary: summary,
     share_source: input.share_source,
-    // New structured fields
-    source_platform: platform,
-    creator_name: creator,
-    // For Instagram/TikTok, Apify caption goes into original_caption (it IS the post caption)
-    original_caption: caption ?? (
-      (platform === "instagram_reel" || platform === "instagram" || platform === "tiktok") && transcript
-        ? transcript
-        : null
-    ),
-    transcript,
-    ai_category: opaqueVideo ? null : category,
-    ai_subcategory: subcategory,
-    ai_tags: tags,
-    ai_key_takeaways: keyTakeaways,
-    recipe_ingredients: recipeIngredients,
-    recipe_steps: recipeSteps,
-    product_names: productNames,
-    travel_details: travelDetails,
-    confidence_score: confidence,
     processing_status: processingStatus,
   };
 
-  const { data: inserted, error: insErr } = await supabaseAdmin
+  // Enrichment fields added to schema over time — omit if undefined/null so a
+  // missing column causes an error we can catch rather than a silent null write.
+  const enrichmentPayload: Record<string, any> = {};
+  if (mediaFormat != null)    enrichmentPayload.media_format      = mediaFormat;
+  if (platform != null)       enrichmentPayload.source_platform   = platform;
+  if (creator != null)        enrichmentPayload.creator_name      = creator;
+  if (transcript != null)     enrichmentPayload.transcript        = transcript;
+  if (!opaqueVideo)           enrichmentPayload.ai_category       = category;
+  if (subcategory != null)    enrichmentPayload.ai_subcategory    = subcategory;
+  if (tags.length)            enrichmentPayload.ai_tags           = tags;
+  if (keyTakeaways.length)    enrichmentPayload.ai_key_takeaways  = keyTakeaways;
+  if (recipeIngredients.length) enrichmentPayload.recipe_ingredients = recipeIngredients;
+  if (recipeSteps.length)     enrichmentPayload.recipe_steps      = recipeSteps;
+  if (productNames.length)    enrichmentPayload.product_names     = productNames;
+  if (travelDetails != null)  enrichmentPayload.travel_details    = travelDetails;
+  if (confidence != null)     enrichmentPayload.confidence_score  = confidence;
+
+  const captionValue = caption ?? (
+    (platform === "instagram_reel" || platform === "instagram" || platform === "tiktok") && transcript
+      ? transcript
+      : null
+  );
+  if (captionValue != null)   enrichmentPayload.original_caption  = captionValue;
+
+  const SELECT_COLS = "id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,source_platform,processing_status,confidence_score";
+
+  // Attempt 1: full payload
+  let { data: inserted, error: insErr } = await supabaseAdmin
     .from("items")
-    .insert(insertPayload)
-    .select("id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,source_platform,processing_status,confidence_score")
+    .insert({ ...corePayload, ...enrichmentPayload })
+    .select(SELECT_COLS)
     .single();
-  if (insErr || !inserted) throw new Error(insErr?.message || "Failed to save item");
+
+  // Attempt 2: if full insert failed (likely a missing column), retry with core only
+  if (insErr || !inserted) {
+    console.warn(`[INGEST] Full insert failed (${insErr?.message}) — retrying with core payload`);
+    const fallback = await supabaseAdmin
+      .from("items")
+      .insert(corePayload)
+      .select("id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,processing_status")
+      .single();
+    if (fallback.error || !fallback.data) {
+      throw new Error(fallback.error?.message || insErr?.message || "Failed to save item");
+    }
+    inserted = fallback.data as typeof inserted;
+    insErr = null;
+  }
 
   // Embedding (best-effort)
   try {
