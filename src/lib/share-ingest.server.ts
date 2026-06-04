@@ -4,6 +4,7 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { bestTitleFromUrl, fetchMetadata, isMeaningfulMetadataValue, type UrlMetadata } from "./url-metadata.server";
 import { fetchTranscript } from "./transcript.server";
+import { fetchTikTokApify, fetchInstagramApify } from "./apify.server";
 import { CATEGORIES, CONTENT_TYPES, SUBCATEGORY_TAXONOMY } from "./taxonomy";
 import {
   contentTypeFromCategory, platformToMediaFormat, detectPlatform, isVideoPlatform,
@@ -19,6 +20,104 @@ export const SHARE_SOURCES = [
   "mobile_app",
 ] as const;
 export type ShareSource = (typeof SHARE_SOURCES)[number];
+
+// ─── Thumbnail helpers ────────────────────────────────────────────────────────
+
+function logThumbnail(
+  platform: string,
+  url: string,
+  method: string,
+  attempt: number,
+  success: boolean,
+  thumbnailUrl: string | null,
+) {
+  console.log(
+    `[THUMBNAIL]\n` +
+    `  platform: ${platform}\n` +
+    `  url: ${url}\n` +
+    `  method: ${method}\n` +
+    `  attempt: ${attempt}\n` +
+    `  success/fail: ${success ? "success" : "fail"}\n` +
+    `  thumbnailUrl: ${thumbnailUrl ?? "null"}`,
+  );
+}
+
+async function refreshThumbnailBackground(
+  itemId: string,
+  url: string,
+  platform: string,
+): Promise<void> {
+  const log = (msg: string) =>
+    console.log(`[THUMBNAIL-REFRESH] item=${itemId} platform=${platform} ${msg}`);
+  log(`starting for url=${url}`);
+  let thumbnail: string | null = null;
+
+  if (platform === "tiktok") {
+    // Attempt 1: TikTok oEmbed
+    for (let i = 1; i <= 3 && !thumbnail; i++) {
+      try {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), 6000);
+        const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+        const res = await fetch(endpoint, {
+          signal: ctrl.signal,
+          headers: { "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" },
+        });
+        clearTimeout(t);
+        if (res.ok) {
+          const json: any = await res.json();
+          if (json.thumbnail_url) {
+            thumbnail = json.thumbnail_url;
+            logThumbnail(platform, url, "oembed", i, true, thumbnail);
+          }
+        }
+      } catch (err) {
+        log(`oEmbed attempt ${i} failed: ${err}`);
+      }
+      if (!thumbnail && i < 3) await new Promise(r => setTimeout(r, 400 * i));
+    }
+    // Attempt 2: Apify coverUrl
+    if (!thumbnail) {
+      try {
+        const result = await fetchTikTokApify(url);
+        if (result?.thumbnail) {
+          thumbnail = result.thumbnail;
+          logThumbnail(platform, url, "apify_cover", 1, true, thumbnail);
+        }
+      } catch (err) {
+        log(`Apify failed: ${err}`);
+      }
+    }
+  }
+
+  if (platform === "instagram" || platform === "instagram_reel") {
+    // Attempt: Apify displayUrl
+    try {
+      const result = await fetchInstagramApify(url);
+      if (result?.thumbnail) {
+        thumbnail = result.thumbnail;
+        logThumbnail(platform, url, "apify_display", 1, true, thumbnail);
+      }
+    } catch (err) {
+      log(`Apify failed: ${err}`);
+    }
+  }
+
+  if (thumbnail) {
+    const { error } = await supabaseAdmin
+      .from("items")
+      .update({ image_url: thumbnail })
+      .eq("id", itemId);
+    if (error) {
+      log(`DB update failed: ${error.message}`);
+    } else {
+      log(`DB updated with thumbnail: ${thumbnail}`);
+    }
+  } else {
+    log(`no thumbnail found — all methods exhausted`);
+    logThumbnail(platform, url, "background_refresh", 3, false, null);
+  }
+}
 
 const SUBCATEGORY_HINT = Object.entries(SUBCATEGORY_TAXONOMY)
   .map(([type, subs]) => `  ${type}: ${subs.join(", ")}`)
@@ -427,7 +526,9 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     const imageIsTikTokApiImg = !!image && /tiktok\.com\/api\/img/i.test(image);
     if (ytEnrich.thumbnail && (!image || imageIsTikTokApiImg)) {
       image = ytEnrich.thumbnail;
-      console.log(`[INGEST] thumbnail set from Apify/yt-dlp enrichment${imageIsTikTokApiImg ? " (replaced ephemeral api/img)" : ""}`);
+      logThumbnail(platform, input.url, transcriptResult?.method ?? "ytEnrich", 1, true, image);
+    } else {
+      logThumbnail(platform, input.url, transcriptResult?.method ?? "ytEnrich", 1, false, null);
     }
   }
 
@@ -557,6 +658,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     if (ai) processingStatus = "ai_processed";
   }
 
+  logThumbnail(platform, input.url, "final", 1, !!image, image);
   console.log(`[INGEST] Final: title=${JSON.stringify(title)} category=${category} status=${processingStatus} image=${!!image}`);
 
   // Core fields — guaranteed to exist in the schema.
@@ -625,6 +727,16 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     }
     inserted = fallback.data as typeof inserted;
     insErr = null;
+  }
+
+  // Background thumbnail refresh — fire-and-forget if image wasn't found at ingest time
+  if (!image && (platform === "tiktok" || platform === "instagram" || platform === "instagram_reel")) {
+    const itemIdForRefresh = inserted?.id;
+    if (itemIdForRefresh) {
+      refreshThumbnailBackground(itemIdForRefresh, input.url, platform).catch((err) => {
+        console.warn(`[THUMBNAIL-REFRESH] background refresh error: ${err}`);
+      });
+    }
   }
 
   // Embedding (best-effort)

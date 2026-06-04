@@ -647,15 +647,23 @@ async function fetchInstagramCaption(url: string): Promise<TranscriptResult | nu
   // ── Priority 3: Apify instagram-scraper ─────────────────────────────────────
   console.log(`[transcript] Instagram: Priority 3 — Apify instagram-scraper…`);
   const apify = await fetchInstagramApify(url);
-  if (apify?.caption && apify.caption.length > 10) {
-    const { text: t, isPartial } = trunc(apify.caption);
-    console.log(
-      `[transcript] Instagram: FINAL source=apify method=instagram_apify ` +
-      `caption_len=${t.length} creator=${JSON.stringify(apify.creator_username)} ` +
-      `hashtags=${apify.hashtags.length}`,
-    );
-    console.log(`[transcript] Instagram Apify caption (first 300): ${JSON.stringify(t.slice(0, 300))}`);
-    return { text: t, method: "instagram_apify", isPartial, ytdlp: apifyToEnrichment(apify) };
+  if (apify) {
+    const enrichment = apifyToEnrichment(apify);
+    if (apify.caption && apify.caption.length > 10) {
+      const { text: t, isPartial } = trunc(apify.caption);
+      console.log(
+        `[transcript] Instagram: FINAL source=apify method=instagram_apify ` +
+        `caption_len=${t.length} creator=${JSON.stringify(apify.creator_username)} ` +
+        `hashtags=${apify.hashtags.length}`,
+      );
+      console.log(`[transcript] Instagram Apify caption (first 300): ${JSON.stringify(t.slice(0, 300))}`);
+      return { text: t, method: "instagram_apify", isPartial, ytdlp: enrichment };
+    }
+    // No caption but Apify found a thumbnail — propagate enrichment so share-ingest can use it
+    if (enrichment.thumbnail) {
+      console.log(`[transcript] Instagram: Apify no caption but has thumbnail — returning enrichment only`);
+      return { text: "", method: "instagram_apify_thumb", isPartial: false, ytdlp: enrichment };
+    }
   }
   console.log(`[transcript] Instagram: Apify returned null — moving to Priority 4`);
 

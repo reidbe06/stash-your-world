@@ -406,6 +406,22 @@ async function tryOembed(target: URL, signal: AbortSignal): Promise<Partial<UrlM
   } catch { return null; }
 }
 
+/** Retry oEmbed up to maxAttempts times with a per-attempt timeout of timeoutMs. */
+async function tryOembedWithRetry(target: URL, maxAttempts: number, timeoutMs = 5000): Promise<Partial<UrlMetadata> | null> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const result = await tryOembed(target, ctrl.signal);
+      if (result?.image) return result;
+    } catch {} finally {
+      clearTimeout(timer);
+    }
+    if (i < maxAttempts - 1) await new Promise(r => setTimeout(r, 400 * (i + 1)));
+  }
+  return null;
+}
+
 // ─── Firecrawl ────────────────────────────────────────────────────────────────
 
 async function tryFirecrawlRequest(target: URL, body: object, signal: AbortSignal): Promise<Partial<UrlMetadata> | null> {
@@ -618,8 +634,11 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
   // Priority: og/twitter → JSON-LD (type-prioritized) → HTML scan
   const rawImage = ogImage || jsonLdImage || htmlImage;
 
-  const oembed = (await tryOembed(finalUrl, new AbortController().signal)) ||
-    (finalUrl.toString() !== target.toString() ? await tryOembed(target, new AbortController().signal) : null);
+  // TikTok oEmbed is the primary thumbnail source after api/img rejection — retry up to 3 times
+  const isTikTokHost = /tiktok\.com/i.test(target.hostname);
+  const oembed = (await tryOembedWithRetry(finalUrl, isTikTokHost ? 3 : 1)) ||
+    (finalUrl.toString() !== target.toString() ? await tryOembedWithRetry(target, isTikTokHost ? 2 : 1) : null);
+  if (oembed?.image) log(`oEmbed image: ${oembed.image}`);
 
   let result: UrlMetadata = {
     title: null,
