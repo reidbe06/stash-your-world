@@ -1,14 +1,15 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Bookmark, Search, Share2, ArrowRight, Sparkles, Brain, Tag, Users } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/lib/auth";
+import { joinWaitlist } from "@/lib/waitlist.functions";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "STASHd — Save. Search. Share." },
-      { name: "description", content: "The premium social organizer for everything you save online. Save. Search. Share." },
+      { title: "STASHd — Coming Soon" },
+      { name: "description", content: "STASHd organizes your saved recipes, products, places, workouts, and ideas — then helps you actually use them when the time is right." },
     ],
   }),
   component: Landing,
@@ -20,21 +21,18 @@ const pillars = [
     eyebrow: "SAVE",
     title: "Save from anywhere",
     desc: "Drop in a link from Instagram, TikTok, Pinterest or the open web. We pull the thumbnail, title and source in one tap.",
-    cta: "Save an Item",
   },
   {
     icon: Search,
     eyebrow: "SEARCH",
     title: "Find it in seconds",
     desc: "Search by keyword, tag, collection or URL. Smart filters surface exactly what past-you stashed.",
-    cta: "Start Stashing",
   },
   {
     icon: Share2,
     eyebrow: "SHARE",
     title: "Share with your people",
     desc: "Turn any collection into a beautiful public link. Friends view it without an account.",
-    cta: "Share Collection",
   },
 ] as const;
 
@@ -43,6 +41,58 @@ const extras = [
   { icon: Tag, title: "Organize with tags", desc: "Smart collections that build themselves." },
   { icon: Users, title: "Collaborate", desc: "Build shared folders with friends." },
 ];
+
+function WaitlistForm() {
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setFormError(null);
+    try {
+      await joinWaitlist({ data: { email } });
+      setSubmitted(true);
+    } catch {
+      setFormError("Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (submitted) {
+    return (
+      <div className="rounded-2xl border bg-card p-8 shadow-card text-center">
+        <Sparkles className="mx-auto h-8 w-8 text-primary" />
+        <p className="mt-4 font-semibold text-lg">You're on the list!</p>
+        <p className="mt-1 text-sm text-muted-foreground">We'll let you know when STASHd launches.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Email Address"
+        required
+        className="flex-1 rounded-full border bg-card px-5 py-3 text-sm shadow-card focus:outline-none focus:ring-2 focus:ring-primary/40"
+      />
+      <button
+        type="submit"
+        disabled={submitting}
+        className="rounded-full bg-brand-gradient px-7 py-3 text-sm font-semibold text-primary-foreground shadow-brand transition hover:translate-y-[-1px] disabled:opacity-60"
+      >
+        {submitting ? "Joining…" : "Join Waitlist"}
+      </button>
+      {formError && <p className="w-full text-center text-xs text-destructive">{formError}</p>}
+    </form>
+  );
+}
 
 function Landing() {
   const { user, loading } = useAuth();
@@ -53,35 +103,31 @@ function Landing() {
     <div className="min-h-screen bg-soft-gradient">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
         <Logo />
-        <Link to="/auth" className="rounded-full border bg-card px-4 py-2 text-sm font-semibold shadow-card hover:bg-accent">
-          Sign in
-        </Link>
       </header>
 
       {/* HERO */}
       <section className="relative mx-auto max-w-6xl px-6 pt-8 pb-20 md:pt-16">
         <div className="grid items-center gap-14 md:grid-cols-2">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-semibold tracking-widest text-muted-foreground shadow-card">
-              <Sparkles className="h-3.5 w-3.5 text-primary" /> SOCIAL ORGANIZER
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold tracking-widest text-primary">
+              <Sparkles className="h-3.5 w-3.5" /> COMING SOON
             </div>
             <h1 className="mt-6 text-5xl font-extrabold leading-[1.05] tracking-tight md:text-7xl">
-              <span className="text-brand-gradient">SAVE.</span><br />
-              <span className="text-brand-gradient">SEARCH.</span><br />
-              <span className="text-brand-gradient">SHARE.</span>
+              <span className="text-brand-gradient">STOP LOSING</span><br />
+              <span className="text-brand-gradient">THE THINGS</span><br />
+              <span className="text-brand-gradient">YOU SAVE.</span>
             </h1>
             <p className="mt-6 max-w-md text-lg text-muted-foreground">
-              STASHd is the premium home for every link, recipe, fit and idea you've ever wanted to remember — and pass along.
+              STASHd organizes your saved recipes, products, places, workouts, and ideas — then helps you actually use them when the time is right.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Link to="/auth" className="inline-flex items-center gap-2 rounded-full bg-brand-gradient px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-brand transition hover:translate-y-[-1px]">
-                Start Stashing <ArrowRight className="h-4 w-4" />
-              </Link>
+              <a href="#waitlist" className="inline-flex items-center gap-2 rounded-full bg-brand-gradient px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-brand transition hover:translate-y-[-1px]">
+                Join the Waitlist <ArrowRight className="h-4 w-4" />
+              </a>
               <a href="#how" className="inline-flex items-center rounded-full border bg-card px-7 py-3.5 text-sm font-semibold shadow-card hover:bg-accent">
                 See how it works
               </a>
             </div>
-            <p className="mt-4 text-xs text-muted-foreground">Free to start · No credit card · Works on every device</p>
           </div>
 
           {/* Phone mock */}
@@ -114,8 +160,20 @@ function Landing() {
         </div>
       </section>
 
+      {/* WAITLIST FORM */}
+      <section id="waitlist" className="border-t bg-card/60">
+        <div className="mx-auto max-w-xl px-6 py-16">
+          <div className="mb-6 text-center">
+            <p className="text-xs font-semibold tracking-widest text-primary">EARLY ACCESS</p>
+            <h2 className="mt-2 text-3xl font-extrabold tracking-tight">Get notified at launch</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Drop your email and we'll reach out the moment STASHd is ready.</p>
+          </div>
+          <WaitlistForm />
+        </div>
+      </section>
+
       {/* THREE PILLARS */}
-      <section id="how" className="border-t bg-card/60">
+      <section id="how" className="border-t">
         <div className="mx-auto max-w-6xl px-6 py-20">
           <div className="mb-12 max-w-2xl">
             <p className="text-xs font-semibold tracking-widest text-primary">HOW IT WORKS</p>
@@ -123,16 +181,13 @@ function Landing() {
           </div>
           <div className="grid gap-5 md:grid-cols-3">
             {pillars.map((p) => (
-              <div key={p.eyebrow} className="group flex flex-col rounded-3xl border bg-card p-7 shadow-card transition hover:shadow-brand">
+              <div key={p.eyebrow} className="flex flex-col rounded-3xl border bg-card p-7 shadow-card">
                 <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-gradient text-primary-foreground shadow-brand">
                   <p.icon className="h-6 w-6" />
                 </div>
                 <p className="text-xs font-bold tracking-widest text-primary">{p.eyebrow}</p>
                 <h3 className="mt-1 text-xl font-bold">{p.title}</h3>
                 <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{p.desc}</p>
-                <Link to="/auth" className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-primary">
-                  {p.cta} <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-                </Link>
               </div>
             ))}
           </div>
@@ -158,15 +213,15 @@ function Landing() {
       <section className="border-t bg-card/60">
         <div className="mx-auto max-w-4xl px-6 py-20 text-center">
           <h2 className="text-4xl font-extrabold tracking-tight md:text-5xl">Your saves deserve better.</h2>
-          <p className="mx-auto mt-4 max-w-xl text-muted-foreground">Join thousands organizing their inspiration the premium way.</p>
-          <Link to="/auth" className="mt-8 inline-flex items-center gap-2 rounded-full bg-brand-gradient px-8 py-4 text-base font-semibold text-primary-foreground shadow-brand">
-            Start Stashing <ArrowRight className="h-4 w-4" />
-          </Link>
+          <p className="mx-auto mt-4 max-w-xl text-muted-foreground">Join the waitlist for early access to STASHd.</p>
+          <a href="#waitlist" className="mt-8 inline-flex items-center gap-2 rounded-full bg-brand-gradient px-8 py-4 text-base font-semibold text-primary-foreground shadow-brand transition hover:translate-y-[-1px]">
+            Join the Waitlist <ArrowRight className="h-4 w-4" />
+          </a>
         </div>
       </section>
 
       <footer className="border-t py-8 text-center text-xs tracking-widest text-muted-foreground">
-        © {new Date().getFullYear()} STASHd · SAVE. SEARCH. SHARE.
+        © {new Date().getFullYear()} STASHd · COMING SOON
       </footer>
     </div>
   );
