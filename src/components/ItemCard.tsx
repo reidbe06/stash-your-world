@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Bookmark, ChevronDown, ChevronUp, ExternalLink, Folder, Sparkles, Trash2 } from "lucide-react";
+import { Bookmark, ChevronDown, ChevronUp, ExternalLink, Folder, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { EditItemModal } from "@/components/EditItemModal";
 
 export interface Item {
   id: string;
@@ -21,6 +22,7 @@ export interface Item {
   description: string | null;
   image_url: string | null;
   type: string;
+  category?: string | null;
   subcategory?: string | null;
   source: string | null;
   tags: string[];
@@ -39,6 +41,8 @@ export interface Item {
   recipe_steps?: string[];
   product_names?: string[];
   confidence_score?: number | null;
+  user_edited?: boolean | null;
+  edited_at?: string | null;
 }
 
 function timeAgo(iso: string): string {
@@ -301,6 +305,7 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const del = async () => {
     setDeleting(true);
@@ -342,13 +347,22 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
           {item.type}
         </span>
         {!readOnly && (
-          <button
-            onClick={() => setOpen(true)}
-            className="absolute right-3 top-3 rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground"
-            aria-label="Delete saved item"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          <div className="absolute right-3 top-3 flex items-center gap-1.5">
+            <button
+              onClick={() => setEditOpen(true)}
+              className="rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
+              aria-label="Edit saved item"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setOpen(true)}
+              className="rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground"
+              aria-label="Delete saved item"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
         )}
       </div>
 
@@ -406,6 +420,8 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
       )}
 
       {!needsContext && <AIDetails item={item} />}
+
+      <EditItemModal item={item} open={editOpen} onClose={() => setEditOpen(false)} />
 
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>

@@ -85,6 +85,8 @@ export type Database = {
           updated_at: string
           url: string | null
           user_id: string
+          user_edited: boolean
+          edited_at: string | null
         }
         Insert: {
           ai_category?: string | null
@@ -120,6 +122,8 @@ export type Database = {
           updated_at?: string
           url?: string | null
           user_id: string
+          user_edited?: boolean
+          edited_at?: string | null
         }
         Update: {
           ai_category?: string | null
@@ -155,6 +159,8 @@ export type Database = {
           updated_at?: string
           url?: string | null
           user_id?: string
+          user_edited?: boolean
+          edited_at?: string | null
         }
         Relationships: [
           {

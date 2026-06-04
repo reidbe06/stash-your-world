@@ -762,7 +762,9 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     ? ai.content_type
     : contentTypeFromCategory(category);
 
-  // Build update payload
+  // Build update payload.
+  // user_edited is reset to false because the user explicitly clicked "Organize with AI",
+  // which counts as opting back into AI categorization.
   const updatePayload: Record<string, any> = {
     type: recategorizeContentType,
     category,
@@ -772,6 +774,8 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     ai_category: category,
     ai_subcategory: subcategory,
     ai_tags: tags,
+    user_edited: false,
+    edited_at: null,
     ai_key_takeaways: keyTakeaways,
     recipe_ingredients: recipeIngredients,
     recipe_steps: recipeSteps,
