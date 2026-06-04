@@ -97,57 +97,54 @@ function SetupPage() {
         {/* Steps */}
         <div className="mb-10 space-y-8 rounded-3xl border bg-card p-6 shadow-card">
           <Step n="1" title="Open the Shortcuts app">
-            <p>On your iPhone, find and open the <Pill>Shortcuts</Pill> app (it comes pre-installed on all iPhones).</p>
-            <p>Tap <Pill>+</Pill> in the top-right corner to create a new shortcut.</p>
+            <p>Find and open the <Pill>Shortcuts</Pill> app on your iPhone — it comes pre-installed.</p>
+            <p>Tap the <Pill>+</Pill> button in the top-right corner to create a new shortcut.</p>
           </Step>
 
           <div className="border-t" />
 
-          <Step n="2" title="Add the URL Encode action">
+          <Step n="2" title='Add the "Open URLs" action'>
             <p>Tap <Pill>Add Action</Pill>.</p>
-            <p>In the search bar, type <Pill>URL Encode</Pill> and tap it to add it.</p>
-            <p>In the action that appears, make sure:</p>
-            <ul className="list-disc pl-4 space-y-1">
-              <li><span className="font-semibold text-foreground">Input</span> is set to <Pill>Shortcut Input</Pill></li>
-              <li><span className="font-semibold text-foreground">Encode / Decode</span> is set to <Pill>Encode</Pill></li>
-            </ul>
-          </Step>
-
-          <div className="border-t" />
-
-          <Step n="3" title='Add the "Open URLs" action'>
-            <p>Tap <Pill>Add Action</Pill> again.</p>
-            <p>Search for <Pill>Open URLs</Pill> and tap it.</p>
-            <p>In the URL field:</p>
-            <ol className="list-decimal pl-4 space-y-1">
-              <li>Tap the URL field so the keyboard appears.</li>
-              <li>Type or paste the base URL below (copy it first):</li>
+            <p>In the search bar type <Pill>Open URLs</Pill> and tap it to add it.</p>
+            <p>In the URL field that appears:</p>
+            <ol className="list-decimal pl-4 space-y-1.5">
+              <li>Copy the base URL below, then tap the URL field and paste it.</li>
+              <li>
+                <span>After pasting, tap the <Pill>variable chip</Pill> icon at the right edge of the keyboard (looks like a small coloured token or magic wand). A picker appears.</span>
+              </li>
+              <li>
+                <span>In the picker, select <Pill>Shortcut Input</Pill>. This inserts the shared URL at the end of the address.</span>
+              </li>
             </ol>
-            <div className="rounded-xl bg-muted/60 px-3 py-2.5 font-mono text-xs text-foreground break-all">
+            <div className="mt-3 rounded-xl bg-muted/60 px-3 py-2.5 font-mono text-xs text-foreground break-all">
               {shareBase}
             </div>
-            <div className="mt-1.5">
+            <div className="mt-2">
               <CopyButton text={shareBase} label="Copy base URL" />
             </div>
-            <p className="mt-2">After pasting, tap the <Pill>Variable</Pill> button (looks like a blue chip or magic wand icon at the right of the keyboard), then select <Pill>URL Encode</Pill> — this inserts the output of step 2 at the end of the URL.</p>
+            <p className="mt-3 text-xs font-medium text-primary/80">
+              💡 The finished URL field should look like:<br />
+              <span className="font-mono">{shareBase}<span className="rounded bg-blue-100 px-1 text-blue-700 dark:bg-blue-900 dark:text-blue-300">Shortcut Input</span></span>
+            </p>
           </Step>
 
           <div className="border-t" />
 
-          <Step n="4" title="Enable it in the Share Sheet">
-            <p>Tap the shortcut name at the top (it may say "New Shortcut") and rename it to <Pill>STASHd</Pill>.</p>
-            <p>Tap <Pill>⋯</Pill> (the three-dot icon, top-right of the shortcut editor).</p>
-            <p>In the details panel, tap <Pill>Add to Share Sheet</Pill>. Set the input type to <Pill>URLs</Pill>.</p>
+          <Step n="3" title="Name it and add to Share Sheet">
+            <p>Tap the shortcut title at the top of the screen (it says "New Shortcut") and rename it to <Pill>STASHd</Pill>.</p>
+            <p>Tap <Pill>⋯</Pill> in the top-right corner of the editor to open shortcut settings.</p>
+            <p>Tap <Pill>Add to Share Sheet</Pill>. Make sure the input type includes <Pill>URLs</Pill>.</p>
             <p>Tap <Pill>Done</Pill>.</p>
           </Step>
 
           <div className="border-t" />
 
-          <Step n="5" title="Use it">
-            <p>Open Instagram, TikTok, YouTube, Pinterest, Safari, or any app with a Share button.</p>
-            <p>Tap <Pill>Share ↑</Pill> on any post or page → scroll until you see <Pill>STASHd</Pill> → tap it.</p>
-            <p>Safari opens and STASHd saves the link automatically.</p>
-            <p className="text-xs text-primary/80 font-medium">💡 If STASHd doesn&apos;t appear, scroll to the bottom of the share sheet and tap <Pill>More</Pill> to find and enable it.</p>
+          <Step n="4" title="Use it from any app">
+            <p>Open Instagram, TikTok, YouTube, Pinterest, Safari, or any other app.</p>
+            <p>Tap the <Pill>Share ↑</Pill> icon on any post or page.</p>
+            <p>Scroll the share sheet until you see <Pill>STASHd</Pill> and tap it.</p>
+            <p>Safari opens, STASHd saves the link, and you see <strong className="text-foreground">"Saved to STASHd."</strong></p>
+            <p className="text-xs font-medium text-primary/80">💡 First time? Scroll to the bottom of the share sheet and tap <Pill>More</Pill> to find STASHd and switch it on.</p>
           </Step>
         </div>
 
