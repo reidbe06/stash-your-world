@@ -74,6 +74,7 @@ function WaitlistForm() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [alreadyExists, setAlreadyExists] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -81,9 +82,11 @@ function WaitlistForm() {
     setSubmitting(true);
     setFormError(null);
     try {
-      await joinWaitlist({ data: { email } });
+      const result = await joinWaitlist({ data: { email } });
+      setAlreadyExists(result.alreadyExists);
       setSubmitted(true);
-    } catch {
+    } catch (err: any) {
+      console.error("[waitlist] form error:", err);
       setFormError("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
@@ -94,8 +97,17 @@ function WaitlistForm() {
     return (
       <div className="rounded-2xl border bg-card p-8 shadow-card text-center">
         <Sparkles className="mx-auto h-8 w-8 text-primary" />
-        <p className="mt-4 font-semibold text-lg">You're on the list!</p>
-        <p className="mt-1 text-sm text-muted-foreground">We'll let you know when STASHd launches.</p>
+        {alreadyExists ? (
+          <>
+            <p className="mt-4 font-semibold text-lg">You're already on the list.</p>
+            <p className="mt-1 text-sm text-muted-foreground">We'll reach out when STASHd launches.</p>
+          </>
+        ) : (
+          <>
+            <p className="mt-4 font-semibold text-lg">You're on the list!</p>
+            <p className="mt-1 text-sm text-muted-foreground">We'll let you know when STASHd launches.</p>
+          </>
+        )}
       </div>
     );
   }
