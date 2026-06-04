@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Bookmark, Search, Share2, ArrowRight, Sparkles, Brain, Tag, Users } from "lucide-react";
+import { Bookmark, Search, Share2, ArrowRight, Sparkles, Brain, Tag, Users, ShoppingBag, ShoppingCart, MapPin, Home } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { useAuth } from "@/lib/auth";
 import { joinWaitlist } from "@/lib/waitlist.functions";
@@ -41,6 +41,33 @@ const extras = [
   { icon: Tag, title: "Organize with tags", desc: "Smart collections that build themselves." },
   { icon: Users, title: "Collaborate", desc: "Build shared folders with friends." },
 ];
+
+const executeCards = [
+  {
+    icon: ShoppingBag,
+    label: "RETAIL",
+    title: "At Target",
+    desc: "Saved products appear when you walk into the store.",
+  },
+  {
+    icon: ShoppingCart,
+    label: "FOOD",
+    title: "Grocery Trips",
+    desc: "See ingredients and saved recipes while shopping.",
+  },
+  {
+    icon: MapPin,
+    label: "TRAVEL",
+    title: "Travel",
+    desc: "Get reminders about saved restaurants, hotels, and places nearby.",
+  },
+  {
+    icon: Home,
+    label: "HOME",
+    title: "Home Projects",
+    desc: "Surface saved ideas when you're shopping for supplies.",
+  },
+] as const;
 
 function WaitlistForm() {
   const [email, setEmail] = useState("");
@@ -188,6 +215,37 @@ function Landing() {
                 <p className="text-xs font-bold tracking-widest text-primary">{p.eyebrow}</p>
                 <h3 className="mt-1 text-xl font-bold">{p.title}</h3>
                 <p className="mt-2 flex-1 text-sm leading-relaxed text-muted-foreground">{p.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* SAVE. ORGANIZE. EXECUTE. */}
+      <section className="border-t bg-soft-gradient">
+        <div className="mx-auto max-w-6xl px-6 py-20">
+          <div className="mb-14 text-center">
+            <h2 className="text-4xl font-extrabold tracking-tight md:text-5xl">
+              <span className="text-brand-gradient">SAVE. ORGANIZE. EXECUTE.</span>
+            </h2>
+            <p className="mx-auto mt-5 max-w-lg text-muted-foreground leading-relaxed">
+              Most apps help you save content.<br />STASHd helps you actually use it.
+            </p>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2">
+            {executeCards.map((card) => (
+              <div key={card.title} className="group relative overflow-hidden rounded-3xl border bg-card shadow-card">
+                <div className="absolute inset-x-0 top-0 h-[3px] bg-brand-gradient" />
+                <div className="p-8">
+                  <div className="mb-5 flex items-center gap-3">
+                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-gradient text-primary-foreground shadow-brand">
+                      <card.icon className="h-5 w-5" />
+                    </div>
+                    <span className="text-[10px] font-bold tracking-widest text-primary">{card.label}</span>
+                  </div>
+                  <h3 className="text-xl font-bold">{card.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{card.desc}</p>
+                </div>
               </div>
             ))}
           </div>
