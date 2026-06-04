@@ -1,68 +1,67 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { Download, Share2, CheckCircle2, Copy, Check, ChevronRight, Smartphone } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Share2, CheckCircle2, Copy, Check, ChevronRight, Smartphone, ExternalLink } from "lucide-react";
 import { Logo } from "@/components/Logo";
 
 export const Route = createFileRoute("/setup")({
   head: () => ({
     meta: [
       { title: "Set up iPhone Shortcut — STASHd" },
-      { name: "description", content: "Install the STASHd iOS Shortcut to save from Instagram, TikTok, Safari, and any app in one tap." },
+      { name: "description", content: "Save from Instagram, TikTok, Safari, and any app into STASHd with one tap from the iPhone Share menu." },
     ],
   }),
   component: SetupPage,
 });
 
-const steps = [
-  {
-    number: "1",
-    title: "Enable untrusted shortcuts",
-    detail: "Open Settings → Shortcuts → toggle on Allow Untrusted Shortcuts. You only need to do this once.",
-    note: "If the toggle is already on, skip this step.",
-  },
-  {
-    number: "2",
-    title: "Download the STASHd Shortcut",
-    detail: "Tap the button below. Safari will download a .shortcut file and open the Shortcuts app automatically.",
-    note: 'Tap "Add Untrusted Shortcut" on the preview screen to confirm.',
-  },
-  {
-    number: "3",
-    title: "Share any link into STASHd",
-    detail: "Open Instagram, TikTok, YouTube, Safari, or Pinterest. Tap the Share icon on any post or page, scroll to find STASHd in the share sheet, and tap it.",
-    note: 'The Shortcut may appear under "More" the first time.',
-  },
-  {
-    number: "4",
-    title: "Watch it save",
-    detail: 'STASHd opens in Safari, categorizes the save with AI, and shows "Saved to STASHd." within a few seconds.',
-    note: "Sign in once if prompted — your share will resume automatically after login.",
-  },
-];
-
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2500);
     } catch {}
   };
   return (
     <button
       onClick={copy}
-      className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-card transition hover:text-foreground"
+      className="inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm transition hover:text-foreground active:scale-95"
     >
       {copied ? <Check className="h-3.5 w-3.5 text-primary" /> : <Copy className="h-3.5 w-3.5" />}
-      {copied ? "Copied!" : "Copy URL"}
+      {copied ? "Copied!" : label}
     </button>
   );
 }
 
+function Step({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-4">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-sm font-bold text-primary-foreground shadow-brand">
+        {n}
+      </div>
+      <div className="pt-1 flex-1">
+        <p className="font-bold text-base">{title}</p>
+        <div className="mt-1.5 text-sm text-muted-foreground leading-relaxed space-y-2">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Pill({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-lg border bg-muted/60 px-2 py-0.5 text-xs font-semibold text-foreground">
+      {children}
+    </span>
+  );
+}
+
 function SetupPage() {
-  const appUrl = typeof window !== "undefined" ? window.location.origin : "";
-  const shareUrl = `${appUrl}/share?url=YOUR_URL_HERE`;
+  const [appUrl, setAppUrl] = useState("");
+  useEffect(() => { setAppUrl(window.location.origin); }, []);
+  const shareBase = `${appUrl}/share?url=`;
+  const testUrl = `${appUrl}/share?url=${encodeURIComponent("https://www.youtube.com/watch?v=dQw4w9WgXcQ")}`;
 
   return (
     <div className="min-h-screen bg-soft-gradient">
@@ -73,7 +72,7 @@ function SetupPage() {
         </Link>
       </header>
 
-      <main className="mx-auto max-w-2xl px-6 pb-20 pt-8">
+      <main className="mx-auto max-w-xl px-5 pb-20 pt-8">
 
         {/* Hero */}
         <div className="mb-10 text-center">
@@ -85,51 +84,78 @@ function SetupPage() {
           </div>
           <h1 className="mt-4 text-4xl font-extrabold tracking-tight">Save from iPhone in one tap.</h1>
           <p className="mt-3 text-muted-foreground">
-            Install the STASHd Shortcut and it appears in your iPhone Share Sheet. Tap it from Instagram, TikTok, YouTube, Pinterest, Safari — anywhere.
+            Create a Shortcut in the iOS Shortcuts app — it then appears in your Share Sheet in every app.
           </p>
         </div>
 
-        {/* Download CTA */}
-        <div className="mb-10 rounded-3xl border bg-card p-6 shadow-card text-center">
-          <p className="mb-1 text-xs font-bold tracking-widest text-primary">STEP 2 STARTS HERE</p>
-          <h2 className="text-xl font-bold">Download the Shortcut</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Tap on your iPhone in Safari for the best experience.</p>
-          <a
-            href="/STASHd.shortcut"
-            download="STASHd.shortcut"
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-brand-gradient px-8 py-3.5 text-sm font-semibold text-primary-foreground shadow-brand transition hover:translate-y-[-1px]"
-          >
-            <Download className="h-4 w-4" />
-            Get the STASHd Shortcut
-          </a>
-          <p className="mt-3 text-xs text-muted-foreground">Free · No account required to install · Works on iOS 15+</p>
+        {/* Time callout */}
+        <div className="mb-8 flex items-center justify-center gap-3 rounded-2xl border bg-card px-5 py-3 shadow-card">
+          <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
+          <p className="text-sm font-medium">Takes about 2 minutes. You do this once and it works forever.</p>
         </div>
 
-        {/* Step by step */}
-        <div className="mb-10">
-          <h2 className="mb-5 text-lg font-bold">Setup guide</h2>
-          <div className="space-y-4">
-            {steps.map((s, i) => (
-              <div key={i} className="flex gap-4 rounded-2xl border bg-card p-5 shadow-card">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-gradient text-sm font-bold text-primary-foreground shadow-brand">
-                  {s.number}
-                </div>
-                <div>
-                  <h3 className="font-bold">{s.title}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground leading-relaxed">{s.detail}</p>
-                  {s.note && (
-                    <p className="mt-2 text-xs text-primary/80 font-medium">💡 {s.note}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
+        {/* Steps */}
+        <div className="mb-10 space-y-8 rounded-3xl border bg-card p-6 shadow-card">
+          <Step n="1" title="Open the Shortcuts app">
+            <p>On your iPhone, find and open the <Pill>Shortcuts</Pill> app (it comes pre-installed on all iPhones).</p>
+            <p>Tap <Pill>+</Pill> in the top-right corner to create a new shortcut.</p>
+          </Step>
+
+          <div className="border-t" />
+
+          <Step n="2" title="Add the URL Encode action">
+            <p>Tap <Pill>Add Action</Pill>.</p>
+            <p>In the search bar, type <Pill>URL Encode</Pill> and tap it to add it.</p>
+            <p>In the action that appears, make sure:</p>
+            <ul className="list-disc pl-4 space-y-1">
+              <li><span className="font-semibold text-foreground">Input</span> is set to <Pill>Shortcut Input</Pill></li>
+              <li><span className="font-semibold text-foreground">Encode / Decode</span> is set to <Pill>Encode</Pill></li>
+            </ul>
+          </Step>
+
+          <div className="border-t" />
+
+          <Step n="3" title='Add the "Open URLs" action'>
+            <p>Tap <Pill>Add Action</Pill> again.</p>
+            <p>Search for <Pill>Open URLs</Pill> and tap it.</p>
+            <p>In the URL field:</p>
+            <ol className="list-decimal pl-4 space-y-1">
+              <li>Tap the URL field so the keyboard appears.</li>
+              <li>Type or paste the base URL below (copy it first):</li>
+            </ol>
+            <div className="rounded-xl bg-muted/60 px-3 py-2.5 font-mono text-xs text-foreground break-all">
+              {shareBase}
+            </div>
+            <div className="mt-1.5">
+              <CopyButton text={shareBase} label="Copy base URL" />
+            </div>
+            <p className="mt-2">After pasting, tap the <Pill>Variable</Pill> button (looks like a blue chip or magic wand icon at the right of the keyboard), then select <Pill>URL Encode</Pill> — this inserts the output of step 2 at the end of the URL.</p>
+          </Step>
+
+          <div className="border-t" />
+
+          <Step n="4" title="Enable it in the Share Sheet">
+            <p>Tap the shortcut name at the top (it may say "New Shortcut") and rename it to <Pill>STASHd</Pill>.</p>
+            <p>Tap <Pill>⋯</Pill> (the three-dot icon, top-right of the shortcut editor).</p>
+            <p>In the details panel, tap <Pill>Add to Share Sheet</Pill>. Set the input type to <Pill>URLs</Pill>.</p>
+            <p>Tap <Pill>Done</Pill>.</p>
+          </Step>
+
+          <div className="border-t" />
+
+          <Step n="5" title="Use it">
+            <p>Open Instagram, TikTok, YouTube, Pinterest, Safari, or any app with a Share button.</p>
+            <p>Tap <Pill>Share ↑</Pill> on any post or page → scroll until you see <Pill>STASHd</Pill> → tap it.</p>
+            <p>Safari opens and STASHd saves the link automatically.</p>
+            <p className="text-xs text-primary/80 font-medium">💡 If STASHd doesn&apos;t appear, scroll to the bottom of the share sheet and tap <Pill>More</Pill> to find and enable it.</p>
+          </Step>
         </div>
 
-        {/* Works with */}
-        <div className="mb-10 rounded-3xl border bg-card p-6 shadow-card">
+        {/* Supported apps */}
+        <div className="mb-8 rounded-3xl border bg-card p-6 shadow-card">
           <h2 className="mb-4 font-bold flex items-center gap-2">
-            <Share2 className="h-4 w-4 text-primary" /> Works with any app that has a Share button
+            <Share2 className="h-4 w-4 text-primary" />
+            Works in any app with a Share button
           </h2>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {["Instagram", "TikTok", "YouTube", "Safari", "Pinterest", "X / Twitter", "Reddit", "Facebook", "Any website"].map((app) => (
@@ -141,46 +167,29 @@ function SetupPage() {
           </div>
         </div>
 
-        {/* Manual alternative */}
-        <details className="group rounded-3xl border bg-card shadow-card">
-          <summary className="flex cursor-pointer items-center justify-between p-6 font-bold">
-            Build it manually instead
-            <ChevronRight className="h-4 w-4 text-muted-foreground transition group-open:rotate-90" />
-          </summary>
-          <div className="border-t px-6 pb-6 pt-5 space-y-4 text-sm text-muted-foreground">
-            <p>If the download doesn't work, create the shortcut yourself in under 2 minutes:</p>
-            <ol className="space-y-3 list-decimal pl-4">
-              <li>Open the <strong className="text-foreground">Shortcuts</strong> app → tap <strong className="text-foreground">+</strong> to create a new shortcut.</li>
-              <li>Tap <strong className="text-foreground">Add Action</strong> → search for <strong className="text-foreground">"URL Encode"</strong> → select it. Set Mode to <strong className="text-foreground">Encode</strong>. Set Input to <strong className="text-foreground">Shortcut Input</strong>.</li>
-              <li>Add another action: search for <strong className="text-foreground">"Open URLs"</strong>. In the URL field type the base URL below, then tap the variable picker and insert the <strong className="text-foreground">URL Encode</strong> result.</li>
-              <li>Tap the shortcut name at the top → rename it <strong className="text-foreground">STASHd</strong>.</li>
-              <li>Tap <strong className="text-foreground">Share icon → Add to Home Screen</strong> or just leave it in Shortcuts.</li>
-            </ol>
-            <div className="rounded-xl bg-muted/60 p-3">
-              <p className="mb-2 text-xs font-bold text-foreground">Base URL to paste in the Open URLs action:</p>
-              <code className="block break-all text-xs font-mono text-foreground">{appUrl}/share?url=</code>
-              <div className="mt-2">
-                <CopyButton text={`${appUrl}/share?url=`} />
-              </div>
-            </div>
-          </div>
-        </details>
-
         {/* Test section */}
-        <div className="mt-8 rounded-3xl border bg-card p-6 shadow-card">
-          <h2 className="mb-2 font-bold">Test it now</h2>
-          <p className="text-sm text-muted-foreground mb-4">You can also test the save page directly from any browser by visiting a URL like:</p>
+        <div className="rounded-3xl border bg-card p-6 shadow-card">
+          <h2 className="mb-1 font-bold">Test the save flow now</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            You can verify the backend works right now — no Shortcut needed. Open this URL while signed in:
+          </p>
           <div className="rounded-xl bg-muted/60 p-3 text-xs font-mono break-all text-foreground">
             {appUrl}/share?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ
           </div>
-          <div className="mt-3">
+          <div className="mt-4 flex flex-wrap gap-3">
             <a
-              href={`/share?url=${encodeURIComponent("https://www.youtube.com/watch?v=dQw4w9WgXcQ")}`}
+              href={testUrl}
+              target="_blank"
+              rel="noreferrer"
               className="inline-flex items-center gap-1.5 rounded-full bg-brand-gradient px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-brand"
             >
-              Test a save now <ChevronRight className="h-3.5 w-3.5" />
+              Test a save <ExternalLink className="h-3.5 w-3.5" />
             </a>
+            <CopyButton text={`${appUrl}/share?url=https://www.youtube.com/watch?v=dQw4w9WgXcQ`} label="Copy test URL" />
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            If you&apos;re not signed in, you&apos;ll be taken to the login screen first — after signing in, the save resumes automatically.
+          </p>
         </div>
 
       </main>
