@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Bookmark, Search, Share2, ArrowRight, Sparkles, Brain, Zap, Users, ShoppingBag, ShoppingCart, MapPin, Home } from "lucide-react";
 import { Logo } from "@/components/Logo";
@@ -143,6 +143,9 @@ function Landing() {
     <div className="min-h-screen bg-soft-gradient">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
         <Logo />
+        <Link to="/auth" className="rounded-full border bg-card px-5 py-2 text-sm font-semibold shadow-card hover:bg-accent">
+          Sign In
+        </Link>
       </header>
 
       {/* HERO */}
