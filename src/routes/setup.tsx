@@ -131,10 +131,21 @@ function SetupPage() {
           <div className="border-t" />
 
           <Step n="3" title="Name it and add to Share Sheet">
-            <p>Tap the shortcut title at the top of the screen (it says "New Shortcut") and rename it to <Pill>STASHd</Pill>.</p>
-            <p>Tap <Pill>⋯</Pill> in the top-right corner of the editor to open shortcut settings.</p>
-            <p>Tap <Pill>Add to Share Sheet</Pill>. Make sure the input type includes <Pill>URLs</Pill>.</p>
-            <p>Tap <Pill>Done</Pill>.</p>
+            <p>Tap the shortcut title at the top (it says "New Shortcut") → rename it to <Pill>STASHd</Pill> → tap <Pill>Done</Pill> on the keyboard.</p>
+            <p>Now tap <Pill>⋯</Pill> (three dots) in the top-right corner of the editor.</p>
+            <p className="font-semibold text-foreground">Depending on your iOS version, you&apos;ll see one of these:</p>
+            <ul className="list-none space-y-2 mt-1">
+              <li className="rounded-xl border bg-muted/40 px-3 py-2">
+                <span className="font-semibold text-foreground">iOS 16 / 17 / 18:</span> A details panel slides up. Look for a row that says <Pill>Use in Share Sheet</Pill> or <Pill>Share Sheet</Pill> — tap it to turn it on, then make sure input is set to <Pill>URLs</Pill>.
+              </li>
+              <li className="rounded-xl border bg-muted/40 px-3 py-2">
+                <span className="font-semibold text-foreground">If you see tabs at the top:</span> Tap the <Pill>Details</Pill> tab. Scroll down to find <Pill>Use in Share Sheet</Pill> and toggle it on.
+              </li>
+              <li className="rounded-xl border bg-muted/40 px-3 py-2">
+                <span className="font-semibold text-foreground">If you see "Add to Home Screen" but not Share Sheet:</span> Scroll down in that same panel — Share Sheet is listed below Home Screen.
+              </li>
+            </ul>
+            <p>Tap <Pill>Done</Pill> to save.</p>
           </Step>
 
           <div className="border-t" />
