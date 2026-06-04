@@ -710,11 +710,19 @@ export async function fetchTranscript(
         // ── Tier 2: Apify clockworks/tiktok-scraper ───────────────────────────
         console.log(`[transcript] TikTok: trying Apify (Tier 2)…`);
         const tktApify = await fetchTikTokApify(url);
-        if (tktApify?.caption && tktApify.caption.length > 10) {
-          const { text: t, isPartial } = trunc(tktApify.caption);
-          console.log(`[transcript] TikTok: Apify SUCCESS caption_len=${t.length} creator=${JSON.stringify(tktApify.creator_username)} hashtags=${tktApify.hashtags.length}`);
-          console.log(`[transcript] TikTok Apify caption (first 300): ${JSON.stringify(t.slice(0, 300))}`);
-          return { text: t, method: "tiktok_apify", isPartial, ytdlp: apifyToEnrichment(tktApify) };
+        if (tktApify) {
+          const enrichment = apifyToEnrichment(tktApify);
+          if (tktApify.caption && tktApify.caption.length > 10) {
+            const { text: t, isPartial } = trunc(tktApify.caption);
+            console.log(`[transcript] TikTok: Apify SUCCESS caption_len=${t.length} creator=${JSON.stringify(tktApify.creator_username)} hashtags=${tktApify.hashtags.length}`);
+            console.log(`[transcript] TikTok Apify caption (first 300): ${JSON.stringify(t.slice(0, 300))}`);
+            return { text: t, method: "tiktok_apify", isPartial, ytdlp: enrichment };
+          }
+          // No caption but Apify found a thumbnail — return enrichment so share-ingest can use it
+          if (enrichment.thumbnail) {
+            console.log(`[transcript] TikTok: Apify no caption but has thumbnail — returning enrichment only`);
+            return { text: "", method: "tiktok_apify_thumb", isPartial: false, ytdlp: enrichment };
+          }
         }
         console.log(`[transcript] TikTok: Apify returned null — falling through to page scrape`);
 

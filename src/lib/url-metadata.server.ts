@@ -603,8 +603,10 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
   const isTinyOg = (ogImageWidth > 0 && ogImageWidth < 100) || (ogImageHeight > 0 && ogImageHeight < 100);
 
   const rawOgImage = html ? pickMeta(html, ["og:image:secure_url", "og:image:url", "og:image", "twitter:image", "twitter:image:src"]) : null;
-  const ogImage = rawOgImage && !isRejectedImageUrl(rawOgImage) && !isTinyOg ? rawOgImage : null;
-  if (rawOgImage && !ogImage) log(`rejected og:image: ${rawOgImage} (${isTinyOg ? "tiny" : "bad url pattern"})`);
+  // TikTok api/img URLs are ephemeral and require auth when rendered in a browser — always reject them
+  const isTikTokApiImg = !!rawOgImage && /tiktok\.com\/api\/img/i.test(rawOgImage);
+  const ogImage = rawOgImage && !isRejectedImageUrl(rawOgImage) && !isTinyOg && !isTikTokApiImg ? rawOgImage : null;
+  if (rawOgImage && !ogImage) log(`rejected og:image: ${rawOgImage} (${isTikTokApiImg ? "tiktok ephemeral api/img" : isTinyOg ? "tiny" : "bad url pattern"})`);
   if (ogImage) log(`candidate: og/twitter image = ${ogImage}`);
 
   const jsonLdImage = jsonLd.image && !isRejectedImageUrl(jsonLd.image) ? jsonLd.image : null;

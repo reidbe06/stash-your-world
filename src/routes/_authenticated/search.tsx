@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2, Sparkles, Loader2, Pencil, FolderPlus } from "lucide-react";
+import { ItemImage } from "@/components/ItemImage";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -492,13 +493,13 @@ function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity
         className="block"
       >
         <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted shadow-card">
-          {item.image_url ? (
-            <img src={item.image_url} alt={item.title} className="h-full w-full object-cover transition group-hover:scale-105" loading="lazy" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-brand-gradient/10">
-              <Bookmark className="h-10 w-10 text-primary/40" />
-            </div>
-          )}
+          <ItemImage
+            src={item.image_url}
+            alt={item.title}
+            url={item.url}
+            source={item.source}
+            imgClassName="h-full w-full object-cover transition group-hover:scale-105"
+          />
           <span className="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-card/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
             {badgeLabel}
           </span>

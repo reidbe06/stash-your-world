@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Bookmark, ChevronDown, ChevronUp, ExternalLink, Folder, FolderPlus, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, Folder, FolderPlus, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { ItemImage } from "@/components/ItemImage";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -342,13 +343,12 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-card transition hover:shadow-brand">
       <div className="relative aspect-[4/3] overflow-hidden bg-muted">
-        {item.image_url ? (
-          <img src={item.image_url} alt={item.title} className="h-full w-full object-cover" loading="lazy" />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-brand-gradient/10">
-            <Bookmark className="h-10 w-10 text-primary/40" />
-          </div>
-        )}
+        <ItemImage
+          src={item.image_url}
+          alt={item.title}
+          url={item.url}
+          source={item.source}
+        />
         <span className="absolute left-3 top-3 rounded-full bg-card/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
           {item.type}
         </span>

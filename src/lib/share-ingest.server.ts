@@ -420,10 +420,14 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
       console.log(`[INGEST] title updated from yt-dlp: ${JSON.stringify(title.slice(0,80))}`);
     }
 
-    // Thumbnail: prefer incoming → meta → yt-dlp
-    if (!image && ytEnrich.thumbnail) {
+    // Thumbnail: prefer incoming → Apify/yt-dlp → meta
+    // For TikTok, meta?.image is an ephemeral api/img URL rejected at the metadata layer,
+    // so image will be null and ytEnrich.thumbnail (a stable CDN URL) is used.
+    // If somehow api/img slipped through, replace it with the Apify thumbnail.
+    const imageIsTikTokApiImg = !!image && /tiktok\.com\/api\/img/i.test(image);
+    if (ytEnrich.thumbnail && (!image || imageIsTikTokApiImg)) {
       image = ytEnrich.thumbnail;
-      console.log(`[INGEST] thumbnail set from yt-dlp`);
+      console.log(`[INGEST] thumbnail set from Apify/yt-dlp enrichment${imageIsTikTokApiImg ? " (replaced ephemeral api/img)" : ""}`);
     }
   }
 

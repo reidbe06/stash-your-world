@@ -145,7 +145,8 @@ export async function fetchTikTokApify(url: string): Promise<ApifyResult | null>
     console.log(`[Apify] TikTok caption (first 300): ${JSON.stringify(caption.slice(0, 300))}`);
   }
 
-  return caption ? result : null;
+  // Return result if we have a caption OR a thumbnail — don't discard thumbnails
+  return (caption || thumbnail) ? result : null;
 }
 
 // ─── Instagram ───────────────────────────────────────────────────────────────
@@ -223,7 +224,8 @@ export async function fetchInstagramApify(url: string): Promise<ApifyResult | nu
     console.log(`[Apify] Instagram caption (first 300): ${JSON.stringify(caption.slice(0, 300))}`);
   }
 
-  return caption ? result : null;
+  // Return result if we have a caption OR a thumbnail — don't discard thumbnails
+  return (caption || thumbnail) ? result : null;
 }
 
 // ─── Utilities ───────────────────────────────────────────────────────────────

@@ -4,3 +4,4 @@
 - [Test architecture](test-architecture.md) — taxonomy.ts + content-type-utils.ts are the pure-logic layer; tests import only from these + url-metadata.server.ts
 - [Bun test quirks](bun-test-quirks.md) — bun test reporter limitations and path alias behavior
 - [SUBCATEGORY_PATTERNS first-match](subcategory-first-match.md) — detectSubcategory returns the FIRST pattern in the array that matches, not the most specific
+- [TikTok thumbnail extraction](tiktok-thumbnail-fix.md) — api/img ephemeral URLs need 5-layer fix: reject in metadata, fix Apify return condition, transcript enrichment path, ingest priority, client onError fallback
