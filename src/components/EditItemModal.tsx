@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
-import { X, Check, Loader2 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { X, Check, Loader2, Plus, FolderOpen } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import { CATEGORIES, SUBCATEGORY_TAXONOMY } from "@/lib/taxonomy";
 import type { Item } from "./ItemCard";
 
@@ -61,18 +62,46 @@ interface Props {
 }
 
 export function EditItemModal({ item, open, onClose }: Props) {
+  const { user } = useAuth();
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
 
-  const initialCategory = item.category ?? item.ai_category ?? "";
-
   const [fields, setFields] = useState<EditFields>({
     title: item.title ?? "",
-    category: initialCategory,
+    category: item.category ?? item.ai_category ?? "",
     subcategory: item.subcategory ?? "",
     tags: item.tags?.join(", ") ?? "",
     description: item.description ?? "",
     url: item.url ?? "",
+  });
+
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<Set<string> | null>(null);
+  const [newColName, setNewColName] = useState("");
+  const [creatingCol, setCreatingCol] = useState(false);
+
+  const { data: collections } = useQuery({
+    queryKey: ["collections", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("collections")
+        .select("id,name")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const { data: currentMemberships } = useQuery({
+    queryKey: ["item-collections", item.id],
+    enabled: open,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("item_collections")
+        .select("collection_id")
+        .eq("item_id", item.id);
+      return new Set((data ?? []).map((r) => r.collection_id));
+    },
   });
 
   useEffect(() => {
@@ -85,8 +114,46 @@ export function EditItemModal({ item, open, onClose }: Props) {
         description: item.description ?? "",
         url: item.url ?? "",
       });
+      setNewColName("");
+      setSelectedCollectionIds(null);
     }
   }, [open, item.id]);
+
+  useEffect(() => {
+    if (open && currentMemberships && selectedCollectionIds === null) {
+      setSelectedCollectionIds(new Set(currentMemberships));
+    }
+  }, [open, currentMemberships]);
+
+  const toggleCollection = (colId: string) => {
+    setSelectedCollectionIds((prev) => {
+      const next = new Set(prev ?? []);
+      if (next.has(colId)) next.delete(colId);
+      else next.add(colId);
+      return next;
+    });
+  };
+
+  const createCollection = async () => {
+    const name = newColName.trim();
+    if (!name || !user || creatingCol) return;
+    setCreatingCol(true);
+
+    const { data: col, error } = await supabase
+      .from("collections")
+      .insert({ user_id: user.id, name })
+      .select("id,name")
+      .single();
+
+    if (error || !col) {
+      toast.error(error?.message ?? "Failed to create collection");
+    } else {
+      setSelectedCollectionIds((prev) => new Set([...(prev ?? []), col.id]));
+      setNewColName("");
+      qc.invalidateQueries({ queryKey: ["collections"] });
+    }
+    setCreatingCol(false);
+  };
 
   const taxonomyKey = CATEGORY_TO_TAXONOMY_KEY[fields.category] ?? "";
   const suggestedSubs: string[] = taxonomyKey ? (SUBCATEGORY_TAXONOMY[taxonomyKey] ?? []) : [];
@@ -102,6 +169,7 @@ export function EditItemModal({ item, open, onClose }: Props) {
       .filter(Boolean);
 
   const handleSave = async () => {
+    if (!user) return;
     setSaving(true);
     const newType = CATEGORY_TO_TYPE[fields.category] ?? fields.category;
     const parsedTags = parseTags(fields.tags);
@@ -135,16 +203,35 @@ export function EditItemModal({ item, open, onClose }: Props) {
       error = fallback.error;
     }
 
-    setSaving(false);
-
     if (error) {
       toast.error(error.message);
+      setSaving(false);
       return;
     }
 
+    if (selectedCollectionIds !== null && currentMemberships !== undefined) {
+      const toAdd = [...selectedCollectionIds].filter((id) => !currentMemberships.has(id));
+      const toRemove = [...currentMemberships].filter((id) => !selectedCollectionIds.has(id));
+
+      if (toAdd.length > 0) {
+        await supabase.from("item_collections").insert(
+          toAdd.map((cid) => ({ user_id: user.id, item_id: item.id, collection_id: cid })),
+        );
+      }
+      if (toRemove.length > 0) {
+        await supabase
+          .from("item_collections")
+          .delete()
+          .eq("item_id", item.id)
+          .in("collection_id", toRemove);
+      }
+    }
+
+    setSaving(false);
     toast.success("Save updated.");
     qc.invalidateQueries({ queryKey: ["items"] });
     qc.invalidateQueries({ queryKey: ["collection-items"] });
+    qc.invalidateQueries({ queryKey: ["item-collections", item.id] });
     onClose();
   };
 
@@ -286,6 +373,63 @@ export function EditItemModal({ item, open, onClose }: Props) {
               placeholder="https://…"
               className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
             />
+          </div>
+
+          <div>
+            <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <FolderOpen className="h-3.5 w-3.5" />
+              Collections
+            </label>
+
+            {!collections || collections.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No collections yet. Create one below.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {collections.map((col) => {
+                  const active = selectedCollectionIds?.has(col.id) ?? false;
+                  return (
+                    <button
+                      key={col.id}
+                      type="button"
+                      onClick={() => toggleCollection(col.id)}
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition ${
+                        active
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:border-primary hover:text-foreground"
+                      }`}
+                    >
+                      {active && <Check className="h-3 w-3" />}
+                      {col.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                type="text"
+                value={newColName}
+                onChange={(e) => setNewColName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && createCollection()}
+                placeholder="New collection…"
+                disabled={creatingCol}
+                className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={createCollection}
+                disabled={!newColName.trim() || creatingCol}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+                aria-label="Create collection"
+              >
+                {creatingCol ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Plus className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
 

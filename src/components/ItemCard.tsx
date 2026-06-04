@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Bookmark, ChevronDown, ChevronUp, ExternalLink, Folder, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { Bookmark, ChevronDown, ChevronUp, ExternalLink, Folder, FolderPlus, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { EditItemModal } from "@/components/EditItemModal";
+import { CollectionQuickAdd } from "@/components/CollectionQuickAdd";
 
 export interface Item {
   id: string;
@@ -28,7 +29,11 @@ export interface Item {
   tags: string[];
   created_at: string;
   collection_id?: string | null;
-  collection?: { name: string } | null;
+  collection?: { id?: string; name: string } | null;
+  item_collections?: Array<{
+    collection_id: string;
+    collections: { id: string; name: string } | null;
+  }> | null;
   processing_status?: string | null;
   ai_summary?: string | null;
   ai_category?: string | null;
@@ -306,6 +311,7 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   const del = async () => {
     setDeleting(true);
@@ -348,6 +354,13 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
         </span>
         {!readOnly && (
           <div className="absolute right-3 top-3 flex items-center gap-1.5">
+            <button
+              onClick={() => setQuickAddOpen(true)}
+              className="rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
+              aria-label="Add to collection"
+            >
+              <FolderPlus className="h-3.5 w-3.5" />
+            </button>
             <button
               onClick={() => setEditOpen(true)}
               className="rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
@@ -400,18 +413,33 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
           </div>
         )}
 
-        <div className="mt-auto flex items-center justify-between pt-3">
-          {item.collection?.name ? (
-            <span className="inline-flex items-center gap-1 truncate text-xs text-muted-foreground">
-              <Folder className="h-3 w-3 shrink-0" />
-              <span className="truncate">{item.collection.name}</span>
-            </span>
-          ) : <span />}
-          {item.url && (
-            <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
-              Open <ExternalLink className="h-3 w-3" />
-            </a>
-          )}
+        <div className="mt-auto pt-3">
+          {(() => {
+            const names = (item.item_collections ?? [])
+              .map((ic) => ic.collections?.name)
+              .filter(Boolean) as string[];
+            return names.length > 0 ? (
+              <div className="mb-2 flex flex-wrap items-center gap-1">
+                {names.slice(0, 2).map((name) => (
+                  <span key={name} className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">
+                    <Folder className="h-2.5 w-2.5 shrink-0" />
+                    {name}
+                  </span>
+                ))}
+                {names.length > 2 && (
+                  <span className="text-[10px] text-muted-foreground">+{names.length - 2} more</span>
+                )}
+              </div>
+            ) : null;
+          })()}
+          <div className="flex items-center justify-between">
+            <span />
+            {item.url && (
+              <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
+                Open <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
         </div>
       </div>
 
@@ -422,6 +450,7 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
       {!needsContext && <AIDetails item={item} />}
 
       <EditItemModal item={item} open={editOpen} onClose={() => setEditOpen(false)} />
+      <CollectionQuickAdd item={item} open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
 
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>

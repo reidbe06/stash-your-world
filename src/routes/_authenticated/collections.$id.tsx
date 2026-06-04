@@ -26,9 +26,22 @@ function CollectionDetail() {
   const { data: items } = useQuery({
     queryKey: ["collection-items", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("items").select("*").eq("collection_id", id).order("created_at", { ascending: false });
+      const { data, error } = await supabase
+        .from("items")
+        .select("*, item_collections!inner(collection_id), collection:collections(id,name)")
+        .eq("item_collections.collection_id", id)
+        .order("created_at", { ascending: false });
+      if (error?.message?.includes("item_collections")) {
+        const { data: fb, error: fbErr } = await supabase
+          .from("items")
+          .select("*")
+          .eq("collection_id", id)
+          .order("created_at", { ascending: false });
+        if (fbErr) throw fbErr;
+        return (fb ?? []) as Item[];
+      }
       if (error) throw error;
-      return data as Item[];
+      return (data ?? []) as Item[];
     },
   });
 

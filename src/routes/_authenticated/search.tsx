@@ -2,12 +2,13 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2, Sparkles, Loader2, Pencil } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2, Sparkles, Loader2, Pencil, FolderPlus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Item } from "@/components/ItemCard";
 import { EditItemModal } from "@/components/EditItemModal";
+import { CollectionQuickAdd } from "@/components/CollectionQuickAdd";
 import { Input } from "@/components/ui/input";
 import { semanticSearchItems, backfillUserEmbeddings } from "@/lib/semantic-search.functions";
 import {
@@ -96,10 +97,18 @@ function SearchPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("items")
-        .select("*, collection:collections(id,name)")
+        .select("*, collection:collections(id,name), item_collections(collection_id, collections(id,name))")
         .order("created_at", { ascending: false });
+      if (error?.message?.includes("item_collections")) {
+        const { data: fb, error: fbErr } = await supabase
+          .from("items")
+          .select("*, collection:collections(id,name)")
+          .order("created_at", { ascending: false });
+        if (fbErr) throw fbErr;
+        return (fb ?? []) as ItemWithCollection[];
+      }
       if (error) throw error;
-      return data as ItemWithCollection[];
+      return (data ?? []) as ItemWithCollection[];
     },
   });
 
@@ -457,6 +466,7 @@ function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   const del = async () => {
     setDeleting(true);
@@ -508,6 +518,13 @@ function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity
 
       <div className="absolute right-2 top-2 flex items-center gap-1">
         <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setQuickAddOpen(true); }}
+          className="rounded-full bg-card/95 p-1.5 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
+          aria-label="Add to collection"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+        </button>
+        <button
           onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditOpen(true); }}
           className="rounded-full bg-card/95 p-1.5 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
           aria-label="Edit saved item"
@@ -524,6 +541,7 @@ function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity
       </div>
 
       <EditItemModal item={item as Item} open={editOpen} onClose={() => setEditOpen(false)} />
+      <CollectionQuickAdd item={item as Item} open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
 
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>

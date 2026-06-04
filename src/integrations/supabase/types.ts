@@ -172,6 +172,45 @@ export type Database = {
           },
         ]
       }
+      item_collections: {
+        Row: {
+          id: string
+          user_id: string
+          item_id: string
+          collection_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          item_id: string
+          collection_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          item_id?: string
+          collection_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "item_collections_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "item_collections_collection_id_fkey"
+            columns: ["collection_id"]
+            isOneToOne: false
+            referencedRelation: "collections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
