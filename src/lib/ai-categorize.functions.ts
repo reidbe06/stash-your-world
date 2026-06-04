@@ -66,6 +66,14 @@ subcategory must be one value from this taxonomy for the chosen content_type:
 ${SUBCATEGORY_HINT}
 If none fit perfectly, pick the closest. For Recipe, default to "Dinner" when unclear.
 
+FASHION vs PRODUCTS (critical — apply before any other rule):
+- Anything a person wears, carries, or puts on their body → category "Fashion", content_type "Fashion". This includes: dresses, tops, shirts, pants, jeans, shorts, shoes, boots, sneakers, sandals, handbags, purses, bags, jewelry, accessories, swimwear, activewear, coats, jackets, lingerie, socks, hats.
+- This rule applies regardless of the retailer: Nordstrom, Target, Amazon, Zara, Altar'd State, Free People, ASOS, Revolve, H&M, TJ Maxx, Macy's, etc. all sell fashion items.
+- Subcategory for shoes, boots, sneakers, sandals, heels → "Shoes".
+- Subcategory for vacation/resort/travel outfits → "Vacation".
+- Non-wearable goods (electronics, appliances, kitchen items, furniture, tools, home decor, lamps) → category "Products", content_type "Product".
+- When uncertain: ask "Would someone wear or carry this?" — yes → Fashion, no → Products.
+
 Tags: 3-6 lowercase short tags, no '#'.
 
 CRITICAL ANTI-HALLUCINATION RULES:

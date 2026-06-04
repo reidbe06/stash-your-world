@@ -33,8 +33,11 @@ export const MEDIA_FORMATS = [
 
 export const SUBCATEGORY_TAXONOMY: Record<string, string[]> = {
   Recipe:        ["Breakfast", "Lunch", "Dinner", "Dessert", "Snacks", "Drinks", "Meal Prep", "Salad", "Soup", "Baking", "Sides"],
-  Fashion:       ["Dresses", "Tops & Shirts", "Pants & Jeans", "Shoes", "Accessories", "Workwear", "Casual", "Vacation", "Activewear", "Jewelry"],
-  Product:       ["Electronics", "Kitchen", "Beauty & Skincare", "Home & Decor", "Fitness", "Clothing", "Gifts"],
+  // Fashion covers ALL wearable/carriable items regardless of retailer.
+  // Shoes = boots, sneakers, heels, sandals — all footwear goes here.
+  Fashion:       ["Dresses", "Tops & Shirts", "Pants & Jeans", "Shorts", "Shoes", "Handbags", "Jewelry", "Accessories", "Swimwear", "Activewear", "Workwear", "Vacation"],
+  // Products = non-wearable goods. Clothing is intentionally absent.
+  Product:       ["Electronics", "Kitchen & Appliances", "Home & Decor", "Furniture", "Beauty & Skincare", "Fitness Equipment", "Tools & Hardware", "Gifts & Other"],
   Travel:        ["Mexico", "Europe", "Asia", "Caribbean", "Beach & Resorts", "Weekend Trips", "Restaurants", "Activities", "Budget", "Luxury", "Destinations"],
   Home:          ["Living Room", "Bedroom", "Kitchen", "Bathroom", "Outdoor", "Organization", "DIY", "Lighting", "Furniture", "Decor & Styling"],
   Tutorial:      ["Cooking", "Makeup & Beauty", "DIY & Crafts", "Tech", "Fitness", "Fashion", "Photography & Film", "How-To"],
