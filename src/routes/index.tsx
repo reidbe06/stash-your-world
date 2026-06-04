@@ -276,12 +276,16 @@ function Landing() {
 
       {/* FINAL CTA */}
       <section className="border-t bg-card/60">
-        <div className="mx-auto max-w-4xl px-6 py-20 text-center">
-          <h2 className="text-4xl font-extrabold tracking-tight md:text-5xl">Your saves deserve better.</h2>
-          <p className="mx-auto mt-4 max-w-xl text-muted-foreground">Join the waitlist for early access to STASHd.</p>
-          <a href="#waitlist" className="mt-8 inline-flex items-center gap-2 rounded-full bg-brand-gradient px-8 py-4 text-base font-semibold text-primary-foreground shadow-brand transition hover:translate-y-[-1px]">
-            Join the Waitlist <ArrowRight className="h-4 w-4" />
-          </a>
+        <div className="mx-auto max-w-2xl px-6 py-20 text-center">
+          <h2 className="text-4xl font-extrabold tracking-tight md:text-5xl">
+            <span className="text-brand-gradient">STOP SAVING THINGS YOU'LL NEVER FIND AGAIN.</span>
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl text-muted-foreground">
+            Join the STASHd waitlist and be first to experience the future of saved content.
+          </p>
+          <div className="mt-8">
+            <WaitlistForm />
+          </div>
         </div>
       </section>
 
