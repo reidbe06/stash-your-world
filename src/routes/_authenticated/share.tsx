@@ -12,7 +12,7 @@
 // On iOS (no Web Share Target API support), users get a clipboard-paste
 // fallback: this same page also accepts a manual paste.
 import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { Loader2, CheckCircle2, AlertTriangle, Sparkles, Clipboard } from "lucide-react";
 import { useAuth } from "@/lib/auth";
@@ -41,6 +41,10 @@ function SharePage() {
   const { user } = useAuth();
   const [status, setStatus] = useState<Status>({ state: "idle" });
   const [manualUrl, setManualUrl] = useState("");
+  // Ref-based guard: set synchronously before the async save() call so that
+  // any re-run of the effect (e.g. Supabase auth state refresh firing while
+  // React's state update is still pending) cannot trigger a second request.
+  const saveCalledRef = useRef(false);
 
   const incomingUrl = (() => {
     if (params.url) return params.url;
@@ -83,7 +87,11 @@ function SharePage() {
   }
 
   useEffect(() => {
-    if (incomingUrl && status.state === "idle") void save(incomingUrl);
+    if (incomingUrl && !saveCalledRef.current && user) {
+      saveCalledRef.current = true;
+      void save(incomingUrl);
+    }
+    // user in deps so we wait for auth to resolve before saving
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingUrl, user]);
 
@@ -141,7 +149,7 @@ function SharePage() {
                 View in STASHd
               </Link>
               <button
-                onClick={() => { setStatus({ state: "idle" }); setManualUrl(""); }}
+                onClick={() => { saveCalledRef.current = false; setStatus({ state: "idle" }); setManualUrl(""); }}
                 className="rounded-full border bg-card py-3 text-sm font-semibold text-muted-foreground hover:text-foreground"
               >
                 Save another

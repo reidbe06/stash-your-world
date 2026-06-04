@@ -263,19 +263,76 @@ export type IngestResult = {
  *   on missing context for opaque social videos → needs_user_context
  *   on hard insert failure → failed (we still throw)
  */
+// Tracking/referral params that should be stripped from URLs before saving or
+// comparing for duplicates.  Extend as needed.
+const TRACKING_PARAMS = new Set([
+  "igsh", "igshid",
+  "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
+  "fbclid", "gclid", "ref", "referrer",
+  "is_from_webapp", "_r", "_t",
+  "share_app_id", "share_link_id", "sender_device", "sender_web_id",
+  "share_id",
+]);
+
+/**
+ * Strip tracking/referral query params and normalise the URL so that
+ * "https://www.instagram.com/reel/X/?igsh=ABC" and
+ * "https://www.instagram.com/reel/X/" are treated as the same item.
+ */
+export function normalizeUrl(raw: string): string {
+  try {
+    const u = new URL(raw);
+    for (const key of [...u.searchParams.keys()]) {
+      if (TRACKING_PARAMS.has(key.toLowerCase())) u.searchParams.delete(key);
+    }
+    // Remove empty query string ("?") left after stripping all params
+    const qs = u.searchParams.toString();
+    return u.origin + u.pathname + (qs ? `?${qs}` : "") + (u.hash || "");
+  } catch {
+    return raw;
+  }
+}
+
 export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult> {
   if (!input.url) throw new Error("URL is required");
-  const parsed = new URL(input.url);
-  const platform = detectPlatform(input.url);
+
+  // Normalize the incoming URL once — used for dedup check and for storage.
+  const canonicalUrl = normalizeUrl(input.url);
+
+  const parsed = new URL(canonicalUrl);
+  const platform = detectPlatform(canonicalUrl);
 
   console.log(`[INGEST] ── START ──────────────────────────────────────`);
-  console.log(`[INGEST] URL:      ${input.url}`);
+  console.log(`[INGEST] URL:      ${canonicalUrl}${canonicalUrl !== input.url ? ` (normalized from ${input.url})` : ""}`);
   console.log(`[INGEST] Platform: ${platform}`);
   console.log(`[INGEST] Source:   ${input.share_source}`);
 
+  // ── Idempotency check ───────────────────────────────────────────────────────
+  // If this user already has an item for this canonical URL, return it immediately
+  // without running the (expensive) metadata / AI pipeline again.
+  const { data: existingItem } = await supabaseAdmin
+    .from("items")
+    .select("id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,source_platform,processing_status,confidence_score")
+    .eq("user_id", input.userId)
+    .eq("url", canonicalUrl)
+    .maybeSingle();
+
+  if (existingItem) {
+    console.log(`[INGEST] Duplicate — returning existing item ${existingItem.id}`);
+    const cat = existingItem.category ?? "Uncategorized";
+    return {
+      item: existingItem,
+      suggested_collection: null,
+      fetched_metadata: false,
+      ai_status: cat !== "Uncategorized" ? "organized" : "uncategorized",
+      needs_info: false,
+      processing_status: (existingItem.processing_status as ProcessingStatus) ?? "ai_processed",
+    };
+  }
+
   let processingStatus: ProcessingStatus = "pending";
 
-  const incomingTitle = isMeaningfulMetadataValue(input.title, input.url) ? input.title!.trim() : null;
+  const incomingTitle = isMeaningfulMetadataValue(input.title, canonicalUrl) ? input.title!.trim() : null;
   const incomingDescription = isMeaningfulMetadataValue(input.description) ? input.description!.trim() : null;
   const incomingImage = isMeaningfulMetadataValue(input.image) ? input.image!.trim() : null;
   const userNote = isMeaningfulMetadataValue(input.note) ? input.note!.trim() : "";
@@ -425,7 +482,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     if (captionForAi) console.log(`[INGEST] Caption preview: ${JSON.stringify(captionForAi.slice(0, 150))}`);
 
     const aiInput = {
-      url: input.url, title, description, source,
+      url: canonicalUrl, title, description, source,
       platform, creator,
       caption: captionForAi,   // clean caption text sent to AI
       transcript,               // raw og:description kept for DB storage
@@ -497,7 +554,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     user_id: input.userId,
     collection_id: inboxCollectionId ?? input.collection_id ?? null,
     title,
-    url: input.url,
+    url: canonicalUrl,
     description: description || null,
     image_url: image ?? null,
     source: source || null,
