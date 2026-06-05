@@ -21,13 +21,13 @@ const schema = z.object({
 function AuthPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [mode, setMode] = useState<"signin" | "signup" | "forgot" | "reset">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (user) {
+    if (user && mode !== "reset") {
       const pending = sessionStorage.getItem("stashd_pending_share");
       if (pending) {
         sessionStorage.removeItem("stashd_pending_share");
@@ -36,7 +36,14 @@ function AuthPage() {
         navigate({ to: "/dashboard" });
       }
     }
-  }, [user, navigate]);
+  }, [user, navigate, mode]);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setMode("reset");
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   function humanizeAuthError(message: string): string {
     const m = message.toLowerCase();
@@ -59,10 +66,31 @@ function AuthPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const parsed = schema.safeParse({ email, password });
-    if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
     setBusy(true);
     try {
+      if (mode === "forgot") {
+        const trimmed = email.trim();
+        if (!trimmed) { toast.error("Enter your email address."); setBusy(false); return; }
+        const { error } = await supabase.auth.resetPasswordForEmail(trimmed, {
+          redirectTo: `${window.location.origin}/auth`,
+        });
+        if (error) throw error;
+        toast.success("Check your inbox — we sent a reset link.");
+        setMode("signin");
+        setBusy(false);
+        return;
+      }
+      if (mode === "reset") {
+        if (password.length < 6) { toast.error("Password must be at least 6 characters."); setBusy(false); return; }
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        toast.success("Password updated! You're signed in.");
+        setMode("signin");
+        setBusy(false);
+        return;
+      }
+      const parsed = schema.safeParse({ email, password });
+      if (!parsed.success) { toast.error(parsed.error.issues[0].message); setBusy(false); return; }
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email, password,
@@ -91,27 +119,48 @@ function AuthPage() {
             Private Beta
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight">
-            {mode === "signin" ? "Welcome back" : "Create your stash"}
+            {mode === "signin" ? "Welcome back" : mode === "signup" ? "Create your stash" : mode === "forgot" ? "Reset password" : "Set new password"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {mode === "signin" ? "Sign in to access your saves." : "Start saving everything you love."}
+            {mode === "signin" ? "Sign in to access your saves." : mode === "signup" ? "Start saving everything you love." : mode === "forgot" ? "We'll email you a reset link." : "Choose a new password for your account."}
           </p>
           <form onSubmit={submit} className="mt-6 space-y-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1.5" />
-            </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="mt-1.5" />
-            </div>
+            {mode !== "reset" && (
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1.5" />
+              </div>
+            )}
+            {(mode === "signin" || mode === "signup" || mode === "reset") && (
+              <div>
+                <Label htmlFor="password">{mode === "reset" ? "New password" : "Password"}</Label>
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="mt-1.5" />
+              </div>
+            )}
             <button type="submit" disabled={busy} className="w-full rounded-full bg-brand-gradient py-3 text-sm font-semibold text-primary-foreground shadow-brand disabled:opacity-60">
-              {busy ? "Please wait…" : mode === "signin" ? "Sign in" : "Create account"}
+              {busy ? "Please wait…" : mode === "signin" ? "Sign in" : mode === "signup" ? "Create account" : mode === "forgot" ? "Send reset link" : "Update password"}
             </button>
           </form>
-          <button onClick={() => setMode(mode === "signin" ? "signup" : "signin")} className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground">
-            {mode === "signin" ? "No account? Sign up" : "Have an account? Sign in"}
-          </button>
+          {mode === "signin" && (
+            <div className="mt-4 flex flex-col items-center gap-2">
+              <button onClick={() => setMode("signup")} className="text-sm text-muted-foreground hover:text-foreground">
+                No account? Sign up
+              </button>
+              <button onClick={() => setMode("forgot")} className="text-sm text-muted-foreground hover:text-foreground">
+                Forgot password?
+              </button>
+            </div>
+          )}
+          {mode === "signup" && (
+            <button onClick={() => setMode("signin")} className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground">
+              Have an account? Sign in
+            </button>
+          )}
+          {(mode === "forgot") && (
+            <button onClick={() => setMode("signin")} className="mt-4 w-full text-center text-sm text-muted-foreground hover:text-foreground">
+              ← Back to sign in
+            </button>
+          )}
         </div>
       </main>
     </div>

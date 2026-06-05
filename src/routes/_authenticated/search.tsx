@@ -517,7 +517,7 @@ function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity
 
   const del = async () => {
     setDeleting(true);
-    const { error } = await supabase.from("items").delete().eq("id", item.id);
+    const { error } = await supabase.from("items").delete().eq("id", item.id).eq("user_id", item.user_id);
     setDeleting(false);
     if (error) return toast.error(error.message);
     setOpen(false);

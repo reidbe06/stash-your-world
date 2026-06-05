@@ -318,7 +318,7 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
 
   const del = async () => {
     setDeleting(true);
-    const { error } = await supabase.from("items").delete().eq("id", item.id);
+    const { error } = await supabase.from("items").delete().eq("id", item.id).eq("user_id", item.user_id);
     setDeleting(false);
     if (error) {
       toast.error(error.message);
