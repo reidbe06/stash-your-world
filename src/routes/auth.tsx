@@ -38,6 +38,25 @@ function AuthPage() {
     }
   }, [user, navigate]);
 
+  function humanizeAuthError(message: string): string {
+    const m = message.toLowerCase();
+    if (m.includes("invalid login credentials") || m.includes("invalid email or password"))
+      return "Email or password is incorrect. Please try again.";
+    if (m.includes("email not confirmed"))
+      return "Please check your inbox and verify your email before signing in.";
+    if (m.includes("user already registered") || m.includes("already been registered"))
+      return "That email is already registered. Try signing in instead.";
+    if (m.includes("rate limit") || m.includes("too many requests") || m.includes("email rate limit"))
+      return "Too many attempts. Please wait a few minutes and try again.";
+    if (m.includes("password should be at least") || m.includes("password must be"))
+      return "Password must be at least 6 characters.";
+    if (m.includes("unable to validate") || m.includes("network") || m.includes("fetch"))
+      return "Connection error. Check your internet and try again.";
+    if (m.includes("signup is disabled"))
+      return "New sign-ups are currently paused. Contact us if you have a beta invite.";
+    return message;
+  }
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const parsed = schema.safeParse({ email, password });
@@ -56,7 +75,7 @@ function AuthPage() {
         if (error) throw error;
       }
     } catch (err: any) {
-      toast.error(err.message ?? "Authentication failed");
+      toast.error(humanizeAuthError(err.message ?? "Authentication failed"));
     } finally { setBusy(false); }
   };
 
@@ -67,6 +86,10 @@ function AuthPage() {
       </header>
       <main className="mx-auto max-w-md px-6 pt-8 pb-16">
         <div className="rounded-3xl border bg-card p-8 shadow-card">
+          <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/8 px-2.5 py-1 text-[11px] font-semibold tracking-wide text-primary">
+            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+            Private Beta
+          </div>
           <h1 className="text-2xl font-extrabold tracking-tight">
             {mode === "signin" ? "Welcome back" : "Create your stash"}
           </h1>

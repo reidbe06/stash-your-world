@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useProfile } from "@/hooks/useProfile";
+import { FeedbackButton } from "@/components/FeedbackButton";
 
 export const Route = createFileRoute("/_authenticated")({ component: AuthedLayout });
 
@@ -43,7 +44,12 @@ function AuthedLayout() {
     <div className="min-h-screen bg-soft-gradient pb-24">
       <header className="sticky top-0 z-30 border-b bg-card/80 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 md:px-6">
-          <Link to="/dashboard"><Logo size="sm" /></Link>
+          <div className="flex items-center gap-2">
+            <Link to="/dashboard"><Logo size="sm" /></Link>
+            <span className="hidden rounded-full border border-primary/25 bg-primary/8 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-primary sm:inline">
+              Private Beta
+            </span>
+          </div>
           <div className="hidden gap-1 md:flex">
             {navItems.map((n) => {
               const active = pathname.startsWith(n.to);
@@ -55,6 +61,7 @@ function AuthedLayout() {
             })}
           </div>
           <div className="flex items-center gap-2">
+            <FeedbackButton />
             <Link to="/profile" aria-label="Profile">
               <UserAvatar url={profile?.avatar_url} email={user.email} size="sm" />
             </Link>
