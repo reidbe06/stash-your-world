@@ -32,7 +32,7 @@ export const MEDIA_FORMATS = [
 ] as const;
 
 export const SUBCATEGORY_TAXONOMY: Record<string, string[]> = {
-  Recipe:        ["Breakfast", "Lunch", "Dinner", "Dessert", "Snacks", "Drinks", "Meal Prep", "Salad", "Soup", "Baking", "Sides"],
+  Recipe:        ["Breakfast", "Lunch", "Dinner", "Desserts", "Appetizers", "Snacks", "Drinks", "Meal Prep", "Salad", "Soup", "Baking", "Sides"],
   // Fashion covers ALL wearable/carriable items regardless of retailer.
   // Shoes = boots, sneakers, heels, sandals — all footwear goes here.
   Fashion:       ["Dresses", "Tops & Shirts", "Pants & Jeans", "Shorts", "Shoes", "Handbags", "Jewelry", "Accessories", "Swimwear", "Activewear", "Workwear", "Vacation"],

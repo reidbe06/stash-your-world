@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2, Sparkles, Loader2, Pencil, FolderPlus } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2, Sparkles, Loader2, Pencil, FolderPlus, ChevronLeft } from "lucide-react";
 import { ItemImage } from "@/components/ItemImage";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -81,6 +81,18 @@ function SearchPage() {
     CATEGORY_CHIPS.some((c) => c.key === type) ? type : "all"
   );
   const [subcategory, setSubcategory] = useState(initialSub || "");
+
+  // Sync URL search params → local state when navigating to this page
+  // (TanStack Router doesn't remount the component on same-route navigation)
+  useEffect(() => {
+    const resolved = CATEGORY_CHIPS.some((c) => c.key === type) ? type : "all";
+    setCategory(resolved);
+  }, [type]);
+
+  useEffect(() => {
+    setSubcategory(initialSub || "");
+  }, [initialSub]);
+
   const [collectionFilter, setCollectionFilter] = useState<string>("all");
   const [tagFilter, setTagFilter] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("newest");
@@ -254,14 +266,48 @@ function SearchPage() {
 
   const sortLabel = sort === "newest" ? "Newest" : sort === "oldest" ? "Oldest" : "Category";
 
+  const categoryLabel = CATEGORY_CHIPS.find((c) => c.key === category)?.label ?? category;
+
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight">Search</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {aiMode ? "Ask in plain English — AI finds what you mean." : "Find anything you've stashed."}
-          </p>
+          {subcategory ? (
+            <>
+              <div className="mb-1 flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSubcategory("")}
+                  className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  {categoryLabel}
+                </button>
+              </div>
+              <h1 className="text-3xl font-extrabold tracking-tight">
+                {categoryLabel}
+                <span className="mx-2 text-muted-foreground/50">›</span>
+                {subcategory}
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {results.length} save{results.length !== 1 ? "s" : ""} in {subcategory}
+              </p>
+            </>
+          ) : category !== "all" ? (
+            <>
+              <h1 className="text-3xl font-extrabold tracking-tight">{categoryLabel}</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {results.length} save{results.length !== 1 ? "s" : ""} in {categoryLabel}
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl font-extrabold tracking-tight">Search</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {aiMode ? "Ask in plain English — AI finds what you mean." : "Find anything you've stashed."}
+              </p>
+            </>
+          )}
         </div>
         <button
           type="button"
