@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useNavigate, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Home, Search, Library, Plus, LogOut, Sparkles, Bell } from "lucide-react";
+import { Home, Search, Plus, LogOut, Sparkles, Bell } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Logo } from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +14,6 @@ const navItems = [
   { to: "/dashboard", icon: Home, label: "Home" },
   { to: "/search", icon: Search, label: "Search" },
   { to: "/ask", icon: Sparkles, label: "Ask" },
-  { to: "/collections", icon: Library, label: "Collections" },
   { to: "/reminders", icon: Bell, label: "Reminders" },
 ] as const;
 
@@ -75,7 +74,7 @@ function AuthedLayout() {
         className="fixed bottom-0 left-0 right-0 z-30 border-t bg-card/95 backdrop-blur md:hidden"
         style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       >
-        <div className="grid h-14 grid-cols-6">
+        <div className="grid h-14 grid-cols-5">
           {navItems.slice(0, 2).map((n) => {
             const active = pathname.startsWith(n.to);
             return (
