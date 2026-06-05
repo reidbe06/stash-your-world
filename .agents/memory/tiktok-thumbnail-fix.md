@@ -1,42 +1,53 @@
 ---
-name: TikTok/Instagram thumbnail extraction
-description: Multi-layer thumbnail fix for TikTok and Instagram, including a regression from the first round
+name: TikTok/Instagram thumbnail extraction and caching
+description: Root cause diagnosis and fix for Instagram/TikTok thumbnails rendering as placeholders
 ---
 
-## The problem
-TikTok's `og:image` returns `tiktok.com/api/img/?itemId=...` — ephemeral, auth-gated, renders as 403 in browser.
-Instagram og:image works intermittently (Instagram blocks datacenter scraping).
+## Root cause (confirmed June 2026)
 
-## Critical lesson: apify.server.ts return condition
-Both `fetchTikTokApify` and `fetchInstagramApify` previously returned null when no caption.
-Changed to `return (caption || thumbnail) ? result : null`.
-**This creates a transcript.server.ts responsibility:** both TikTok and Instagram Apify branches
-must handle the thumbnail-only case (when apify is non-null but caption is missing).
-If you only add one and not the other, you create a regression for the other platform.
+Instagram CDN URLs (`scontent-*.cdninstagram.com`) work server-side but return HTTP 403
+in the browser. This is Referer-based hotlink protection — Instagram blocks `<img src>`
+from non-instagram.com origins. The `oe=` expiry and `oh=` auth tokens are NOT the issue;
+the URLs are valid but hotlink-blocked.
 
-## Fix layers (all five must be in place)
+TikTok CDN URLs (`p16-sign.tiktokcdn*.com`) have the same problem.
 
-1. **url-metadata.server.ts** — reject `api/img` TikTok URLs via `isTikTokApiImg` check.
-   oEmbed is called with `tryOembedWithRetry()` — TikTok gets 3 attempts × 5s timeout.
+**The thumbnails WERE being stored in DB correctly. The failure was at render time.**
 
-2. **apify.server.ts** — return `(caption || thumbnail) ? result : null` for both platforms.
+## Fix layers
 
-3. **transcript.server.ts TikTok** — if Apify returns thumbnail-only (no caption), return
-   `{ text: "", method: "tiktok_apify_thumb", ytdlp: enrichment }` so share-ingest can use it.
+1. **cacheThumbnailToStorage(rawUrl, platform, seed)** in share-ingest.server.ts:
+   - Downloads CDN image server-side with correct Referer header (200 OK from server)
+   - Uploads to Supabase Storage `thumbnails` bucket (public, upsert, 1-year cache)
+   - Returns the permanent public Supabase Storage URL
+   - Called from ingestSharedUrl() for tiktok/instagram/instagram_reel after image is set
+   - Called from refreshThumbnailBackground() before DB update
 
-4. **transcript.server.ts Instagram** — SAME pattern as TikTok. Without this, the Apify thumbnail
-   is silently dropped when caption is missing (the Instagram regression in round 2).
+2. **transcript.server.ts** — both TikTok and Instagram Apify branches handle thumbnail-only
+   (when Apify has thumbnail but no caption). If only one platform has this, regression occurs.
 
-5. **share-ingest.server.ts** — thumbnail priority: `if (ytEnrich.thumbnail && (!image || isTikTokApiImg))`
-   — uses Apify/yt-dlp thumbnail when image is null OR when image is the bad api/img URL.
-   After save: `refreshThumbnailBackground()` fires if image still null — retries oEmbed + Apify
-   and updates `image_url` in DB.
+3. **url-metadata.server.ts** — TikTok oEmbed retried 3× with 5s timeout per attempt
 
-6. **ItemImage.tsx** — client-side `onError` shows platform-branded placeholder (never blank box).
+4. **ItemImage.tsx** — client-side onError shows platform-branded placeholder (never blank)
 
-## Logging
-`logThumbnail(platform, url, method, attempt, success, thumbnailUrl)` emits `[THUMBNAIL]` blocks.
-`[THUMBNAIL-REFRESH]` logs from background refresh function in share-ingest.server.ts.
+## Supabase Storage setup
 
-**Why:** TikTok/Instagram CDN URLs are signed and expire. Always need server-side (get best URL)
-+ client-side (graceful expiry) + background refresh (fix after failed ingest) defenses.
+Bucket: `thumbnails` (public, 5MB file limit)
+Path: `{platform}/{hash36_of_canonical_url}.{ext}`
+Public URL: `{SUPABASE_URL}/storage/v1/object/public/thumbnails/{path}`
+
+## Key test
+
+Server-side test: `await fetch(instagramCdnUrl)` → 200 ✓
+Browser context: `<img src={instagramCdnUrl}>` → 403 ✗ (hotlink protection)
+Supabase Storage URL: accessible from any context, no auth needed ✓
+
+## apify.server.ts invariant
+
+Both TikTok AND Instagram: `return (caption || thumbnail) ? result : null`
+Both transcript.server.ts branches must handle thumbnail-only case or one platform regresses.
+
+**Why:** Instagram/TikTok CDN URLs are hotlink-protected and cannot load in browser.
+Must cache via own storage at ingest time, not just store raw CDN URL.
+**How to apply:** Any new social platform with hotlink-protected thumbnails → add to
+`isHotlinkProtected` check in share-ingest.server.ts and `cacheThumbnailToStorage`.

@@ -23,6 +23,81 @@ export type ShareSource = (typeof SHARE_SOURCES)[number];
 
 // ─── Thumbnail helpers ────────────────────────────────────────────────────────
 
+const THUMBNAIL_BUCKET = "thumbnails";
+
+/**
+ * Downloads a hotlink-protected CDN image server-side and uploads it to
+ * Supabase Storage so the browser can load it without CORS / hotlink errors.
+ *
+ * Instagram scontent-*.cdninstagram.com URLs return 200 server-side but 403
+ * in the browser (hotlink / Referer check). Caching fixes that permanently.
+ *
+ * Returns the public storage URL, or the original rawUrl if download fails.
+ */
+async function cacheThumbnailToStorage(
+  rawUrl: string,
+  platform: string,
+  seed: string,
+): Promise<string> {
+  try {
+    const refererMap: Record<string, string> = {
+      instagram:       "https://www.instagram.com/",
+      instagram_reel:  "https://www.instagram.com/",
+      tiktok:          "https://www.tiktok.com/",
+    };
+    const referer = refererMap[platform] ?? "https://www.google.com/";
+
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 15_000);
+    const res = await fetch(rawUrl, {
+      signal: ctrl.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+        "Referer": referer,
+        "Accept": "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      },
+    });
+    clearTimeout(timeout);
+
+    if (!res.ok) {
+      console.warn(`[THUMB-CACHE] download ${res.status} for ${rawUrl.slice(0, 80)}…`);
+      return rawUrl;
+    }
+
+    const contentType = res.headers.get("content-type") ?? "image/jpeg";
+    const ext = contentType.includes("webp") ? "webp" : contentType.includes("png") ? "png" : "jpg";
+
+    // Stable filename: platform + hash of the seed URL
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) hash = (Math.imul(31, hash) + seed.charCodeAt(i)) | 0;
+    const storagePath = `${platform}/${Math.abs(hash).toString(36)}.${ext}`;
+
+    const arrayBuffer = await res.arrayBuffer();
+    const { error } = await supabaseAdmin.storage
+      .from(THUMBNAIL_BUCKET)
+      .upload(storagePath, arrayBuffer, {
+        contentType,
+        upsert: true,
+        cacheControl: "31536000",
+      });
+
+    if (error) {
+      console.warn(`[THUMB-CACHE] storage upload failed: ${error.message}`);
+      return rawUrl;
+    }
+
+    const { data: { publicUrl } } = supabaseAdmin.storage
+      .from(THUMBNAIL_BUCKET)
+      .getPublicUrl(storagePath);
+
+    console.log(`[THUMB-CACHE] ✓ ${platform} → ${publicUrl}`);
+    return publicUrl;
+  } catch (err) {
+    console.warn(`[THUMB-CACHE] error: ${err}`);
+    return rawUrl;
+  }
+}
+
 function logThumbnail(
   platform: string,
   url: string,
@@ -104,14 +179,16 @@ async function refreshThumbnailBackground(
   }
 
   if (thumbnail) {
+    // Cache the CDN URL to storage so it loads in browsers without hotlink errors
+    const cachedUrl = await cacheThumbnailToStorage(thumbnail, platform, url);
     const { error } = await supabaseAdmin
       .from("items")
-      .update({ image_url: thumbnail })
+      .update({ image_url: cachedUrl })
       .eq("id", itemId);
     if (error) {
       log(`DB update failed: ${error.message}`);
     } else {
-      log(`DB updated with thumbnail: ${thumbnail}`);
+      log(`DB updated with cached thumbnail: ${cachedUrl}`);
     }
   } else {
     log(`no thumbnail found — all methods exhausted`);
@@ -530,6 +607,12 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     } else {
       logThumbnail(platform, input.url, transcriptResult?.method ?? "ytEnrich", 1, false, null);
     }
+  }
+
+  // Cache hotlink-protected thumbnails (Instagram/TikTok CDN URLs are blocked in browsers)
+  const isHotlinkProtected = platform === "tiktok" || platform === "instagram" || platform === "instagram_reel";
+  if (image && isHotlinkProtected) {
+    image = await cacheThumbnailToStorage(image, platform, canonicalUrl);
   }
 
   // Existing collection names (for AI hint)
