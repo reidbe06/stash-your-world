@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ChevronDown, ChevronUp, ExternalLink, Folder, FolderPlus, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { Bell, ChevronDown, ChevronUp, ExternalLink, Folder, FolderPlus, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { ItemImage } from "@/components/ItemImage";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { EditItemModal } from "@/components/EditItemModal";
 import { CollectionQuickAdd } from "@/components/CollectionQuickAdd";
+import { ReminderPicker } from "@/components/ReminderPicker";
 
 export interface Item {
   id: string;
@@ -35,6 +36,7 @@ export interface Item {
     collection_id: string;
     collections: { id: string; name: string } | null;
   }> | null;
+  reminder_at?: string | null;
   processing_status?: string | null;
   ai_summary?: string | null;
   ai_category?: string | null;
@@ -354,6 +356,7 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
         </span>
         {!readOnly && (
           <div className="absolute right-3 top-3 flex items-center gap-1.5">
+            <ReminderPicker itemId={item.id} reminderAt={item.reminder_at} />
             <button
               onClick={() => setQuickAddOpen(true)}
               className="rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"

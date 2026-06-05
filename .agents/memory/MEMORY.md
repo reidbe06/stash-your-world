@@ -1,2 +1,3 @@
 - [TikTok/Instagram thumbnail caching](tiktok-thumbnail-fix.md) — CDN URLs hotlink-blocked in browser; fix = download server-side + upload to Supabase Storage thumbnails bucket
 - [TanStack Router search param sync](search-param-sync.md) — useState(initialParam) doesn't update on same-route navigation; must useEffect([param]) to sync
+- [Supabase DDL from Replit](supabase-ddl-blocked.md) — direct postgres + Management API all blocked from Replit network; only way is Supabase dashboard SQL editor
