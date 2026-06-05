@@ -71,24 +71,53 @@ function AuthedLayout() {
       </main>
 
       {/* Bottom mobile nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t bg-card/95 backdrop-blur md:hidden">
-        <div className="mx-auto flex max-w-5xl items-center justify-around px-2 py-2">
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-30 border-t bg-card/95 backdrop-blur md:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+      >
+        <div className="grid h-14 grid-cols-6">
           {navItems.slice(0, 2).map((n) => {
             const active = pathname.startsWith(n.to);
             return (
-              <Link key={n.to} to={n.to} className={cn("flex flex-col items-center gap-0.5 px-3 py-1.5", active ? "text-primary" : "text-muted-foreground")}>
-                <n.icon className="h-5 w-5" /><span className="text-[10px] font-medium">{n.label}</span>
+              <Link
+                key={n.to}
+                to={n.to}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-[3px] transition-colors",
+                  active ? "text-primary" : "text-muted-foreground"
+                )}
+              >
+                <n.icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.25 : 1.75} />
+                <span className="text-[9px] font-semibold tracking-tight leading-none">{n.label}</span>
               </Link>
             );
           })}
-          <Link to="/save" className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-primary-foreground shadow-brand" aria-label="Save new">
-            <Plus className="h-6 w-6" />
+
+          {/* Save — center col */}
+          <Link
+            to="/save"
+            className="flex flex-col items-center justify-center gap-[3px]"
+            aria-label="Save new item"
+          >
+            <div className="flex h-[34px] w-[34px] items-center justify-center rounded-full bg-brand-gradient shadow-sm">
+              <Plus className="h-[17px] w-[17px] text-primary-foreground" strokeWidth={2.5} />
+            </div>
+            <span className="text-[9px] font-semibold tracking-tight leading-none text-muted-foreground">Save</span>
           </Link>
+
           {navItems.slice(2).map((n) => {
             const active = pathname.startsWith(n.to);
             return (
-              <Link key={n.to} to={n.to} className={cn("flex flex-col items-center gap-0.5 px-3 py-1.5", active ? "text-primary" : "text-muted-foreground")}>
-                <n.icon className="h-5 w-5" /><span className="text-[10px] font-medium">{n.label}</span>
+              <Link
+                key={n.to}
+                to={n.to}
+                className={cn(
+                  "flex flex-col items-center justify-center gap-[3px] transition-colors",
+                  active ? "text-primary" : "text-muted-foreground"
+                )}
+              >
+                <n.icon className="h-[22px] w-[22px]" strokeWidth={active ? 2.25 : 1.75} />
+                <span className="text-[9px] font-semibold tracking-tight leading-none">{n.label}</span>
               </Link>
             );
           })}
