@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2, Sparkles, Loader2, Pencil, FolderPlus, ChevronLeft } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2, Sparkles, Loader2, Pencil, FolderPlus, ChevronLeft, ChevronRight, UtensilsCrossed } from "lucide-react";
 import { ItemImage } from "@/components/ItemImage";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -81,6 +81,7 @@ function SearchPage() {
     CATEGORY_CHIPS.some((c) => c.key === type) ? type : "all"
   );
   const [subcategory, setSubcategory] = useState(initialSub || "");
+  const [showAllForCategory, setShowAllForCategory] = useState(false);
 
   // Sync URL search params → local state when navigating to this page
   // (TanStack Router doesn't remount the component on same-route navigation)
@@ -146,9 +147,10 @@ function SearchPage() {
     );
   }, [items, runBackfill]);
 
-  // Reset subcategory when type changes
+  // Reset subcategory + showAll when type changes
   useEffect(() => {
     setSubcategory("");
+    setShowAllForCategory(false);
   }, [category]);
 
   // Debounced semantic search
@@ -284,20 +286,25 @@ function SearchPage() {
                   {categoryLabel}
                 </button>
               </div>
-              <h1 className="text-3xl font-extrabold tracking-tight">
-                {categoryLabel}
-                <span className="mx-2 text-muted-foreground/50">›</span>
-                {subcategory}
-              </h1>
+              <h1 className="text-3xl font-extrabold tracking-tight">{subcategory}</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                {results.length} save{results.length !== 1 ? "s" : ""} in {subcategory}
+                {results.length} save{results.length !== 1 ? "s" : ""}
               </p>
             </>
           ) : category !== "all" ? (
             <>
+              <div className="mb-1 flex items-center gap-1.5">
+                <Link
+                  to="/dashboard"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                  Library
+                </Link>
+              </div>
               <h1 className="text-3xl font-extrabold tracking-tight">{categoryLabel}</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                {results.length} save{results.length !== 1 ? "s" : ""} in {categoryLabel}
+                {results.length} save{results.length !== 1 ? "s" : ""}
               </p>
             </>
           ) : (
@@ -472,37 +479,87 @@ function SearchPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold tracking-tight">
-          {useSemanticRanking ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Sparkles className="h-4 w-4 text-primary" />
-              Smart results
-            </span>
-          ) : q ? "Results" : "Recent"}
-          <span className="ml-2 text-sm font-medium text-muted-foreground">{results.length}</span>
-        </h2>
-        {useSemanticRanking && aiQuery && (
-          <span className="text-xs text-muted-foreground">Ranked by relevance to "{aiQuery}"</span>
-        )}
-      </div>
+      {/* Recipes subcategory selection — shown when Recipes is selected but no subcategory picked yet */}
+      {category === "Recipe" && !subcategory && !showAllForCategory && availableSubcats.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            Subcategories
+          </h2>
+          <div className="space-y-2.5">
+            {availableSubcats.map(({ sub, count: sc }, i) => {
+              const palettes = [
+                "bg-orange-100 text-orange-500",
+                "bg-amber-100 text-amber-600",
+                "bg-rose-100 text-rose-500",
+                "bg-pink-100 text-pink-500",
+                "bg-yellow-100 text-yellow-600",
+                "bg-red-100 text-red-400",
+              ];
+              const palette = palettes[i % palettes.length];
+              return (
+                <button
+                  key={sub}
+                  onClick={() => setSubcategory(sub)}
+                  className="flex w-full items-center gap-3.5 rounded-2xl border border-border/40 bg-white px-4 py-3.5 text-left shadow-sm transition hover:shadow-md active:scale-[0.985]"
+                >
+                  <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${palette}`}>
+                    <UtensilsCrossed className="h-4 w-4" />
+                  </span>
+                  <span className="flex-1 text-sm font-bold text-foreground">{sub}</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold tabular-nums text-muted-foreground">{sc}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowAllForCategory(true)}
+            className="text-sm font-semibold text-primary hover:underline"
+          >
+            View all Recipes →
+          </button>
+        </div>
+      )}
 
-      {results.length > 0 ? (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {results.map((it) => <ResultCard key={it.id} item={it} similarity={(it as any)._sim} />)}
-        </div>
-      ) : (
-        <div className="rounded-3xl border border-dashed bg-card/50 py-16 text-center">
-          <p className="text-sm text-muted-foreground">
-            {aiLoading
-              ? "Searching…"
-              : q
-                ? aiMode
-                  ? `No relevant matches for "${q}". Try rephrasing or turn AI search off.`
-                  : `No matches for "${q}".`
-                : "Nothing matches these filters."}
-          </p>
-        </div>
+      {/* Results — hidden while subcategory selection is shown for Recipes */}
+      {!(category === "Recipe" && !subcategory && !showAllForCategory && availableSubcats.length > 0) && (
+        <>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold tracking-tight">
+              {useSemanticRanking ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Smart results
+                </span>
+              ) : q ? "Results" : "Recent"}
+              <span className="ml-2 text-sm font-medium text-muted-foreground">{results.length}</span>
+            </h2>
+            {useSemanticRanking && aiQuery && (
+              <span className="text-xs text-muted-foreground">Ranked by relevance to "{aiQuery}"</span>
+            )}
+          </div>
+
+          {results.length > 0 ? (
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+              {results.map((it) => <ResultCard key={it.id} item={it} similarity={(it as any)._sim} />)}
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-dashed bg-card/50 py-16 text-center">
+              <p className="text-sm text-muted-foreground">
+                {aiLoading
+                  ? "Searching…"
+                  : q
+                    ? aiMode
+                      ? `No relevant matches for "${q}". Try rephrasing or turn AI search off.`
+                      : `No matches for "${q}".`
+                    : "Nothing matches these filters."}
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

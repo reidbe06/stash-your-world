@@ -1,0 +1,45 @@
+Update the STASHd Library/Home category UI and navigation behavior to match this design direction:
+
+1. Redesign the category/folder section
+- Remove the current “file tree” style folder look with branch lines.
+- Use clean rounded white cards with soft borders/shadows.
+- Each main category row should have:
+  - pastel circular icon on the left
+  - bold category name
+  - small save count/subtext
+  - count and chevron on the right
+- Keep the STASHd pink accent color.
+- Make the UI feel clean, modern, premium, and mobile-first.
+
+2. Recipes behavior
+- On the main Library/Home page, Recipes can expand to show subcategories: Dinner, Meal Prep, Appetizers, Desserts, Breakfast.
+- If I tap “Recipes,” open a dedicated Recipes page.
+- The Recipes page should show only recipe subfolders first, not all recipe saves immediately.
+- Each subfolder row should show icon, name, count, and chevron.
+
+3. Subfolder behavior
+- If I tap “Dinner” from the Library page OR from the Recipes page, it should open a Dinner filtered view.
+- Dinner view should show ONLY saves where category = Recipes and subcategory = Dinner.
+- Same for Meal Prep, Appetizers, Desserts, and Breakfast.
+- Do not show all Recipes when a subfolder is selected.
+
+4. Navigation/filter logic
+- Main category click:
+  - All Saves = show all saves
+  - Recipes = show Recipes subcategory page
+  - Fashion = show Fashion saves
+  - Products = show Products saves
+  - Home & Decor = show Home & Decor saves
+- Subcategory click:
+  - show only saves matching that exact subcategory.
+
+5. Add page headers
+- Recipes page header: “Recipes” with “22 saves”
+- Dinner page header: “Dinner” with “14 saves”
+- Include a back arrow at the top so users can return to Library.
+
+6. Preserve existing functionality
+- Do not break saving, editing, search, collections, authentication, or bottom nav.
+- Only update the Library/Home category UI and the category/subcategory routing/filtering behavior.
+
+Important: This is a UX/navigation fix, not just a visual change. Clicking Dinner must filter to Dinner only.
