@@ -731,6 +731,21 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
       ai?.recipe_nutrition && typeof ai.recipe_nutrition === "object" && !Array.isArray(ai.recipe_nutrition)
         ? ai.recipe_nutrition
         : null;
+
+    // JSON-LD structured recipe data is more accurate than AI extraction —
+    // prefer it whenever the source page had a Recipe schema
+    if (meta?.recipe_ingredients && meta.recipe_ingredients.length > 0) {
+      recipeIngredients = meta.recipe_ingredients.slice(0, 40).map((s) => s.slice(0, 200));
+      console.log(`[INGEST] JSON-LD ingredients: ${recipeIngredients.length} items (overriding AI)`);
+    }
+    if (meta?.recipe_steps && meta.recipe_steps.length > 0) {
+      recipeSteps = meta.recipe_steps.slice(0, 30).map((s) => s.slice(0, 600));
+      console.log(`[INGEST] JSON-LD steps: ${recipeSteps.length} items (overriding AI)`);
+    }
+    if (meta?.recipe_nutrition) {
+      recipeNutrition = meta.recipe_nutrition;
+      console.log(`[INGEST] JSON-LD nutrition: ${JSON.stringify(meta.recipe_nutrition)}`);
+    }
     productNames = cleanArr(ai?.product_names, 20, 200);
     travelDetails =
       ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
@@ -944,6 +959,19 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
 
   const platform = (item.source_platform ?? "web") as SourcePlatform;
 
+  // Fetch URL metadata to extract JSON-LD recipe data (exact structured data beats AI)
+  let urlMeta: UrlMetadata | null = null;
+  if (item.url) {
+    try {
+      urlMeta = await fetchMetadata(item.url);
+      if (urlMeta?.recipe_ingredients?.length || urlMeta?.recipe_steps?.length) {
+        console.log(`[RECATEGORIZE] JSON-LD recipe found: ingredients=${urlMeta.recipe_ingredients?.length ?? 0} steps=${urlMeta.recipe_steps?.length ?? 0}`);
+      }
+    } catch (err) {
+      console.warn(`[RECATEGORIZE] URL metadata fetch failed: ${err}`);
+    }
+  }
+
   // Build context for AI — prefer explicit user note, fall back to existing item data
   const contextNote = trimmedNote
     || (item as any).description
@@ -983,11 +1011,24 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
   const category = ai?.category && CATS.includes(ai.category) ? ai.category : "Uncategorized";
   const tags = cleanArr(ai?.tags, 8, 60).map((t: string) => t.toLowerCase());
   const keyTakeaways = cleanArr(ai?.key_takeaways, 6, 240);
-  const recipeIngredients = cleanArr(ai?.recipe_ingredients, 40, 200);
-  const recipeSteps = cleanArr(ai?.recipe_steps, 30, 600);
-  const recipeNutritionRe =
+  let recipeIngredients = cleanArr(ai?.recipe_ingredients, 40, 200);
+  let recipeSteps = cleanArr(ai?.recipe_steps, 30, 600);
+  let recipeNutritionRe: Record<string, unknown> | null =
     ai?.recipe_nutrition && typeof ai.recipe_nutrition === "object" && !Array.isArray(ai.recipe_nutrition)
-      ? ai.recipe_nutrition : null;
+      ? (ai.recipe_nutrition as Record<string, unknown>) : null;
+
+  // Prefer JSON-LD structured recipe data over AI extraction
+  if (urlMeta?.recipe_ingredients && urlMeta.recipe_ingredients.length > 0) {
+    recipeIngredients = urlMeta.recipe_ingredients.slice(0, 40).map((s) => s.slice(0, 200));
+    console.log(`[RECATEGORIZE] JSON-LD ingredients: ${recipeIngredients.length} items (overriding AI)`);
+  }
+  if (urlMeta?.recipe_steps && urlMeta.recipe_steps.length > 0) {
+    recipeSteps = urlMeta.recipe_steps.slice(0, 30).map((s) => s.slice(0, 600));
+    console.log(`[RECATEGORIZE] JSON-LD steps: ${recipeSteps.length} items (overriding AI)`);
+  }
+  if (urlMeta?.recipe_nutrition) {
+    recipeNutritionRe = urlMeta.recipe_nutrition as Record<string, unknown>;
+  }
   const productNames = cleanArr(ai?.product_names, 20, 200);
   const travelDetails =
     ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)

@@ -1,0 +1,80 @@
+Fix Recipe Detail behavior so ingredients and instructions are extracted automatically.
+
+Current problem:
+The app shows a button that says “Extract Recipe Details.”
+That is not the desired user experience.
+
+Correct behavior:
+When a user saves a recipe URL, STASHd should automatically extract and store:
+- recipe summary
+- ingredients
+- instructions/steps
+- nutrition if available
+
+The user should NOT have to click “Extract Recipe Details” for normal recipe saves.
+
+Required behavior:
+
+1. During save/ingest flow
+When a new item is saved and the category is Recipe/Recipes:
+- fetch/read the original source URL
+- extract recipe data automatically
+- store the extracted data in Supabase
+
+Store into existing fields:
+- ai_summary or summary
+- recipe_ingredients
+- recipe_steps
+- recipe_nutrition, if available
+- tags, if useful
+
+2. Extraction source priority
+Use this order:
+- JSON-LD Recipe schema from the page
+- recipe metadata from the page
+- visible page text
+- stored scraped content/OCR/caption
+- title/summary fallback only as last resort
+
+3. Detail page behavior
+When a user opens a recipe save:
+- show Summary
+- show Ingredients
+- show Instructions
+- show Nutrition only if available
+
+Do not show “Extract Recipe Details” as the normal state.
+
+4. Existing recipe saves
+For old recipe saves that were created before this feature:
+- if recipe_ingredients or recipe_steps are missing, show:
+  “Recipe details are still being prepared.”
+- include a smaller secondary option:
+  “Retry extraction”
+Only show Retry extraction for existing incomplete saves, not as the main experience.
+
+5. URL-based extraction
+If the save has a source_url/original_url, the app should attempt to fetch and parse the URL automatically.
+Do not tell the user to manually add details if a valid source URL exists.
+
+6. Error handling
+Only show an error if:
+- there is no source URL
+- no scraped content exists
+- no recipe data can be extracted
+
+Error message:
+“We couldn’t extract recipe details from this save.”
+
+7. Acceptance tests
+- Save a recipe URL from a recipe website.
+- Open the saved item.
+- Ingredients appear automatically.
+- Instructions appear automatically.
+- Nutrition appears only if the source provides it.
+- User does not need to click Extract Recipe Details.
+- Existing incomplete recipe saves show Retry extraction, not the main button.
+- Save cards and detail page routing still work.
+
+Important:
+Do not mark complete until a brand-new recipe save automatically displays ingredients and instructions on the detail page.

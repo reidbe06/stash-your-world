@@ -5,6 +5,9 @@ export type UrlMetadata = {
   source: string | null;
   type: string | null;
   media_format: string | null;
+  recipe_ingredients?: string[] | null;
+  recipe_steps?: string[] | null;
+  recipe_nutrition?: Record<string, unknown> | null;
 };
 
 const BLOCKED_OR_PLACEHOLDER = /^(auto-filled from the page.*|untitled|title|description|notes?|thumbnail image url|robot or human\??|are you a robot\??|access denied|just a moment|attention required|pardon our interruption|captcha|cloudflare)$/i;
@@ -164,6 +167,43 @@ function pickTitle(html: string): string | null {
   return m ? normalizeText(m[1])?.slice(0, 300) ?? null : null;
 }
 
+// ─── Recipe JSON-LD helpers ───────────────────────────────────────────────────
+
+function parseRecipeInstructions(raw: unknown): string[] {
+  if (typeof raw === "string") return raw.trim() ? [raw.trim()] : [];
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item): string[] => {
+    if (typeof item === "string") return item.trim() ? [item.trim()] : [];
+    if (item && typeof item === "object") {
+      const obj = item as Record<string, unknown>;
+      if (typeof obj.text === "string" && obj.text.trim()) return [obj.text.trim()];
+      if (obj.itemListElement) return parseRecipeInstructions(obj.itemListElement);
+    }
+    return [];
+  }).filter(Boolean);
+}
+
+function parseNutritionValue(val: unknown): number | null {
+  if (val == null) return null;
+  const m = String(val).match(/[\d.]+/);
+  return m ? parseFloat(m[0]) : null;
+}
+
+function parseRecipeNutrition(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const n = raw as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  const cal = parseNutritionValue(n.calories);
+  const prot = parseNutritionValue(n.proteinContent);
+  const carb = parseNutritionValue(n.carbohydrateContent);
+  const fat = parseNutritionValue(n.fatContent);
+  if (cal !== null) result.calories_per_serving = cal;
+  if (prot !== null) result.protein_g = prot;
+  if (carb !== null) result.carbs_g = carb;
+  if (fat !== null) result.fat_g = fat;
+  return Object.keys(result).length > 0 ? result : null;
+}
+
 // ─── JSON-LD extraction (type-prioritized) ────────────────────────────────────
 
 function flattenJsonLd(value: unknown): any[] {
@@ -210,6 +250,32 @@ const JSON_LD_TYPE_PRIORITY: string[][] = [
 export function pickJsonLd(html: string): Partial<UrlMetadata & { _method: string }> {
   const nodes = parseJsonLd(html);
   if (!nodes.length) return {};
+
+  // Pass 0: dedicated Recipe extraction — captures full structured recipe data
+  for (const node of nodes) {
+    const nodeTypes: string[] = [node["@type"]].flat().map(String);
+    if (!nodeTypes.some((t) => t === "Recipe" || t.endsWith("/Recipe"))) continue;
+
+    const rawImage = readJsonImage(node.image || node.thumbnailUrl || node.primaryImageOfPage);
+    const image = rawImage && !isRejectedImageUrl(rawImage) ? rawImage : null;
+    const title = normalizeText(node.name || node.headline || node.title);
+    const description = normalizeText(node.description || node.caption);
+    const recipeIngredients: string[] = Array.isArray(node.recipeIngredient)
+      ? node.recipeIngredient.filter((v: any) => typeof v === "string").map((v: string) => v.trim()).filter(Boolean)
+      : [];
+    const recipeSteps = parseRecipeInstructions(node.recipeInstructions);
+    const recipeNutrition = parseRecipeNutrition(node.nutrition);
+
+    if (title || description || recipeIngredients.length || recipeSteps.length) {
+      console.log(`[url-metadata] json-ld: Recipe matched image=${image ?? "none"} ingredients=${recipeIngredients.length} steps=${recipeSteps.length}`);
+      return {
+        title, description, image, _method: "json-ld:Recipe",
+        ...(recipeIngredients.length && { recipe_ingredients: recipeIngredients }),
+        ...(recipeSteps.length && { recipe_steps: recipeSteps }),
+        ...(recipeNutrition && { recipe_nutrition: recipeNutrition }),
+      };
+    }
+  }
 
   // Pass 1: find highest-priority type that has an image
   for (const typeGroup of JSON_LD_TYPE_PRIORITY) {
@@ -693,5 +759,8 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
     source: result.source || hostSource,
     type: result.type || "link",
     media_format: result.media_format || "Webpage",
+    ...(jsonLd.recipe_ingredients?.length && { recipe_ingredients: jsonLd.recipe_ingredients }),
+    ...(jsonLd.recipe_steps?.length && { recipe_steps: jsonLd.recipe_steps }),
+    ...(jsonLd.recipe_nutrition && { recipe_nutrition: jsonLd.recipe_nutrition }),
   };
 }

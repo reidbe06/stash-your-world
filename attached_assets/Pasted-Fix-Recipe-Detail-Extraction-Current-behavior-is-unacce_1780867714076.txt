@@ -1,0 +1,57 @@
+Fix Recipe Detail Extraction. Current behavior is unacceptable.
+
+Bug:
+When I click “Extract Recipe Details,” the app says:
+“Not enough recipe content found. Open the original source or edit this save to add details.”
+
+That is wrong when the save has an original recipe URL.
+
+Example:
+Source: momontimeout.com
+Title: Veggie Pizza Party Appetizer
+
+Expected behavior:
+The app should fetch/read the original URL content, extract recipe details, and populate:
+- recipe summary
+- ingredients
+- instructions/steps
+- nutrition if available
+
+Required fix:
+1. Find the “Extract Recipe Details” button handler.
+2. It must use the saved item’s original URL/source URL.
+3. If recipe_ingredients or recipe_steps are empty, fetch the original URL content again.
+4. Parse the recipe page content using:
+   - JSON-LD Recipe schema if available
+   - recipe metadata
+   - page text fallback
+   - scraped content already stored on the item, if available
+
+5. Do NOT fail just because the existing note/summary is short.
+6. Do NOT ask the user to manually add details when a source URL exists.
+7. Only show “Not enough recipe content found” if:
+   - there is no source URL, AND
+   - there is no scraped content, AND
+   - there is no note/description/caption to extract from.
+
+Implementation priority:
+Recipe extraction should use this order:
+1. Existing stored scraped_content/full_text/html_content if available
+2. Fetch original source URL
+3. Parse JSON-LD Recipe schema
+4. Parse page text
+5. Fall back to existing title/summary/note
+
+Store extracted data into:
+- recipe_ingredients
+- recipe_steps
+- recipe_nutrition
+- ai_summary if improved
+
+Acceptance test:
+Use an existing recipe save with a real recipe URL.
+Click “Extract Recipe Details.”
+The app should fetch the original page and extract ingredients/instructions.
+The detail page should refresh and display those fields.
+Do not mark complete if the app only displays the generic AI summary.
+Do not mark complete if it says “Not enough recipe content found” while a valid source URL exists.
