@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Bell, ChevronDown, ChevronUp, ExternalLink, Folder, FolderPlus, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { ItemImage } from "@/components/ItemImage";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -311,6 +312,7 @@ function NeedsContextPanel({ item, onDone }: { item: Item; onDone: () => void })
 
 export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -344,7 +346,16 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
 
   return (
     <article className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-card transition hover:shadow-brand">
-      <div className="relative aspect-[4/3] overflow-hidden bg-muted">
+      {/* Ghost overlay — makes the whole card navigate to detail page.
+          Interactive elements (buttons, links, AIDetails) sit above it via relative z-10. */}
+      <span
+        className="absolute inset-0 z-0 cursor-pointer"
+        onClick={() => navigate({ to: "/item/$id", params: { id: item.id } })}
+        aria-label={`View ${item.title}`}
+        role="link"
+      />
+
+      <div className="relative z-10 aspect-[4/3] overflow-hidden bg-muted">
         <ItemImage
           src={item.image_url}
           alt={item.title}
@@ -382,17 +393,13 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
         )}
       </div>
 
-      <div className="flex flex-1 flex-col p-4">
+      <div className="relative z-10 flex flex-1 flex-col p-4">
         <h3 className="line-clamp-2 font-semibold leading-snug">{item.title}</h3>
 
         <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
           {host && (
             <>
-              {item.url ? (
-                <a href={item.url} target="_blank" rel="noreferrer" className="truncate hover:text-primary hover:underline">{host}</a>
-              ) : (
-                <span className="truncate">{host}</span>
-              )}
+              <span className="truncate">{host}</span>
               <span aria-hidden>•</span>
             </>
           )}
@@ -437,20 +444,24 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
           })()}
           <div className="flex items-center justify-between">
             <span />
-            {item.url && (
-              <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline">
-                Open <ExternalLink className="h-3 w-3" />
-              </a>
-            )}
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
+              View <ExternalLink className="h-3 w-3" />
+            </span>
           </div>
         </div>
       </div>
 
       {needsContext && !readOnly && (
-        <NeedsContextPanel item={item} onDone={handleRecategorizeDone} />
+        <div className="relative z-10">
+          <NeedsContextPanel item={item} onDone={handleRecategorizeDone} />
+        </div>
       )}
 
-      {!needsContext && <AIDetails item={item} />}
+      {!needsContext && (
+        <div className="relative z-10">
+          <AIDetails item={item} />
+        </div>
+      )}
 
       <EditItemModal item={item} open={editOpen} onClose={() => setEditOpen(false)} />
       <CollectionQuickAdd item={item} open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
