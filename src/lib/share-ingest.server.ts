@@ -931,12 +931,11 @@ export type RecategorizeResult = {
 export async function recategorizeItem(input: RecategorizeInput): Promise<RecategorizeResult> {
   const { userId, itemId, note } = input;
   const trimmedNote = note.trim();
-  if (!trimmedNote) throw new Error("Note is required");
 
   // Fetch the existing item (server-side, admin client)
   const { data: item, error: fetchErr } = await supabaseAdmin
     .from("items")
-    .select("id,url,title,source,source_platform,creator_name,original_caption,transcript,image_url,collection_id,user_id")
+    .select("id,url,title,source,source_platform,creator_name,original_caption,transcript,image_url,collection_id,user_id,description,ai_summary")
     .eq("id", itemId)
     .eq("user_id", userId)
     .single();
@@ -944,6 +943,13 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
   if (fetchErr || !item) throw new Error(fetchErr?.message || "Item not found");
 
   const platform = (item.source_platform ?? "web") as SourcePlatform;
+
+  // Build context for AI — prefer explicit user note, fall back to existing item data
+  const contextNote = trimmedNote
+    || (item as any).description
+    || (item as any).ai_summary
+    || item.title
+    || "";
 
   // Existing collections for the suggested_collection hint
   const { data: cols } = await supabaseAdmin
@@ -956,7 +962,7 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
          .map((s: string) => s.slice(0, maxLen))
       : [];
 
-  console.log(`[RECATEGORIZE] item=${itemId} platform=${platform} note=${JSON.stringify(trimmedNote.slice(0, 120))}`);
+  console.log(`[RECATEGORIZE] item=${itemId} platform=${platform} note=${JSON.stringify(contextNote.slice(0, 120))}`);
 
   const ai = await aiCategorize({
     url: item.url ?? "",
@@ -967,7 +973,7 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     creator: item.creator_name ?? null,
     caption: item.original_caption ?? null,
     transcript: item.transcript ?? null,
-    notes: trimmedNote,
+    notes: contextNote,
     existingCollections: existingNames,
   });
 
@@ -1018,8 +1024,8 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     travel_details: travelDetails,
     confidence_score: confidence,
     processing_status: "ai_processed",
-    // Store the user's note in description so it's visible
-    description: trimmedNote,
+    // Only overwrite description when the user explicitly typed a note
+    ...(trimmedNote ? { description: trimmedNote } : {}),
   };
 
   if (aiTitle && isMeaningfulMetadataValue(aiTitle, item.url ?? "")) {

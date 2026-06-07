@@ -90,19 +90,39 @@ function ItemDetailPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Not authenticated");
 
+      // Build context from existing item data so the AI has something to work with
+      const note = item.description
+        || item.ai_summary
+        || item.title
+        || item.url
+        || "Extract recipe details from this saved item.";
+
       const res = await fetch("/api/public/items/recategorize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ item_id: item.id, note: "" }),
+        body: JSON.stringify({ item_id: item.id, note }),
       });
 
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Extraction failed");
 
-      toast.success("Recipe details extracted!");
+      const returned = json.item as { recipe_ingredients?: string[]; recipe_steps?: string[] } | undefined;
+      const gotContent =
+        (returned?.recipe_ingredients?.length ?? 0) > 0 ||
+        (returned?.recipe_steps?.length ?? 0) > 0;
+
+      if (gotContent) {
+        toast.success("Recipe details extracted!");
+      } else {
+        toast.info(
+          "Not enough recipe content found. Open the original source or edit this save to add details.",
+          { duration: 6000 },
+        );
+      }
+
       qc.invalidateQueries({ queryKey: ["item-detail", id] });
       qc.invalidateQueries({ queryKey: ["items"] });
     } catch (err: any) {
