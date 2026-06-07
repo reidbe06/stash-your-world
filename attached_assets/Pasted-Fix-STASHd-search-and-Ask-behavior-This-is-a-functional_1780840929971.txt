@@ -1,0 +1,61 @@
+Fix STASHd search and Ask behavior. This is a functional bug, not a UI request.
+
+Current bug:
+When I search “pasta” in the Search bar or Ask bar, the app returns all saves ranked by relevance. That is wrong.
+
+Correct behavior:
+A search for “pasta” should ONLY return saves that actually contain/match “pasta” in searchable fields. Do not include unrelated saves.
+
+Required searchable fields:
+- title
+- description
+- AI summary
+- tags
+- category
+- subcategory
+- OCR text, if available
+- URL metadata, if available
+
+Important:
+Do NOT return all saves and simply rank them by relevance.
+Do NOT include unrelated saves.
+Do NOT use semantic similarity as the only filter.
+The first filter must be an actual keyword/text match.
+
+Implementation requirements:
+1. Find the actual search function/query used by both:
+   - Search page search bar
+   - Ask bar
+
+2. Update the logic so search results are filtered first:
+   - Normalize query to lowercase.
+   - Normalize searchable save fields to lowercase.
+   - Return a save only if at least one searchable field includes the query text or a close token match.
+
+3. After filtering to true matches, then sorting/ranking can happen.
+
+4. Category chips must further limit results:
+   - If All is selected, search across all saves.
+   - If Recipes is selected, search only within Recipes.
+   - If Fashion is selected, search only within Fashion.
+   - If Products is selected, search only within Products.
+   - Same for Home, Travel, etc.
+
+5. Ask bar must use the same filtering rules:
+   - Ask “pasta” should return only pasta-related saves.
+   - It should not return all saves ranked by relevance.
+
+6. Empty state:
+   - If no saves match, show:
+     “No saves found for ‘pasta’”
+   - Do not show unrelated suggestions.
+
+Acceptance tests:
+- Search “pasta” → only pasta saves appear.
+- Search “shoes” → only shoe/fashion saves appear.
+- Search “sunset” → only sunset/travel saves appear.
+- Ask “pasta” → only pasta-related saves appear.
+- Search “pasta” with Recipes chip selected → only Recipes containing pasta appear.
+- Search “pasta” with Fashion chip selected → should show no results unless a Fashion save actually contains pasta.
+
+Do not mark this complete until these tests pass in the running app.

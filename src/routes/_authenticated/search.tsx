@@ -210,10 +210,10 @@ function SearchPage() {
     if (!items) return [] as (ItemWithCollection & { _sim?: number })[];
     const needle = q.trim().toLowerCase();
 
+    // Category / collection / tag gates — never changes between paths
     const passesFilters = (it: ItemWithCollection) => {
       if (category !== "all" && it.type !== category) return false;
       if (subcategory) {
-        // Check both fields — ingest may populate either `subcategory` or `ai_subcategory`
         const itemSub = it.subcategory ?? it.ai_subcategory ?? null;
         if (itemSub !== subcategory) return false;
       }
@@ -225,29 +225,52 @@ function SearchPage() {
       return true;
     };
 
+    // Keyword match — the required first gate for EVERY search.
+    // Checks all user-visible text fields so e.g. "pasta" won't show
+    // a sunset photo even if the semantic score is high.
+    const passesKeyword = (it: ItemWithCollection): boolean => {
+      if (!needle) return true;
+      const hay = [
+        it.title,
+        it.description,
+        (it as any).ai_summary,
+        it.source,
+        it.url,
+        it.collection?.name,
+        it.type,
+        it.subcategory,
+        it.ai_subcategory,
+        (it as any).transcript,
+        ...(it.tags ?? []),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(needle);
+    };
+
     if (useSemanticRanking) {
-      const ranked = items
+      // Keyword match is REQUIRED — semantic scores only reorder matches,
+      // they never expand the result set to unrelated saves.
+      const keywordMatched = items
         .filter(passesFilters)
-        .filter((it) => aiScores!.has(it.id))
-        .map((it) => ({ ...it, _sim: aiScores!.get(it.id)! }))
-        .sort((a, b) => (b._sim ?? 0) - (a._sim ?? 0));
-      return ranked;
+        .filter(passesKeyword);
+
+      return keywordMatched
+        .map((it) => ({ ...it, _sim: aiScores!.get(it.id) ?? -1 }))
+        .sort((a, b) => {
+          // Items returned by semantic search are ranked by similarity;
+          // items not in the semantic result set fall back to newest-first.
+          const aHas = a._sim >= 0;
+          const bHas = b._sim >= 0;
+          if (aHas && bHas) return b._sim - a._sim;
+          if (aHas) return -1;
+          if (bHas) return 1;
+          return +new Date(b.created_at) - +new Date(a.created_at);
+        });
     }
 
-    const filtered = items.filter((it) => {
-      if (!passesFilters(it)) return false;
-      if (!needle) return true;
-      return (
-        it.title.toLowerCase().includes(needle) ||
-        (it.description ?? "").toLowerCase().includes(needle) ||
-        (it.source ?? "").toLowerCase().includes(needle) ||
-        (it.url ?? "").toLowerCase().includes(needle) ||
-        (it.collection?.name ?? "").toLowerCase().includes(needle) ||
-        it.type.toLowerCase().includes(needle) ||
-        ((it as any).subcategory ?? "").toLowerCase().includes(needle) ||
-        it.tags.some((t) => t.toLowerCase().includes(needle))
-      );
-    });
+    const filtered = items.filter((it) => passesFilters(it) && passesKeyword(it));
 
     const sorted = [...filtered];
     if (sort === "oldest") sorted.sort((a, b) => +new Date(a.created_at) - +new Date(b.created_at));
@@ -549,7 +572,7 @@ function SearchPage() {
               <span className="ml-2 text-sm font-medium text-muted-foreground">{results.length}</span>
             </h2>
             {useSemanticRanking && aiQuery && (
-              <span className="text-xs text-muted-foreground">Ranked by relevance to "{aiQuery}"</span>
+              <span className="text-xs text-muted-foreground">Sorted by relevance to "{aiQuery}"</span>
             )}
           </div>
 
@@ -563,9 +586,7 @@ function SearchPage() {
                 {aiLoading
                   ? "Searching…"
                   : q
-                    ? aiMode
-                      ? `No relevant matches for "${q}". Try rephrasing or turn AI search off.`
-                      : `No matches for "${q}".`
+                    ? `No saves found for "${q}".`
                     : "Nothing matches these filters."}
               </p>
             </div>
