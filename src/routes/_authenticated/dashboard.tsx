@@ -1,14 +1,15 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bookmark, Shirt, Home as HomeIcon, Sparkles, Dumbbell, Plane, Laptop,
-  UtensilsCrossed, ShoppingBag, Briefcase, Heart, ChevronRight, Search,
+  UtensilsCrossed, ShoppingBag, Briefcase, Heart, ChevronRight, ChevronDown, Search,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Item } from "@/components/ItemCard";
+import { Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "My Library — STASHd" }] }),
@@ -41,6 +42,7 @@ const CONTENT_CATEGORIES: Category[] = [
 function Library() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const { data: items } = useQuery({
     queryKey: ["items", user?.id],
@@ -63,16 +65,39 @@ function Library() {
     return map;
   }, [items]);
 
-  function handleCategoryClick(c: Category) {
-    if (c.key === "all") {
+  // Subcategory counts — checks both `subcategory` and `ai_subcategory` fields
+  const subCounts = useMemo(() => {
+    const map: Record<string, { sub: string; count: number }[]> = {};
+    for (const c of CONTENT_CATEGORIES) {
+      if (c.key === "all") continue;
+      const catItems = items?.filter(c.match) ?? [];
+      const bySub: Record<string, number> = {};
+      catItems.forEach((it) => {
+        const sub = it.subcategory ?? it.ai_subcategory ?? null;
+        if (sub) bySub[sub] = (bySub[sub] || 0) + 1;
+      });
+      map[c.key] = Object.entries(bySub)
+        .sort((a, b) => b[1] - a[1])
+        .map(([sub, count]) => ({ sub, count }));
+    }
+    return map;
+  }, [items]);
+
+  function goToCategory(key: string) {
+    if (key === "all") {
       navigate({ to: "/search", search: {} as never });
     } else {
-      navigate({ to: "/search", search: { type: c.key } as never });
+      navigate({ to: "/search", search: { type: key } as never });
     }
+  }
+
+  function goToSubcategory(typeKey: string, sub: string) {
+    navigate({ to: "/search", search: { type: typeKey, sub } as never });
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">Library</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -80,6 +105,7 @@ function Library() {
         </p>
       </div>
 
+      {/* Search bar */}
       <button
         type="button"
         onClick={() => navigate({ to: "/search", search: {} as never })}
@@ -89,6 +115,7 @@ function Library() {
         Search your saves...
       </button>
 
+      {/* Categories heading */}
       <div className="flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           Categories
@@ -96,42 +123,97 @@ function Library() {
         <span className="text-xs font-semibold text-primary">Edit</span>
       </div>
 
+      {/* Category cards */}
       <div className="space-y-2.5">
         {CONTENT_CATEGORIES.map((c) => {
           const count = counts[c.key] ?? 0;
+          const subs = subCounts[c.key] ?? [];
+          const hasSubs = subs.length > 0;
+          const isExpanded = expanded === c.key;
           const subtext =
             c.key === "all"
               ? "All your saved content"
               : `${count} save${count !== 1 ? "s" : ""}`;
 
           return (
-            <button
+            <div
               key={c.key}
-              onClick={() => handleCategoryClick(c)}
-              className="flex w-full items-center gap-3.5 rounded-2xl border border-border/40 bg-white px-4 py-3.5 text-left shadow-sm transition hover:shadow-md active:scale-[0.985]"
+              className="overflow-hidden rounded-2xl border border-border/40 bg-white shadow-sm"
             >
-              <span
-                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${c.tint} ${c.fg}`}
-              >
-                <c.icon className="h-5 w-5" />
-              </span>
+              {/* Main row */}
+              <div className="flex items-stretch">
+                {/* Primary action: navigate to category page */}
+                <button
+                  type="button"
+                  onClick={() => goToCategory(c.key)}
+                  className="flex flex-1 items-center gap-3.5 px-4 py-3.5 text-left transition hover:bg-accent/20 active:bg-accent/40"
+                >
+                  <span
+                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${c.tint} ${c.fg}`}
+                  >
+                    <c.icon className="h-5 w-5" />
+                  </span>
 
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold text-foreground">
-                  {c.label}
-                </span>
-                <span className="block text-xs text-muted-foreground">
-                  {subtext}
-                </span>
-              </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-foreground">
+                      {c.label}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {subtext}
+                    </span>
+                  </span>
 
-              <span className="flex shrink-0 items-center gap-1.5">
-                <span className="text-sm font-semibold tabular-nums text-muted-foreground">
-                  {count}
-                </span>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              </span>
-            </button>
+                  <span className="mr-1 text-sm font-semibold tabular-nums text-muted-foreground">
+                    {count}
+                  </span>
+                </button>
+
+                {/* Chevron: expand/collapse for categories that have subcategories */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (hasSubs) {
+                      setExpanded(isExpanded ? null : c.key);
+                    } else {
+                      goToCategory(c.key);
+                    }
+                  }}
+                  className="flex items-center justify-center border-l border-border/20 px-4 text-muted-foreground transition hover:bg-accent/20 hover:text-foreground"
+                  aria-label={hasSubs ? (isExpanded ? "Collapse" : "Expand subcategories") : "Open"}
+                >
+                  {hasSubs && isExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+
+              {/* Inline subcategory list — no tree lines, clean rows */}
+              {isExpanded && hasSubs && (
+                <div className="border-t border-border/20 bg-muted/10">
+                  {subs.map(({ sub, count: sc }) => (
+                    <button
+                      key={sub}
+                      type="button"
+                      onClick={() => goToSubcategory(c.key, sub)}
+                      className="flex w-full items-center gap-3 border-b border-border/10 px-5 py-3 text-left transition last:border-0 hover:bg-accent/30"
+                    >
+                      <span className="flex-1 text-sm text-foreground/85">{sub}</span>
+                      <span className="text-xs tabular-nums text-muted-foreground">{sc}</span>
+                      <ChevronRight className="ml-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => goToCategory(c.key)}
+                    className="w-full px-5 py-3 text-left text-sm font-semibold text-primary hover:underline"
+                  >
+                    View all {c.label} →
+                  </button>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

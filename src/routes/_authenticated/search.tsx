@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -75,6 +75,7 @@ function timeAgo(iso: string) {
 
 function SearchPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { type, q: initialQ, sub: initialSub } = Route.useSearch();
   const [q, setQ] = useState(initialQ);
   const [category, setCategory] = useState(
@@ -188,12 +189,14 @@ function SearchPage() {
     return Array.from(set).sort().slice(0, 24);
   }, [items]);
 
-  // Dynamic subcategory chips for selected type
+  // Dynamic subcategory chips for selected type.
+  // Checks both `subcategory` and `ai_subcategory` so items are found
+  // regardless of which field was populated during ingest.
   const availableSubcats = useMemo(() => {
     if (category === "all") return [];
     const counts = new Map<string, number>();
     items?.filter((it) => it.type === category).forEach((it) => {
-      const sub = (it as any).subcategory;
+      const sub = it.subcategory ?? it.ai_subcategory ?? null;
       if (sub) counts.set(sub, (counts.get(sub) ?? 0) + 1);
     });
     return Array.from(counts.entries())
@@ -209,7 +212,11 @@ function SearchPage() {
 
     const passesFilters = (it: ItemWithCollection) => {
       if (category !== "all" && it.type !== category) return false;
-      if (subcategory && (it as any).subcategory !== subcategory) return false;
+      if (subcategory) {
+        // Check both fields — ingest may populate either `subcategory` or `ai_subcategory`
+        const itemSub = it.subcategory ?? it.ai_subcategory ?? null;
+        if (itemSub !== subcategory) return false;
+      }
       if (collectionFilter !== "all") {
         if (collectionFilter === "none" && it.collection_id) return false;
         if (collectionFilter !== "none" && it.collection_id !== collectionFilter) return false;
@@ -279,7 +286,9 @@ function SearchPage() {
               <div className="mb-1 flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setSubcategory("")}
+                  onClick={() =>
+                    navigate({ to: "/search", search: { type: category } as never })
+                  }
                   className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -499,7 +508,9 @@ function SearchPage() {
               return (
                 <button
                   key={sub}
-                  onClick={() => setSubcategory(sub)}
+                  onClick={() =>
+                    navigate({ to: "/search", search: { type: category, sub } as never })
+                  }
                   className="flex w-full items-center gap-3.5 rounded-2xl border border-border/40 bg-white px-4 py-3.5 text-left shadow-sm transition hover:shadow-md active:scale-[0.985]"
                 >
                   <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${palette}`}>
