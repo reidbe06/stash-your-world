@@ -1,0 +1,59 @@
+The previous fix is not working in the running app.
+
+The acceptance test says:
+- Click any save card → opens STASHd detail page
+- Click “Open Original Source” inside detail page → external link
+
+But in the actual app, clicking a save card still opens the original external link directly.
+
+Do not mark this fixed until the running app behavior changes.
+
+Required fix:
+
+1. Find the ACTUAL save card component currently rendered in the app.
+   - Do not edit an unused duplicate component.
+   - Search for all places where save cards are rendered.
+   - Search for all uses of:
+     - window.open
+     - source_url
+     - original_url
+     - external_url
+     - href
+     - target="_blank"
+     - onClick opening URLs
+
+2. Remove direct external-link behavior from the save card itself.
+   Save card click should navigate internally to:
+   /save/:id
+   or the app’s actual internal detail route.
+
+3. Create/wire the detail page route if it is not actually connected.
+   The detail page should load the save by id and show:
+   - image/thumbnail
+   - title
+   - category/subcategory
+   - summary if available
+   - button: Open Original Source
+
+4. Only the “Open Original Source” button should open the external URL.
+   The card itself must never open the external URL.
+
+5. Check event bubbling.
+   If the card has action buttons/icons inside it, make sure those buttons use event.stopPropagation() so they do not trigger the card click.
+
+6. Add temporary console proof:
+   - When clicking a card, log: “SAVE CARD CLICKED - navigating to detail”, save.id
+   - When clicking Open Original Source, log: “OPEN ORIGINAL CLICKED”, save.source_url
+   Test this in browser.
+   Remove the logs after confirming.
+
+Acceptance tests:
+- Click save card from Home → opens STASHd internal detail page.
+- Click save card from Search → opens STASHd internal detail page.
+- Click save card from Category page → opens STASHd internal detail page.
+- Click save card from Subcategory page → opens STASHd internal detail page.
+- Click Open Original Source inside detail page → opens external link.
+- No save card anywhere opens the external link directly.
+
+Important:
+Do not say this is complete based only on code changes. Verify in the running app.
