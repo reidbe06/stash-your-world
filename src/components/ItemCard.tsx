@@ -1,23 +1,10 @@
 import { useRef, useState } from "react";
-import { Bell, ChevronDown, ChevronUp, ExternalLink, Folder, FolderPlus, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { ItemImage } from "@/components/ItemImage";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { EditItemModal } from "@/components/EditItemModal";
-import { CollectionQuickAdd } from "@/components/CollectionQuickAdd";
-import { ReminderPicker } from "@/components/ReminderPicker";
 
 export interface Item {
   id: string;
@@ -313,176 +300,51 @@ function NeedsContextPanel({ item, onDone }: { item: Item; onDone: () => void })
 export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean }) {
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
 
-  const del = async () => {
-    setDeleting(true);
-    const { error } = await supabase.from("items").delete().eq("id", item.id).eq("user_id", item.user_id);
-    setDeleting(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    setOpen(false);
-    toast.success("Saved item deleted");
-    qc.invalidateQueries({ queryKey: ["items"] });
-    qc.invalidateQueries({ queryKey: ["collection-items"] });
-  };
-
-  const handleRecategorizeDone = () => {
-    qc.invalidateQueries({ queryKey: ["items"] });
-    qc.invalidateQueries({ queryKey: ["collection-items"] });
-  };
+  const subcategoryLabel = (item as any).subcategory ?? (item as any).ai_subcategory ?? null;
+  const typeLabel = subcategoryLabel ? `${item.type} › ${subcategoryLabel}` : item.type;
+  const needsContext = item.processing_status === "needs_user_context";
 
   let host: string | null = item.source;
   if (!host && item.url) {
     try { host = new URL(item.url).hostname.replace("www.", ""); } catch {}
   }
 
-  const needsContext = item.processing_status === "needs_user_context";
-
-  const goToDetail = () => navigate({ to: "/item/$id", params: { id: item.id } });
-  const stop = (e: React.MouseEvent) => e.stopPropagation();
-
   return (
     <article
       className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-card transition hover:shadow-brand cursor-pointer"
-      onClick={goToDetail}
+      onClick={() => navigate({ to: "/item/$id", params: { id: item.id } })}
     >
-      <div className="aspect-[4/3] overflow-hidden bg-muted">
+      <div className="aspect-[4/3] overflow-hidden bg-muted relative">
         <ItemImage
           src={item.image_url}
           alt={item.title}
           url={item.url}
           source={item.source}
         />
-        <span className="absolute left-3 top-3 rounded-full bg-card/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
-          {item.type}
+        <span className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] truncate rounded-full bg-card/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
+          {typeLabel}
         </span>
-        {!readOnly && (
-          <div className="absolute right-3 top-3 flex items-center gap-1.5" onClick={stop}>
-            <ReminderPicker itemId={item.id} reminderAt={item.reminder_at} />
-            <button
-              onClick={(e) => { stop(e); setQuickAddOpen(true); }}
-              className="rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
-              aria-label="Add to collection"
-            >
-              <FolderPlus className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={(e) => { stop(e); setEditOpen(true); }}
-              className="rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
-              aria-label="Edit saved item"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={(e) => { stop(e); setOpen(true); }}
-              className="rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground"
-              aria-label="Delete saved item"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-        )}
       </div>
 
-      <div className="flex flex-1 flex-col p-4">
-        <h3 className="line-clamp-2 font-semibold leading-snug">{item.title}</h3>
-
-        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-          {host && (
-            <>
-              <span className="truncate">{host}</span>
-              <span aria-hidden>•</span>
-            </>
-          )}
-          <span className="shrink-0">{timeAgo(item.created_at)}</span>
-        </div>
-
-        {item.processing_status && !needsContext && (
-          <div className="mt-2">
-            <StatusBadge status={item.processing_status} />
-          </div>
+      <div className="flex flex-1 flex-col p-3.5">
+        <h3 className="line-clamp-2 text-sm font-semibold leading-snug">{item.title}</h3>
+        {host && (
+          <p className="mt-1 truncate text-xs text-muted-foreground">{host}</p>
         )}
-
-        {item.tags.length > 0 && !needsContext && (
-          <div className="mt-2 flex flex-wrap gap-1">
-            {item.tags.slice(0, 3).map((t) => (
-              <span key={t} className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">#{t}</span>
-            ))}
-            {item.tags.length > 3 && (
-              <span className="text-[10px] font-medium text-muted-foreground">+{item.tags.length - 3}</span>
-            )}
-          </div>
-        )}
-
-        <div className="mt-auto pt-3">
-          {(() => {
-            const names = (item.item_collections ?? [])
-              .map((ic) => ic.collections?.name)
-              .filter(Boolean) as string[];
-            return names.length > 0 ? (
-              <div className="mb-2 flex flex-wrap items-center gap-1">
-                {names.slice(0, 2).map((name) => (
-                  <span key={name} className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[10px] font-medium text-accent-foreground">
-                    <Folder className="h-2.5 w-2.5 shrink-0" />
-                    {name}
-                  </span>
-                ))}
-                {names.length > 2 && (
-                  <span className="text-[10px] text-muted-foreground">+{names.length - 2} more</span>
-                )}
-              </div>
-            ) : null;
-          })()}
-          <div className="flex items-center justify-between">
-            <span />
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
-              View <ExternalLink className="h-3 w-3" />
-            </span>
-          </div>
-        </div>
       </div>
 
       {needsContext && !readOnly && (
-        <div onClick={stop}>
-          <NeedsContextPanel item={item} onDone={handleRecategorizeDone} />
+        <div onClick={(e) => e.stopPropagation()}>
+          <NeedsContextPanel
+            item={item}
+            onDone={() => {
+              qc.invalidateQueries({ queryKey: ["items"] });
+              qc.invalidateQueries({ queryKey: ["collection-items"] });
+            }}
+          />
         </div>
       )}
-
-      {!needsContext && (
-        <div onClick={stop}>
-          <AIDetails item={item} />
-        </div>
-      )}
-
-      <EditItemModal item={item} open={editOpen} onClose={() => setEditOpen(false)} />
-      <CollectionQuickAdd item={item} open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
-
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to delete this saved item?</AlertDialogTitle>
-            <AlertDialogDescription>
-              "{item.title}" will be permanently removed from your library and any collection it belongs to. This can't be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); del(); }}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? "Deleting…" : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </article>
   );
 }

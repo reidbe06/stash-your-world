@@ -2,14 +2,12 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Trash2, Sparkles, Loader2, Pencil, FolderPlus, ChevronLeft, ChevronRight, UtensilsCrossed } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, Bookmark, X, ArrowUpDown, Sparkles, Loader2, ChevronLeft, ChevronRight, UtensilsCrossed } from "lucide-react";
 import { ItemImage } from "@/components/ItemImage";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Item } from "@/components/ItemCard";
-import { EditItemModal } from "@/components/EditItemModal";
-import { CollectionQuickAdd } from "@/components/CollectionQuickAdd";
 import { Input } from "@/components/ui/input";
 import { semanticSearchItems, backfillUserEmbeddings } from "@/lib/semantic-search.functions";
 import {
@@ -21,16 +19,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/search")({
@@ -598,35 +586,17 @@ function SearchPage() {
 }
 
 function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity?: number }) {
-  const qc = useQueryClient();
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
-
-  const del = async () => {
-    setDeleting(true);
-    const { error } = await supabase.from("items").delete().eq("id", item.id).eq("user_id", item.user_id);
-    setDeleting(false);
-    if (error) return toast.error(error.message);
-    setOpen(false);
-    toast.success("Saved item deleted");
-    qc.invalidateQueries({ queryKey: ["items"] });
-    qc.invalidateQueries({ queryKey: ["collection-items"] });
-  };
 
   const badgeLabel = (item as any).subcategory
     ? `${item.type} › ${(item as any).subcategory}`
     : item.type;
 
-  const goToDetail = () => {
-    console.log("SAVE CARD CLICKED - navigating to detail", item.id);
-    navigate({ to: "/item/$id", params: { id: item.id } });
-  };
-
   return (
-    <div className="group relative cursor-pointer" onClick={goToDetail}>
+    <div
+      className="group cursor-pointer"
+      onClick={() => navigate({ to: "/item/$id", params: { id: item.id } })}
+    >
       <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted shadow-card">
         <ItemImage
           src={item.image_url}
@@ -648,56 +618,7 @@ function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity
       <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{item.title}</h3>
       <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
         {item.source ?? "Saved"} · {timeAgo(item.created_at)}
-        {item.collection?.name && ` · ${item.collection.name}`}
       </p>
-
-      <div className="absolute right-2 top-2 flex items-center gap-1">
-        <button
-          onClick={(e) => { e.stopPropagation(); setQuickAddOpen(true); }}
-          className="rounded-full bg-card/95 p-1.5 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
-          aria-label="Add to collection"
-        >
-          <FolderPlus className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}
-          className="rounded-full bg-card/95 p-1.5 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
-          aria-label="Edit saved item"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); setOpen(true); }}
-          className="rounded-full bg-card/95 p-1.5 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground"
-          aria-label="Delete saved item"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
-
-      <EditItemModal item={item as Item} open={editOpen} onClose={() => setEditOpen(false)} />
-      <CollectionQuickAdd item={item as Item} open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
-
-      <AlertDialog open={open} onOpenChange={setOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to delete this saved item?</AlertDialogTitle>
-            <AlertDialogDescription>
-              "{item.title}" will be permanently removed from your library and any collection it belongs to. This can't be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); del(); }}
-              disabled={deleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {deleting ? "Deleting…" : "Delete"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

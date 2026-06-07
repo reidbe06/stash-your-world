@@ -149,10 +149,7 @@ function ItemCard({ it }: { it: AskMatchItem }) {
   return (
     <div
       className="group block cursor-pointer"
-      onClick={() => {
-        console.log("SAVE CARD CLICKED - navigating to detail", it.id);
-        navigate({ to: "/item/$id", params: { id: it.id } });
-      }}
+      onClick={() => navigate({ to: "/item/$id", params: { id: it.id } })}
     >
       <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted shadow-card">
         {it.image_url ? (
