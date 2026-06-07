@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft, ExternalLink, FolderPlus, Pencil, Sparkles,
-  Bell, CheckCircle2, Folder,
+  Bell, CheckCircle2, Folder, Trash2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -12,6 +12,17 @@ import { ItemImage } from "@/components/ItemImage";
 import { EditItemModal } from "@/components/EditItemModal";
 import { CollectionQuickAdd } from "@/components/CollectionQuickAdd";
 import { ReminderPicker } from "@/components/ReminderPicker";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/_authenticated/item/$id")({
   head: () => ({ meta: [{ title: "Save — STASHd" }] }),
@@ -40,6 +51,26 @@ function ItemDetailPage() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!item) return;
+    setDeleting(true);
+    const { error } = await supabase
+      .from("items")
+      .delete()
+      .eq("id", item.id);
+    setDeleting(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["items"] });
+    qc.invalidateQueries({ queryKey: ["collection-items"] });
+    toast.success("Save deleted");
+    navigate({ to: "/dashboard" });
+  };
 
   const { data: item, isLoading } = useQuery({
     queryKey: ["item-detail", id],
@@ -289,6 +320,18 @@ function ItemDetailPage() {
           <ChevronLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
         </button>
 
+        {/* Delete Save */}
+        <button
+          type="button"
+          onClick={() => setDeleteOpen(true)}
+          className="flex w-full items-center gap-3 border-t border-border/20 px-4 py-3.5 text-left transition hover:bg-destructive/5"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-red-100">
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </span>
+          <span className="flex-1 text-sm font-medium text-destructive">Delete Save</span>
+        </button>
+
         {/* Open Original Source — secondary */}
         {item.url && (
           <a
@@ -326,6 +369,27 @@ function ItemDetailPage() {
           qc.invalidateQueries({ queryKey: ["item-detail", id] });
         }}
       />
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this save?</AlertDialogTitle>
+            <AlertDialogDescription>
+              "{item.title}" will be permanently removed from your library and any collection it belongs to. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
