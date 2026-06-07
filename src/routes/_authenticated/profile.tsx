@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { LogOut, Mail, Bell, Lock, HelpCircle, ChevronRight, Sparkles, Chrome, Download, Share2, Smartphone } from "lucide-react";
+import { LogOut, Mail, Bell, Lock, HelpCircle, ChevronRight, Sparkles, Chrome, Download, Share2, Smartphone, FolderOpen } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -54,6 +54,22 @@ function Profile() {
           <p className="text-xs uppercase tracking-wide text-muted-foreground">Collections</p>
         </Link>
       </div>
+
+      <Link
+        to="/collections"
+        className="flex items-center gap-4 rounded-2xl border bg-card px-5 py-4 shadow-card transition hover:shadow-brand"
+      >
+        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-gradient text-primary-foreground shadow-brand">
+          <FolderOpen className="h-5 w-5" />
+        </span>
+        <div className="flex-1">
+          <span className="block text-sm font-semibold">My Collections</span>
+          <span className="block text-xs text-muted-foreground">
+            {stats?.collections === 1 ? "1 collection" : `${stats?.collections ?? 0} collections`}
+          </span>
+        </div>
+        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+      </Link>
 
       <ChromeExtensionCard />
       <MobileShareCard />
