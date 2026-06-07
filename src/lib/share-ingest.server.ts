@@ -302,6 +302,7 @@ CRITICAL ANTI-HALLUCINATION RULES:
 - summary: one sentence, max 160 chars, grounded strictly in provided text.
 - key_takeaways: 0-5 short bullets (max 120 chars each) ONLY when the content clearly teaches/recommends something.
 - recipe_ingredients / recipe_steps: ONLY populate if the content is clearly a recipe. Otherwise empty arrays.
+- recipe_nutrition: ONLY populate if the content explicitly states nutrition facts per serving. Otherwise null. Provide numbers only (no units in values).
 - product_names: ONLY populate if the content recommends specific named products. Otherwise empty array.
 - travel_details: ONLY populate if content is travel-related. Object with optional destination, location, activities[]. Otherwise null.
 - confidence_score: 0..1 — how confident you are in the categorization based on provided evidence.
@@ -330,6 +331,16 @@ ${collectionsHint}` },
             key_takeaways: { type: "array", items: { type: "string" } },
             recipe_ingredients: { type: "array", items: { type: "string" } },
             recipe_steps: { type: "array", items: { type: "string" } },
+            recipe_nutrition: {
+              type: ["object", "null"],
+              description: "Per-serving nutrition. Only populate when content explicitly states nutrition facts.",
+              properties: {
+                calories_per_serving: { type: "number" },
+                protein_g: { type: "number" },
+                carbs_g: { type: "number" },
+                fat_g: { type: "number" },
+              },
+            },
             product_names: { type: "array", items: { type: "string" } },
             travel_details: {
               type: ["object", "null"],
@@ -345,7 +356,7 @@ ${collectionsHint}` },
             "category", "content_type", "media_format", "generated_title", "subcategory", "tags",
             "summary", "notes", "suggested_collection",
             "key_takeaways", "recipe_ingredients", "recipe_steps",
-            "product_names", "confidence_score",
+            "product_names", "confidence_score", "recipe_nutrition",
           ],
         },
       },
@@ -641,6 +652,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   let keyTakeaways: string[];
   let recipeIngredients: string[];
   let recipeSteps: string[];
+  let recipeNutrition: any;
   let productNames: string[];
   let travelDetails: any;
   let confidence: number | null;
@@ -715,6 +727,10 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     keyTakeaways = cleanArr(ai?.key_takeaways, 6, 240);
     recipeIngredients = cleanArr(ai?.recipe_ingredients, 40, 200);
     recipeSteps = cleanArr(ai?.recipe_steps, 30, 600);
+    recipeNutrition =
+      ai?.recipe_nutrition && typeof ai.recipe_nutrition === "object" && !Array.isArray(ai.recipe_nutrition)
+        ? ai.recipe_nutrition
+        : null;
     productNames = cleanArr(ai?.product_names, 20, 200);
     travelDetails =
       ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
@@ -777,6 +793,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   if (keyTakeaways.length)    enrichmentPayload.ai_key_takeaways  = keyTakeaways;
   if (recipeIngredients.length) enrichmentPayload.recipe_ingredients = recipeIngredients;
   if (recipeSteps.length)     enrichmentPayload.recipe_steps      = recipeSteps;
+  if (recipeNutrition != null) enrichmentPayload.recipe_nutrition  = recipeNutrition;
   if (productNames.length)    enrichmentPayload.product_names     = productNames;
   if (travelDetails != null)  enrichmentPayload.travel_details    = travelDetails;
   if (confidence != null)     enrichmentPayload.confidence_score  = confidence;
@@ -891,6 +908,7 @@ export type RecategorizeResult = {
   ai_key_takeaways: string[];
   recipe_ingredients: string[];
   recipe_steps: string[];
+  recipe_nutrition: Record<string, unknown> | null;
   product_names: string[];
   confidence_score: number | null;
   processing_status: string;
@@ -947,6 +965,9 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
   const keyTakeaways = cleanArr(ai?.key_takeaways, 6, 240);
   const recipeIngredients = cleanArr(ai?.recipe_ingredients, 40, 200);
   const recipeSteps = cleanArr(ai?.recipe_steps, 30, 600);
+  const recipeNutritionRe =
+    ai?.recipe_nutrition && typeof ai.recipe_nutrition === "object" && !Array.isArray(ai.recipe_nutrition)
+      ? ai.recipe_nutrition : null;
   const productNames = cleanArr(ai?.product_names, 20, 200);
   const travelDetails =
     ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
@@ -978,6 +999,7 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     ai_key_takeaways: keyTakeaways,
     recipe_ingredients: recipeIngredients,
     recipe_steps: recipeSteps,
+    recipe_nutrition: recipeNutritionRe,
     product_names: productNames,
     travel_details: travelDetails,
     confidence_score: confidence,
@@ -990,15 +1012,29 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     updatePayload.title = aiTitle.slice(0, 500);
   }
 
-  const { data: updated, error: updErr } = await supabaseAdmin
+  let { data: updated, error: updErr } = await supabaseAdmin
     .from("items")
     .update(updatePayload as any)
     .eq("id", itemId)
     .eq("user_id", userId)
-    .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,product_names,confidence_score,processing_status")
+    .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,recipe_nutrition,product_names,confidence_score,processing_status")
     .single();
 
-  if (updErr || !updated) throw new Error(updErr?.message || "Failed to update item");
+  // Fallback: if update failed (likely a missing column from pending migration), retry without enrichment fields
+  if (updErr || !updated) {
+    console.warn(`[RECATEGORIZE] Full update failed (${updErr?.message}) — retrying without new columns`);
+    const { recipe_nutrition: _rn, travel_details: _td, ...coreUpdatePayload } = updatePayload;
+    const fallback = await supabaseAdmin
+      .from("items")
+      .update(coreUpdatePayload as any)
+      .eq("id", itemId)
+      .eq("user_id", userId)
+      .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,product_names,confidence_score,processing_status")
+      .single();
+    if (fallback.error || !fallback.data) throw new Error(fallback.error?.message || updErr?.message || "Failed to update item");
+    updated = fallback.data as typeof updated;
+    updErr = null;
+  }
 
   // Re-embed best-effort
   try {

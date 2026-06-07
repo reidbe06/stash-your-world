@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft, ExternalLink, FolderPlus, Pencil, Sparkles,
-  Bell, CheckCircle2, Folder, Trash2,
+  Bell, CheckCircle2, Folder, Trash2, UtensilsCrossed, ChefHat,
+  ChevronDown, ChevronUp,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -29,12 +30,20 @@ export const Route = createFileRoute("/_authenticated/item/$id")({
   component: ItemDetailPage,
 });
 
+type RecipeNutrition = {
+  calories_per_serving?: number | null;
+  protein_g?: number | null;
+  carbs_g?: number | null;
+  fat_g?: number | null;
+};
+
 type FullItem = Item & {
   source_platform?: string | null;
   subcategory?: string | null;
   ai_subcategory?: string | null;
   media_format?: string | null;
   travel_details?: Record<string, unknown> | null;
+  recipe_nutrition?: RecipeNutrition | null;
 };
 
 function formatDate(iso: string) {
@@ -52,6 +61,7 @@ function ItemDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [ingredientsOpen, setIngredientsOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = async () => {
@@ -218,31 +228,89 @@ function ItemDetailPage() {
         </div>
       )}
 
-      {/* ── Recipe specifics ── */}
-      {(item.recipe_ingredients?.length || item.recipe_steps?.length) ? (
-        <div className="rounded-2xl border border-border/40 bg-white p-4 shadow-sm space-y-4">
-          {item.recipe_ingredients && item.recipe_ingredients.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Ingredients
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-sm text-foreground">
-                {item.recipe_ingredients.map((ing, i) => <li key={i}>{ing}</li>)}
-              </ul>
+      {/* ── Ingredients ── */}
+      {item.recipe_ingredients && item.recipe_ingredients.length > 0 && (
+        <div className="rounded-2xl border border-border/40 bg-card p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-orange-100">
+                <UtensilsCrossed className="h-3.5 w-3.5 text-orange-500" />
+              </span>
+              <p className="text-sm font-semibold">Ingredients</p>
             </div>
-          )}
-          {item.recipe_steps && item.recipe_steps.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-                Steps
-              </p>
-              <ol className="list-decimal list-inside space-y-1.5 text-sm text-foreground">
-                {item.recipe_steps.map((step, i) => <li key={i}>{step}</li>)}
-              </ol>
-            </div>
+            <span className="text-xs text-muted-foreground">{item.recipe_ingredients.length} items</span>
+          </div>
+          <ul className="space-y-2">
+            {(ingredientsOpen ? item.recipe_ingredients : item.recipe_ingredients.slice(0, 5)).map((ing, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-sm text-foreground">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                {ing}
+              </li>
+            ))}
+          </ul>
+          {item.recipe_ingredients.length > 5 && (
+            <button
+              onClick={() => setIngredientsOpen(!ingredientsOpen)}
+              className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+            >
+              {ingredientsOpen
+                ? <><ChevronUp className="h-3.5 w-3.5" /> Show less</>
+                : <><ChevronDown className="h-3.5 w-3.5" /> Show all {item.recipe_ingredients.length} ingredients</>}
+            </button>
           )}
         </div>
-      ) : null}
+      )}
+
+      {/* ── Instructions ── */}
+      {item.recipe_steps && item.recipe_steps.length > 0 && (
+        <div className="rounded-2xl border border-border/40 bg-card p-4 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100">
+                <ChefHat className="h-3.5 w-3.5 text-emerald-600" />
+              </span>
+              <p className="text-sm font-semibold">Instructions</p>
+            </div>
+            <span className="text-xs text-muted-foreground">{item.recipe_steps.length} steps</span>
+          </div>
+          <ol className="space-y-3.5">
+            {item.recipe_steps.map((step, i) => (
+              <li key={i} className="flex items-start gap-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                  {i + 1}
+                </span>
+                <p className="pt-0.5 text-sm leading-relaxed text-foreground">{step}</p>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      {/* ── Nutrition ── */}
+      {(() => {
+        const n = item.recipe_nutrition as RecipeNutrition | null | undefined;
+        if (!n) return null;
+        const entries = [
+          { label: "Calories", value: n.calories_per_serving, unit: "" },
+          { label: "Protein", value: n.protein_g, unit: "g" },
+          { label: "Carbs", value: n.carbs_g, unit: "g" },
+          { label: "Fat", value: n.fat_g, unit: "g" },
+        ].filter((e) => e.value != null && e.value !== undefined);
+        if (entries.length === 0) return null;
+        return (
+          <div className="rounded-2xl border border-border/40 bg-card p-4 shadow-sm space-y-3">
+            <p className="text-sm font-semibold">Nutrition <span className="text-xs font-normal text-muted-foreground">(per serving)</span></p>
+            <div className="grid grid-cols-4 gap-2">
+              {entries.map((e) => (
+                <div key={e.label} className="flex flex-col items-center rounded-xl bg-accent/50 px-2 py-3 text-center">
+                  <span className="text-lg font-bold leading-none">{e.value}{e.unit}</span>
+                  <span className="mt-1 text-[10px] text-muted-foreground">{e.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Product names ── */}
       {item.product_names && item.product_names.length > 0 && (

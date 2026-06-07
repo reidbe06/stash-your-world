@@ -45,6 +45,7 @@ function DevNotesPage() {
     { field: "Creator username", column: "items.creator_name", status: "ready" },
     { field: "AI recipe ingredients", column: "items.recipe_ingredients", status: "ready" },
     { field: "AI recipe steps", column: "items.recipe_steps", status: "ready" },
+    { field: "AI recipe nutrition", column: "items.recipe_nutrition", status: "pending migration" },
     { field: "Product names", column: "items.product_names", status: "ready" },
     { field: "Travel details", column: "items.travel_details (jsonb)", status: "ready" },
     { field: "Key takeaways", column: "items.ai_key_takeaways", status: "ready" },

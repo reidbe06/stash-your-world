@@ -71,6 +71,7 @@ export type Database = {
           processing_status: string
           product_names: string[]
           recipe_ingredients: string[]
+          recipe_nutrition: Json | null
           recipe_steps: string[]
           share_source: string
           source: string | null
@@ -108,6 +109,7 @@ export type Database = {
           processing_status?: string
           product_names?: string[]
           recipe_ingredients?: string[]
+          recipe_nutrition?: Json | null
           recipe_steps?: string[]
           share_source?: string
           source?: string | null
@@ -145,6 +147,7 @@ export type Database = {
           processing_status?: string
           product_names?: string[]
           recipe_ingredients?: string[]
+          recipe_nutrition?: Json | null
           recipe_steps?: string[]
           share_source?: string
           source?: string | null

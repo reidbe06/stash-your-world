@@ -35,6 +35,7 @@ export interface Item {
   original_caption?: string | null;
   recipe_ingredients?: string[];
   recipe_steps?: string[];
+  recipe_nutrition?: { calories_per_serving?: number | null; protein_g?: number | null; carbs_g?: number | null; fat_g?: number | null } | null;
   product_names?: string[];
   confidence_score?: number | null;
   user_edited?: boolean | null;
