@@ -344,18 +344,15 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
 
   const needsContext = item.processing_status === "needs_user_context";
 
-  return (
-    <article className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-card transition hover:shadow-brand">
-      {/* Ghost overlay — makes the whole card navigate to detail page.
-          Interactive elements (buttons, links, AIDetails) sit above it via relative z-10. */}
-      <span
-        className="absolute inset-0 z-0 cursor-pointer"
-        onClick={() => navigate({ to: "/item/$id", params: { id: item.id } })}
-        aria-label={`View ${item.title}`}
-        role="link"
-      />
+  const goToDetail = () => navigate({ to: "/item/$id", params: { id: item.id } });
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
 
-      <div className="relative z-10 aspect-[4/3] overflow-hidden bg-muted">
+  return (
+    <article
+      className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card shadow-card transition hover:shadow-brand cursor-pointer"
+      onClick={goToDetail}
+    >
+      <div className="aspect-[4/3] overflow-hidden bg-muted">
         <ItemImage
           src={item.image_url}
           alt={item.title}
@@ -366,24 +363,24 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
           {item.type}
         </span>
         {!readOnly && (
-          <div className="absolute right-3 top-3 flex items-center gap-1.5">
+          <div className="absolute right-3 top-3 flex items-center gap-1.5" onClick={stop}>
             <ReminderPicker itemId={item.id} reminderAt={item.reminder_at} />
             <button
-              onClick={() => setQuickAddOpen(true)}
+              onClick={(e) => { stop(e); setQuickAddOpen(true); }}
               className="rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
               aria-label="Add to collection"
             >
               <FolderPlus className="h-3.5 w-3.5" />
             </button>
             <button
-              onClick={() => setEditOpen(true)}
+              onClick={(e) => { stop(e); setEditOpen(true); }}
               className="rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
               aria-label="Edit saved item"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>
             <button
-              onClick={() => setOpen(true)}
+              onClick={(e) => { stop(e); setOpen(true); }}
               className="rounded-full bg-card/95 p-2 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground"
               aria-label="Delete saved item"
             >
@@ -393,7 +390,7 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
         )}
       </div>
 
-      <div className="relative z-10 flex flex-1 flex-col p-4">
+      <div className="flex flex-1 flex-col p-4">
         <h3 className="line-clamp-2 font-semibold leading-snug">{item.title}</h3>
 
         <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -452,13 +449,13 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
       </div>
 
       {needsContext && !readOnly && (
-        <div className="relative z-10">
+        <div onClick={stop}>
           <NeedsContextPanel item={item} onDone={handleRecategorizeDone} />
         </div>
       )}
 
       {!needsContext && (
-        <div className="relative z-10">
+        <div onClick={stop}>
           <AIDetails item={item} />
         </div>
       )}

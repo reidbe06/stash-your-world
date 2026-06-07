@@ -1,0 +1,63 @@
+URGENT: The last change broke core navigation. Please stop adding new features and fix the regression first.
+
+Current broken behavior:
+1. I can no longer click any subcategories.
+2. Clicking Dinner / Dresses / Clothing / etc. does nothing or does not open the filtered view.
+3. Clicking a save still opens the original external link instead of opening the new STASHd detail page.
+
+This must be fixed before anything else.
+
+Required fix:
+
+A. Restore subcategory click behavior
+- Find the actual subcategory cards/rows currently rendered in the app.
+- Make every subcategory row clickable.
+- When clicked, it must navigate to the filtered saves view using BOTH:
+  - category
+  - subcategory
+
+Examples:
+- Recipes > Dinner → show only saves where category = Recipes and subcategory = Dinner
+- Fashion > Dresses → show only saves where category = Fashion and subcategory = Dresses
+- Fashion > Clothing → show only saves where category = Fashion and subcategory = Clothing
+
+Do not hardcode only Recipes. This must work for every category.
+
+B. Fix save card click behavior
+- Clicking a save card should NOT immediately open the original external URL.
+- Clicking a save card should open the internal STASHd Save Detail Page.
+- The original URL should only open when the user taps an “Open Original” or “Buy Now” button inside the detail page.
+
+C. Preserve external link
+- Do not delete source_url/original_url.
+- Keep the original link stored.
+- Just stop using it as the default card click action.
+
+D. Save Detail Page minimum version
+For now, the Save Detail Page only needs:
+- Image/thumbnail
+- Title
+- Category/subcategory
+- Summary if available
+- Buttons:
+  - Open Original
+  - Add to Collection
+  - Edit Save
+  - Delete or More
+
+Do not attempt advanced recipe extraction yet.
+Do not attempt product extraction yet.
+Just make the internal detail page open reliably.
+
+E. Acceptance tests before marking complete:
+- Click Recipes → shows subcategories.
+- Click Recipes > Dinner → shows only Dinner saves.
+- Click Fashion → shows subcategories.
+- Click Fashion > Dresses → shows only Dresses saves.
+- Click any save card → opens STASHd internal detail page.
+- Click Open Original inside detail page → opens the original source link.
+- Existing search, save, edit, collection, and bottom navigation still work.
+
+Important:
+If the last implementation created a new unused DetailPage component, either wire it correctly into the actual routing or remove it.
+Do not mark complete until the tests pass in the running app.

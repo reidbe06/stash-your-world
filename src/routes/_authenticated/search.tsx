@@ -148,11 +148,11 @@ function SearchPage() {
     );
   }, [items, runBackfill]);
 
-  // Reset subcategory + showAll when type changes
-  useEffect(() => {
-    setSubcategory("");
-    setShowAllForCategory(false);
-  }, [category]);
+  // NOTE: Do NOT reset subcategory in a useEffect on category change.
+  // When navigating from /category/Fashion → /search?type=Fashion&sub=Dresses,
+  // both type and sub arrive together. A category-change effect would wipe
+  // the subcategory before it renders. Subcategory is reset explicitly in
+  // the chip onClick handler below instead.
 
   // Debounced semantic search
   useEffect(() => {
@@ -444,7 +444,7 @@ function SearchPage() {
             return (
               <button
                 key={c.key}
-                onClick={() => setCategory(c.key)}
+                onClick={() => { setCategory(c.key); setSubcategory(""); setShowAllForCategory(false); }}
                 className={cn(
                   "shrink-0 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-semibold transition",
                   active
