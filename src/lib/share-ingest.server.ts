@@ -301,7 +301,7 @@ CRITICAL ANTI-HALLUCINATION RULES:
 - generated_title: clean user-facing title (max 90 chars). Prefer the exact provided Title/Caption. Never use placeholder text like "Auto-filled".
 - summary: one sentence, max 160 chars, grounded strictly in provided text.
 - key_takeaways: 0-5 short bullets (max 120 chars each) ONLY when the content clearly teaches/recommends something.
-- recipe_ingredients / recipe_steps: ONLY populate if the content is clearly a recipe. Otherwise empty arrays.
+- recipe_ingredients / recipe_steps: ONLY populate when the ingredient list or step-by-step instructions are EXPLICITLY written out in the provided text (caption, transcript, description). For video sources (TikTok, Instagram, YouTube, Reels, Shorts) never infer or invent ingredients/steps from a dish name or title alone — if no explicit list appears in the text, return empty arrays. Recipe websites with schema data are the only reliable source; AI inference from a video title is forbidden.
 - recipe_nutrition: ONLY populate if the content explicitly states nutrition facts per serving. Otherwise null. Provide numbers only (no units in values).
 - product_names: ONLY populate if the content recommends specific named products. Otherwise empty array.
 - travel_details: ONLY populate if content is travel-related. Object with optional destination, location, activities[]. Otherwise null.

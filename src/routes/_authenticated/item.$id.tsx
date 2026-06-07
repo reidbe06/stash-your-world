@@ -180,6 +180,8 @@ function ItemDetailPage() {
   const hasIngredients = Array.isArray(item.recipe_ingredients) && item.recipe_ingredients.length > 0;
   const hasSteps = Array.isArray(item.recipe_steps) && item.recipe_steps.length > 0;
   const hasRecipeContent = hasIngredients || hasSteps;
+  const VIDEO_PLATFORMS = new Set(["instagram_reel", "instagram", "tiktok", "youtube", "youtube_short", "vimeo"]);
+  const isVideoRecipe = !!item.source_platform && VIDEO_PLATFORMS.has(item.source_platform);
 
   let host: string | null = item.source_platform ?? item.source ?? null;
   if (!host && item.url) {
@@ -281,27 +283,64 @@ function ItemDetailPage() {
         </div>
       )}
 
-      {/* ── Recipe: gentle empty state with secondary retry ── */}
+      {/* ── Recipe: empty state — video vs web ── */}
       {isRecipe && !hasRecipeContent && (
-        <div className="rounded-2xl border border-border/30 bg-muted/20 px-4 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100">
-              <UtensilsCrossed className="h-4 w-4 text-orange-400" />
-            </span>
-            <p className="text-sm text-muted-foreground">
-              {extracting ? "Extracting recipe details…" : "Recipe details are still being prepared."}
-            </p>
+        isVideoRecipe ? (
+          /* Video recipe: ingredients aren't guaranteed to be in caption/transcript */
+          <div className="rounded-2xl border border-border/30 bg-muted/20 p-4 space-y-3">
+            <div className="flex items-start gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100 mt-0.5">
+                <UtensilsCrossed className="h-4 w-4 text-orange-400" />
+              </span>
+              <div>
+                <p className="text-sm font-medium">Recipe details couldn't be fully extracted from this video.</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Ingredients and instructions are only available when they appear in the caption, description, or transcript.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={() => setEditOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition"
+              >
+                <Pencil className="h-3 w-3" />
+                Add Recipe Notes
+              </button>
+              <button
+                type="button"
+                onClick={handleExtractRecipe}
+                disabled={extracting}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                <RefreshCw className={`h-3 w-3 ${extracting ? "animate-spin" : ""}`} />
+                {extracting ? "Retrying…" : "Retry extraction"}
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={handleExtractRecipe}
-            disabled={extracting}
-            className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            <RefreshCw className={`h-3 w-3 ${extracting ? "animate-spin" : ""}`} />
-            {extracting ? "Retrying…" : "Retry extraction"}
-          </button>
-        </div>
+        ) : (
+          /* Web/blog recipe: still being prepared or can be retried */
+          <div className="rounded-2xl border border-border/30 bg-muted/20 px-4 py-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-100">
+                <UtensilsCrossed className="h-4 w-4 text-orange-400" />
+              </span>
+              <p className="text-sm text-muted-foreground">
+                {extracting ? "Extracting recipe details…" : "Recipe details are still being prepared."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleExtractRecipe}
+              disabled={extracting}
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-border/50 bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-accent/30 disabled:opacity-50 disabled:cursor-not-allowed transition"
+            >
+              <RefreshCw className={`h-3 w-3 ${extracting ? "animate-spin" : ""}`} />
+              {extracting ? "Retrying…" : "Retry extraction"}
+            </button>
+          </div>
+        )
       )}
 
       {/* ── Ingredients ── */}
