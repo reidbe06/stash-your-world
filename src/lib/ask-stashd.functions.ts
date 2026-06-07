@@ -138,6 +138,7 @@ export const askStashd = createServerFn({ method: "POST" })
         } else if (hasKeywords) {
           const orParts = topicKeywords.flatMap((kw) => [
             `title.ilike.%${kw}%`,
+            `description.ilike.%${kw}%`,
             `ai_summary.ilike.%${kw}%`,
             `subcategory.ilike.%${kw}%`,
             `ai_subcategory.ilike.%${kw}%`,
@@ -149,6 +150,7 @@ export const askStashd = createServerFn({ method: "POST" })
         // Specific query — keyword filter across all relevant text columns
         const orParts = topicKeywords.flatMap((kw) => [
           `title.ilike.%${kw}%`,
+          `description.ilike.%${kw}%`,
           `subcategory.ilike.%${kw}%`,
           `ai_subcategory.ilike.%${kw}%`,
           `ai_summary.ilike.%${kw}%`,
@@ -177,13 +179,18 @@ export const askStashd = createServerFn({ method: "POST" })
     const allKeywordIds = [...new Set([...keywordTagIds, ...keywordTextIds])];
     console.log(`[ASK] matched before embeddings: ${allKeywordIds.length}`);
 
-    // ── 1d. Fallback JS cosine if semantic returns nothing ─────────────────────
+    // ── 1d. Semantic scores — used for reordering only, never for expanding set ─
     const { data: semanticMatches } = await semanticPromise;
-    let semanticIds: string[] = Array.isArray(semanticMatches)
-      ? semanticMatches.map((m: any) => m.id)
-      : [];
 
-    if (semanticIds.length === 0) {
+    // Build a similarity score map: id → similarity (0–1)
+    const semanticScoreMap = new Map<string, number>();
+    let semanticIds: string[] = [];
+
+    if (Array.isArray(semanticMatches) && semanticMatches.length > 0) {
+      semanticMatches.forEach((m: any) => semanticScoreMap.set(m.id, m.similarity ?? 0));
+      semanticIds = semanticMatches.map((m: any) => m.id);
+    } else {
+      // Fallback: JS cosine similarity when pgvector RPC returns nothing
       const { data: rows } = await supabaseAdmin
         .from("items")
         .select("id, embedding")
@@ -206,32 +213,62 @@ export const askStashd = createServerFn({ method: "POST" })
           })
           .filter(Boolean) as { id: string; sim: number }[];
         scored.sort((a, b) => b.sim - a.sim);
-        semanticIds = scored.slice(0, matchCount).map((s) => s.id);
+        // Only include items with a meaningful similarity score
+        const SIM_FLOOR = 0.35;
+        const thresholded = scored.filter((s) => s.sim >= SIM_FLOOR);
+        const fallback = thresholded.length > 0 ? thresholded : scored.slice(0, 5);
+        fallback.forEach((s) => semanticScoreMap.set(s.id, s.sim));
+        semanticIds = fallback.map((s) => s.id);
       }
     }
 
-    console.log(`[ASK] matched after embeddings (semantic): ${semanticIds.length}`);
+    console.log(`[ASK] semantic candidates: ${semanticIds.length}`);
 
-    // ── 1e. Merge ─────────────────────────────────────────────────────────────
-    // Browse: combine all sources for comprehensive coverage
-    // Specific + keyword hits: use keyword results only — avoid polluting context
-    //   with semantically-similar-but-wrong items (e.g. makeup tutorials for "dance tutorials")
-    // Specific + no keyword hits: fall back to semantic
+    // ── 1e. Merge — keyword match is ALWAYS the required first gate ────────────
+    //
+    // Rule: items that don't contain the search keywords in their text fields
+    // must NEVER appear in Ask results, even if semantically related.
+    //
+    // • Keyword hits exist  → use ONLY those IDs; semantic scores reorder them.
+    // • No keyword hits     → fall back to semantic with a minimum threshold
+    //   (covers vague browse queries like "what have I saved?" and still
+    //    returns nothing for truly nonsense queries like "find xyzrandom").
     let mergedIds: string[];
-    if (isBrowse) {
-      mergedIds = [...new Set([...allKeywordIds, ...semanticIds])];
-    } else if (allKeywordIds.length > 0) {
-      mergedIds = allKeywordIds;
+    let strategy: string;
+
+    if (allKeywordIds.length > 0) {
+      // Keyword-strict: semantic only reorders within the matched set
+      const unique = [...new Set(allKeywordIds)];
+      unique.sort((a, b) => {
+        // Higher similarity → earlier position; items absent from semantic come last
+        const aScore = semanticScoreMap.get(a) ?? -1;
+        const bScore = semanticScoreMap.get(b) ?? -1;
+        return bScore - aScore;
+      });
+      mergedIds = unique;
+      strategy = "keyword-strict";
     } else {
+      // No keyword matches: semantic fallback (already filtered to sim >= 0.35 above,
+      // or pgvector min_similarity for the DB path)
       mergedIds = semanticIds;
+      strategy = allKeywordIds.length === 0 && semanticIds.length === 0
+        ? "empty"
+        : "semantic-fallback";
     }
 
-    console.log(`[ASK] merged total: ${mergedIds.length} unique items (strategy=${isBrowse ? "browse-union" : allKeywordIds.length > 0 ? "keyword-strict" : "semantic-fallback"})`);
+    console.log(`[ASK] merged total: ${mergedIds.length} unique items (strategy=${strategy})`);
+
+    // Re-derive isBrowse for prompt: if we had keyword hits, treat as specific even
+    // if the sentence pattern looked like browse — we have exact matches, use them.
+    const effectivelyBrowse = isBrowse && allKeywordIds.length === 0;
 
     if (mergedIds.length === 0) {
+      // Extract a short topic label for the empty state message
+      const topicLabel = topicKeywords.length > 0
+        ? topicKeywords.join(" ")
+        : data.question.trim().slice(0, 60);
       return {
-        answer:
-          "I couldn't find anything in your STASHd that matches. Try saving more items or rephrasing your question.",
+        answer: `No saves found for "${topicLabel}."`,
         itemIds: [],
         collectionIds: [],
         items: [],
@@ -313,10 +350,10 @@ export const askStashd = createServerFn({ method: "POST" })
             ? `collection: ${collectionMap.get(it.collection_id)}`
             : null,
           it.source && `source: ${it.source}`,
-          (!isBrowse || i < 50) && it.ai_summary
+          (!effectivelyBrowse || i < 50) && it.ai_summary
             ? `summary: ${it.ai_summary}`
             : null,
-          (!isBrowse || i < 50) && it.description
+          (!effectivelyBrowse || i < 50) && it.description
             ? `notes: ${String(it.description).slice(0, 200)}`
             : null,
         ].filter(Boolean);
@@ -331,15 +368,17 @@ export const askStashd = createServerFn({ method: "POST" })
         : "";
 
     const keywordMatchCount = allKeywordIds.length;
-    const usedKeywordStrategy = !isBrowse && keywordMatchCount > 0;
+    // usedKeywordStrategy is true whenever keyword hits drove the result set —
+    // this is now true for BOTH browse and specific queries when keywords matched.
+    const usedKeywordStrategy = keywordMatchCount > 0;
 
     const retrievalNote = usedKeywordStrategy
-      ? `RETRIEVAL: Found ${keywordMatchCount} item(s) via keyword/tag search (tags, title, subcategory, summary). Items are pre-filtered — do NOT treat them as a general sample.`
-      : !isBrowse && keywordMatchCount === 0
+      ? `RETRIEVAL: Found ${keywordMatchCount} item(s) via keyword/tag search (tags, title, description, subcategory, summary). Items are pre-filtered — these are the ONLY saves that actually match. Do NOT treat them as a general sample.`
+      : keywordMatchCount === 0
         ? `RETRIEVAL: No exact keyword matches found. Results are from semantic similarity search only.`
         : `RETRIEVAL: ${totalCount} item(s) matched via structured + semantic search.`;
 
-    const queryInstruction = isBrowse
+    const queryInstruction = effectivelyBrowse
       ? `This is a BROWSE/COLLECTION query. The user wants to know about ALL matching items. You MUST:
 1. State the exact total count: "${totalCount}" matching items found.
 2. Give a helpful summary of the collection (common themes, notable items, variety).
@@ -347,7 +386,7 @@ export const askStashd = createServerFn({ method: "POST" })
 4. Keep the answer conversational and useful — tell the user what's in their collection.`
       : usedKeywordStrategy
         ? `This is a SPECIFIC query answered by keyword/tag filtering. You MUST:
-1. Open with an exact count: e.g. "I found ${keywordMatchCount} dance tutorial(s) in your STASHd." (replace with the actual topic from the user's question).
+1. Open with an exact count: e.g. "I found ${keywordMatchCount} pasta recipe(s) in your STASHd." (replace with the actual topic from the user's question — do NOT use "dance tutorial").
 2. Briefly describe each matched item (title, type, key detail from summary/tags).
 3. If NONE of the items actually match the user's topic, say so plainly — do not stretch.
 4. In "item_ids", return the ids of the most relevant items (max 8, in order of relevance).`
@@ -398,8 +437,8 @@ ${collectionIds.length ? collectionIds.map((id) => `${id} = ${collectionMap.get(
                 item_ids: {
                   type: "array",
                   items: { type: "string" },
-                  maxItems: isBrowse ? 12 : 8,
-                  description: isBrowse
+                  maxItems: effectivelyBrowse ? 12 : 8,
+                  description: effectivelyBrowse
                     ? "IDs of the most interesting/representative items (up to 12)"
                     : "IDs of items most relevant to the answer (up to 8)",
                 },
@@ -436,7 +475,7 @@ ${collectionIds.length ? collectionIds.map((id) => `${id} = ${collectionMap.get(
       collection_ids: string[];
     };
 
-    const maxHighlights = isBrowse ? 12 : 8;
+    const maxHighlights = effectivelyBrowse ? 12 : 8;
     const filteredItemIds = (parsed.item_ids || []).filter((id) => validItemIds.has(id)).slice(0, maxHighlights);
     const filteredCollectionIds = (parsed.collection_ids || [])
       .filter((id) => validCollectionIds.has(id))
