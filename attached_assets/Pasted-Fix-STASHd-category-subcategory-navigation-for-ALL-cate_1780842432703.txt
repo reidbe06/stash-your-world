@@ -1,0 +1,66 @@
+Fix STASHd category/subcategory navigation for ALL categories, not just Recipes.
+
+Current issue:
+The new subcategory card layout only works correctly for Recipes. When I click Fashion, it still opens the Fashion saves/results page instead of showing Fashion subcategories first.
+
+Correct behavior:
+Every category that has subcategories should behave like Recipes.
+
+Main category click behavior:
+- Recipes → show Recipes subcategory page/list first
+- Fashion → show Fashion subcategory page/list first
+- Products → show Products subcategory page/list first
+- Home → show Home subcategory page/list first
+- Travel → show Travel subcategory page/list first
+- Tutorials → show Tutorials subcategory page/list first
+- Fitness → show Fitness subcategory page/list first
+- Beauty → show Beauty subcategory page/list first
+
+Subcategory page UI:
+Use the same clean rounded card layout currently used for Recipes:
+- page title = selected category name
+- total save count under title
+- “SUBCATEGORIES” label
+- rounded white cards
+- circular pastel icon on left
+- subcategory name
+- count on right
+- chevron on far right
+- no branch lines/tree lines
+
+Fashion example:
+Click Fashion → show:
+- Dresses 4
+- Clothing 2
+
+Do NOT immediately show all Fashion saves.
+
+Subcategory click behavior:
+When I click a subcategory, show ONLY saves matching both:
+- category = selected category
+- subcategory = selected subcategory
+
+Examples:
+- Fashion > Dresses → only Fashion saves with subcategory Dresses
+- Fashion > Clothing → only Fashion saves with subcategory Clothing
+- Recipes > Dinner → only Recipe saves with subcategory Dinner
+- Products > Shoes → only Product saves with subcategory Shoes
+
+Important implementation requirements:
+1. Do not hardcode this behavior only for Recipes.
+2. Create one reusable category/subcategory flow that works for every category.
+3. If a category has subcategories, clicking it should show subcategories first.
+4. If a category has no subcategories, then it may show all saves in that category.
+5. The filter/query must use BOTH category and subcategory when a subcategory is selected.
+6. Update the actual component being rendered, not a duplicate unused component.
+
+Acceptance tests:
+- Click Recipes → shows Recipes subcategories, not all recipe saves.
+- Click Fashion → shows Fashion subcategories, not all fashion saves.
+- Click Fashion > Dresses → shows only Dresses.
+- Click Fashion > Clothing → shows only Clothing.
+- Click Recipes > Dinner → shows only Dinner.
+- No branch/tree lines appear anywhere.
+- Same clean rounded subcategory card UI is used across all categories.
+
+Do not mark complete until these tests pass in the running app.

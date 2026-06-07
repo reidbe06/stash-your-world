@@ -87,7 +87,12 @@ function Library() {
     if (key === "all") {
       navigate({ to: "/search", search: {} as never });
     } else {
-      navigate({ to: "/search", search: { type: key } as never });
+      const subs = subCounts[key] ?? [];
+      if (subs.length > 0) {
+        navigate({ to: "/category/$type", params: { type: key } });
+      } else {
+        navigate({ to: "/search", search: { type: key } as never });
+      }
     }
   }
 

@@ -25,6 +25,7 @@ import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
 import { Route as ApiPublicUrlMetadataRouteImport } from './routes/api/public/url-metadata'
 import { Route as AuthenticatedCollectionsIdRouteImport } from './routes/_authenticated/collections.$id'
+import { Route as AuthenticatedCategoryTypeRouteImport } from './routes/_authenticated/category.$type'
 import { Route as ApiPublicShareSaveRouteImport } from './routes/api/public/share.save'
 import { Route as ApiPublicItemsRecategorizeRouteImport } from './routes/api/public/items.recategorize'
 import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/extension.save'
@@ -111,6 +112,12 @@ const AuthenticatedCollectionsIdRoute =
     path: '/$id',
     getParentRoute: () => AuthenticatedCollectionsRoute,
   } as any)
+const AuthenticatedCategoryTypeRoute =
+  AuthenticatedCategoryTypeRouteImport.update({
+    id: '/category/$type',
+    path: '/category/$type',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const ApiPublicShareSaveRoute = ApiPublicShareSaveRouteImport.update({
   id: '/api/public/share/save',
   path: '/api/public/share/save',
@@ -148,6 +155,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof AuthenticatedSearchRoute
   '/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
+  '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -169,6 +177,7 @@ export interface FileRoutesByTo {
   '/search': typeof AuthenticatedSearchRoute
   '/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
+  '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -192,6 +201,7 @@ export interface FileRoutesById {
   '/_authenticated/search': typeof AuthenticatedSearchRoute
   '/_authenticated/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
+  '/_authenticated/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -215,6 +225,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/share'
     | '/share/$slug'
+    | '/category/$type'
     | '/collections/$id'
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
@@ -236,6 +247,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/share'
     | '/share/$slug'
+    | '/category/$type'
     | '/collections/$id'
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
@@ -258,6 +270,7 @@ export interface FileRouteTypes {
     | '/_authenticated/search'
     | '/_authenticated/share'
     | '/share/$slug'
+    | '/_authenticated/category/$type'
     | '/_authenticated/collections/$id'
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
@@ -393,6 +406,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCollectionsIdRouteImport
       parentRoute: typeof AuthenticatedCollectionsRoute
     }
+    '/_authenticated/category/$type': {
+      id: '/_authenticated/category/$type'
+      path: '/category/$type'
+      fullPath: '/category/$type'
+      preLoaderRoute: typeof AuthenticatedCategoryTypeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/api/public/share/save': {
       id: '/api/public/share/save'
       path: '/api/public/share/save'
@@ -448,6 +468,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSaveRoute: typeof AuthenticatedSaveRoute
   AuthenticatedSearchRoute: typeof AuthenticatedSearchRoute
   AuthenticatedShareRoute: typeof AuthenticatedShareRoute
+  AuthenticatedCategoryTypeRoute: typeof AuthenticatedCategoryTypeRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -460,6 +481,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSaveRoute: AuthenticatedSaveRoute,
   AuthenticatedSearchRoute: AuthenticatedSearchRoute,
   AuthenticatedShareRoute: AuthenticatedShareRoute,
+  AuthenticatedCategoryTypeRoute: AuthenticatedCategoryTypeRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
