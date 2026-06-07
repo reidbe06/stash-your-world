@@ -599,6 +599,7 @@ function SearchPage() {
 
 function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity?: number }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
@@ -619,56 +620,54 @@ function ResultCard({ item, similarity }: { item: ItemWithCollection; similarity
     ? `${item.type} › ${(item as any).subcategory}`
     : item.type;
 
+  const goToDetail = () => {
+    console.log("SAVE CARD CLICKED - navigating to detail", item.id);
+    navigate({ to: "/item/$id", params: { id: item.id } });
+  };
+
   return (
-    <div className="group relative">
-      <a
-        href={item.url ?? "#"}
-        target={item.url ? "_blank" : undefined}
-        rel="noreferrer"
-        className="block"
-      >
-        <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted shadow-card">
-          <ItemImage
-            src={item.image_url}
-            alt={item.title}
-            url={item.url}
-            source={item.source}
-            imgClassName="h-full w-full object-cover transition group-hover:scale-105"
-          />
-          <span className="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-card/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
-            {badgeLabel}
+    <div className="group relative cursor-pointer" onClick={goToDetail}>
+      <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted shadow-card">
+        <ItemImage
+          src={item.image_url}
+          alt={item.title}
+          url={item.url}
+          source={item.source}
+          imgClassName="h-full w-full object-cover transition group-hover:scale-105"
+        />
+        <span className="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-card/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary backdrop-blur">
+          {badgeLabel}
+        </span>
+        {typeof similarity === "number" && (
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-brand">
+            <Sparkles className="h-2.5 w-2.5" />
+            {Math.round(similarity * 100)}% match
           </span>
-          {typeof similarity === "number" && (
-            <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-brand-gradient px-2 py-0.5 text-[10px] font-semibold text-primary-foreground shadow-brand">
-              <Sparkles className="h-2.5 w-2.5" />
-              {Math.round(similarity * 100)}% match
-            </span>
-          )}
-        </div>
-        <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{item.title}</h3>
-        <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-          {item.source ?? "Saved"} · {timeAgo(item.created_at)}
-          {item.collection?.name && ` · ${item.collection.name}`}
-        </p>
-      </a>
+        )}
+      </div>
+      <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-snug">{item.title}</h3>
+      <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
+        {item.source ?? "Saved"} · {timeAgo(item.created_at)}
+        {item.collection?.name && ` · ${item.collection.name}`}
+      </p>
 
       <div className="absolute right-2 top-2 flex items-center gap-1">
         <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setQuickAddOpen(true); }}
+          onClick={(e) => { e.stopPropagation(); setQuickAddOpen(true); }}
           className="rounded-full bg-card/95 p-1.5 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
           aria-label="Add to collection"
         >
           <FolderPlus className="h-3.5 w-3.5" />
         </button>
         <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditOpen(true); }}
+          onClick={(e) => { e.stopPropagation(); setEditOpen(true); }}
           className="rounded-full bg-card/95 p-1.5 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-accent hover:text-foreground"
           aria-label="Edit saved item"
         >
           <Pencil className="h-3.5 w-3.5" />
         </button>
         <button
-          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen(true); }}
+          onClick={(e) => { e.stopPropagation(); setOpen(true); }}
           className="rounded-full bg-card/95 p-1.5 text-muted-foreground shadow-sm backdrop-blur transition hover:bg-destructive hover:text-destructive-foreground"
           aria-label="Delete saved item"
         >

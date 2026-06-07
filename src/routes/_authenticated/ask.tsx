@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Sparkles, Send, Loader2, Bookmark, Library, ChevronDown, ChevronUp, Grid2X2 } from "lucide-react";
@@ -145,12 +145,14 @@ function AskPage() {
 }
 
 function ItemCard({ it }: { it: AskMatchItem }) {
+  const navigate = useNavigate();
   return (
-    <a
-      href={it.url ?? "#"}
-      target={it.url ? "_blank" : undefined}
-      rel="noreferrer"
-      className="group block"
+    <div
+      className="group block cursor-pointer"
+      onClick={() => {
+        console.log("SAVE CARD CLICKED - navigating to detail", it.id);
+        navigate({ to: "/item/$id", params: { id: it.id } });
+      }}
     >
       <div className="relative aspect-square overflow-hidden rounded-2xl bg-muted shadow-card">
         {it.image_url ? (
@@ -173,7 +175,7 @@ function ItemCard({ it }: { it: AskMatchItem }) {
       <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
         {it.source ?? it.category ?? "Saved"}
       </p>
-    </a>
+    </div>
   );
 }
 

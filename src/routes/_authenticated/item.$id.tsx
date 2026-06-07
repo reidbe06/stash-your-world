@@ -295,6 +295,7 @@ function ItemDetailPage() {
             href={item.url}
             target="_blank"
             rel="noreferrer"
+            onClick={() => console.log("OPEN ORIGINAL CLICKED", item.url)}
             className="flex w-full items-center gap-3 border-t border-border/20 px-4 py-3.5 text-left transition hover:bg-accent/20"
           >
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted">
