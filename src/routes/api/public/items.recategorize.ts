@@ -14,7 +14,7 @@ const CORS = {
 
 const Schema = z.object({
   item_id: z.string().uuid(),
-  note: z.string().trim().min(1).max(2000),
+  note: z.string().trim().max(2000).default(""),
 });
 
 export const Route = createFileRoute("/api/public/items/recategorize")({

@@ -814,19 +814,33 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     .select(SELECT_COLS)
     .single();
 
-  // Attempt 2: if full insert failed (likely a missing column), retry with core only
+  // Attempt 2: if full insert failed, strip columns that are likely missing from the DB
+  // (e.g. media_format from unapplied migration) but KEEP all recipe/enrichment data
   if (insErr || !inserted) {
-    console.warn(`[INGEST] Full insert failed (${insErr?.message}) — retrying with core payload`);
-    const fallback = await supabaseAdmin
+    console.warn(`[INGEST] Full insert failed (${insErr?.message}) — retrying without media_format`);
+    const { media_format: _mf, ...enrichWithoutMediaFormat } = enrichmentPayload;
+    const attempt2 = await supabaseAdmin
       .from("items")
-      .insert(corePayload)
-      .select("id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,processing_status")
+      .insert({ ...corePayload, ...enrichWithoutMediaFormat })
+      .select(SELECT_COLS)
       .single();
-    if (fallback.error || !fallback.data) {
-      throw new Error(fallback.error?.message || insErr?.message || "Failed to save item");
+    if (!attempt2.error && attempt2.data) {
+      inserted = attempt2.data as typeof inserted;
+      insErr = null;
+    } else {
+      // Attempt 3: last resort — core payload only
+      console.warn(`[INGEST] Attempt 2 also failed (${attempt2.error?.message}) — falling back to core payload`);
+      const fallback = await supabaseAdmin
+        .from("items")
+        .insert(corePayload)
+        .select("id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,processing_status")
+        .single();
+      if (fallback.error || !fallback.data) {
+        throw new Error(fallback.error?.message || insErr?.message || "Failed to save item");
+      }
+      inserted = fallback.data as typeof inserted;
+      insErr = null;
     }
-    inserted = fallback.data as typeof inserted;
-    insErr = null;
   }
 
   // Background thumbnail refresh — fire-and-forget if image wasn't found at ingest time

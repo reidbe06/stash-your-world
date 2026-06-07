@@ -1,0 +1,81 @@
+The recipe intelligence feature did NOT work in the actual app.
+
+The database column was added successfully, but the user-facing Recipe Detail Page still looks exactly the same as the basic Save Detail Page.
+
+Do not claim this is complete based on database checks only.
+
+Current problem:
+- Recipe saves do not show a recipe-specific detail layout.
+- No recipe summary is displayed.
+- No ingredients are displayed.
+- No instructions are displayed.
+- No nutrition is displayed.
+- The Save Detail Page still looks like the generic detail page.
+
+Required outcome:
+When an item has category = "Recipes" or "Recipe", the Save Detail Page must render a Recipe Detail layout.
+
+Recipe Detail Page must show:
+
+1. Hero image/thumbnail
+2. Title
+3. Category/subcategory chips
+4. AI Summary section
+5. Ingredients section
+6. Instructions section
+7. Nutrition section ONLY if recipe_nutrition exists
+8. Actions:
+   - Add Reminder
+   - Add to Collection
+   - Edit Save
+   - Delete Save
+   - Open Original Source
+
+Important:
+The Recipe Detail Page must not rely only on recipe_nutrition.
+Even if nutrition is null, the page should still show:
+- Summary
+- Ingredients
+- Instructions
+
+Debug/audit first:
+Before modifying code, inspect the current item detail route/component and answer:
+1. What file renders the Save Detail Page?
+2. Does it currently branch based on category = Recipe/Recipes?
+3. Which fields exist in public.items for recipe data?
+4. Which fields are currently queried for the detail page?
+5. Are recipe_ingredients and recipe_steps being selected from Supabase?
+6. Are those fields being rendered anywhere?
+7. Is the AI extraction code actually writing recipe_ingredients and recipe_steps when a recipe is saved?
+
+Then fix the issue.
+
+Implementation requirements:
+1. Update the actual detail page component that is rendered in the app.
+2. Do not create an unused duplicate component.
+3. Query all recipe fields from Supabase:
+   - ai_summary or summary
+   - recipe_ingredients
+   - recipe_steps
+   - recipe_nutrition
+   - tags
+   - source_url/original_url
+4. Render a Recipe Detail layout when category is Recipe or Recipes.
+5. If recipe_ingredients or recipe_steps are empty, show a helpful empty state:
+   “Recipe details have not been extracted yet.”
+   Add a button:
+   “Extract Recipe Details”
+6. The “Extract Recipe Details” button should run the existing AI organize/extraction process for that item and then refresh the page.
+7. Existing recipe saves should be able to be reprocessed so they can populate ingredients and instructions.
+8. New recipe saves should automatically attempt to populate these recipe fields.
+
+Acceptance tests:
+- Open an existing Recipe save → it opens internal STASHd detail page.
+- If recipe fields exist → Summary, Ingredients, Instructions show.
+- If nutrition exists → Nutrition shows.
+- If nutrition is null → Nutrition does not show, but Summary/Ingredients/Instructions still show.
+- If recipe fields are empty → show “Recipe details have not been extracted yet” and an “Extract Recipe Details” button.
+- Click “Extract Recipe Details” → recipe fields are populated if source content supports it.
+- Open Original Source button still opens the original link.
+
+Do not mark this complete until you show that an actual recipe detail page in the running app displays recipe-specific sections.
