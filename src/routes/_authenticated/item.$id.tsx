@@ -59,11 +59,7 @@ function ItemDetailPage() {
   const qc = useQueryClient();
 
   const handleBack = () => {
-    if (window.history.length > 1) {
-      navigate({ to: -1 as never });
-    } else {
-      navigate({ to: "/search" });
-    }
+    navigate({ to: "/search" });
   };
 
   const [editOpen, setEditOpen] = useState(false);
