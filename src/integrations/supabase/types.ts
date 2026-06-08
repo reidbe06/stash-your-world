@@ -86,6 +86,7 @@ export type Database = {
           product_description: string | null
           product_image_url: string | null
           affiliate_url: string | null
+          detected_products: Json | null
           title: string
           transcript: string | null
           travel_details: Json | null
@@ -131,6 +132,7 @@ export type Database = {
           product_description?: string | null
           product_image_url?: string | null
           affiliate_url?: string | null
+          detected_products?: Json | null
           title: string
           transcript?: string | null
           travel_details?: Json | null
@@ -176,6 +178,7 @@ export type Database = {
           product_description?: string | null
           product_image_url?: string | null
           affiliate_url?: string | null
+          detected_products?: Json | null
           title?: string
           transcript?: string | null
           travel_details?: Json | null

@@ -196,6 +196,28 @@ async function refreshThumbnailBackground(
   }
 }
 
+// ─── Product link extraction from caption / transcript text ──────────────────
+
+const PRODUCT_DOMAIN_RE = /\b(amazon\.|amzn\.to|etsy\.com|target\.com|nordstrom\.com|sephora\.com|ulta\.com|walmart\.com|bestbuy\.com|wayfair\.com|anthropologie\.com|freepeople\.com|revolve\.com|asos\.com|shein\.com|zara\.com|macys\.com|bloomingdales\.com|farfetch\.com|net-a-porter\.com|ltk\.app|liketoknow\.it|shopltk\.com|shop\.app|shopify\.com)\b/i;
+
+function extractProductLinksFromText(text: string): Array<{ url: string; retailer: string | null }> {
+  const urlRe = /https?:\/\/[^\s\u0000-\u001f<>"']+/g;
+  const found = text.match(urlRe) ?? [];
+  const results: Array<{ url: string; retailer: string | null }> = [];
+  for (const url of found) {
+    if (!PRODUCT_DOMAIN_RE.test(url)) continue;
+    let retailer: string | null = null;
+    try {
+      const hostname = new URL(url).hostname.replace(/^www\./, "");
+      const parts = hostname.split(".");
+      const name = parts.length > 1 ? parts[parts.length - 2] : hostname;
+      retailer = name.charAt(0).toUpperCase() + name.slice(1);
+    } catch {}
+    results.push({ url, retailer });
+  }
+  return results;
+}
+
 const SUBCATEGORY_HINT = Object.entries(SUBCATEGORY_TAXONOMY)
   .map(([type, subs]) => `  ${type}: ${subs.join(", ")}`)
   .join("\n");
@@ -309,6 +331,7 @@ CRITICAL ANTI-HALLUCINATION RULES:
 - product_retailer: The retailer/seller name (Amazon, Target, Etsy, etc.), derivable from URL or description. Otherwise null.
 - product_category: Specific product sub-category (Skincare, Blender, etc.) grounded in provided text. Otherwise null.
 - product_description: One factual sentence about what the product is/does, grounded strictly in provided text. Otherwise null.
+- detected_products: [] unless this is Products/Fashion content with explicitly named products in caption/transcript/hashtags. Each product_name must appear verbatim in the provided text. Never invent or infer from context alone.
 - travel_details: ONLY populate if content is travel-related. Object with optional destination, location, activities[]. Otherwise null.
 - confidence_score: 0..1 — how confident you are in the categorization based on provided evidence.
 - notes: helpful concise note (max 220 chars) based ONLY on provided text.
@@ -352,6 +375,23 @@ ${collectionsHint}` },
             product_retailer: { type: ["string", "null"], description: "Retailer or seller name (e.g. 'Amazon', 'Target', 'Nordstrom'). null if not identifiable." },
             product_category: { type: ["string", "null"], description: "Specific product category (e.g. 'Skincare', 'Blender', 'Running Shoes'). null if unclear." },
             product_description: { type: ["string", "null"], description: "One sentence product description grounded in provided text. null if not a product." },
+            detected_products: {
+              type: "array",
+              description: "Individual products explicitly named/promoted in this content. ONLY for Products/Fashion saves where specific named items appear in caption, transcript, or hashtags. Return [] for recipes, travel, tutorials, and any content where no specific product name is stated. NEVER invent product names. NEVER use generic terms. Each entry must name a real product explicitly present in the provided text.",
+              items: {
+                type: "object",
+                properties: {
+                  product_name: { type: "string", description: "Exact product name as it appears in the text." },
+                  brand: { type: ["string", "null"] },
+                  retailer: { type: ["string", "null"], description: "Retailer or platform name if identifiable." },
+                  price: { type: ["string", "null"], description: "Price with currency symbol if explicitly stated." },
+                  original_product_url: { type: ["string", "null"], description: "Direct product URL if found in caption or description." },
+                  confidence_score: { type: "number", description: "0.0–1.0 confidence this is a real named product being promoted." },
+                  extraction_source: { type: "string", enum: ["caption", "transcript", "hashtag", "description", "metadata"] },
+                },
+                required: ["product_name", "confidence_score", "extraction_source"],
+              },
+            },
             travel_details: {
               type: ["object", "null"],
               properties: {
@@ -368,6 +408,7 @@ ${collectionsHint}` },
             "key_takeaways", "recipe_ingredients", "recipe_steps",
             "product_names", "product_brand", "product_price",
             "product_retailer", "product_category", "product_description",
+            "detected_products",
             "confidence_score", "recipe_nutrition",
           ],
         },
@@ -672,6 +713,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   let productCategory: string | null;
   let productDescription: string | null;
   let productImageUrl: string | null;
+  let detectedProducts: any[];
   let travelDetails: any;
   let confidence: number | null;
   let subcategory: string | null;
@@ -697,6 +739,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     productCategory = null;
     productDescription = null;
     productImageUrl = null;
+    detectedProducts = [];
     travelDetails = null;
     confidence = null;
     subcategory = null;
@@ -784,6 +827,25 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     if (meta?.product_category) { productCategory = meta.product_category; console.log(`[INGEST] JSON-LD product_category: ${productCategory}`); }
     if (meta?.product_description) { productDescription = meta.product_description; console.log(`[INGEST] JSON-LD product_description length: ${productDescription.length}`); }
     if (meta?.product_image_url) { productImageUrl = meta.product_image_url; console.log(`[INGEST] JSON-LD product_image_url: ${productImageUrl}`); }
+
+    // Merge AI-extracted detected products with product links found in caption/transcript text
+    const aiDetectedProducts = Array.isArray(ai?.detected_products) ? ai.detected_products : [];
+    const textToScan = [captionForAi, transcript].filter(Boolean).join(" ");
+    const urlExtracted = extractProductLinksFromText(textToScan)
+      .filter(link => !aiDetectedProducts.some((p: any) => p.original_product_url === link.url))
+      .map(link => ({
+        product_name: bestTitleFromUrl(link.url) ?? link.retailer ?? "Product",
+        brand: null as string | null,
+        retailer: link.retailer,
+        price: null as string | null,
+        original_product_url: link.url,
+        confidence_score: 0.6,
+        extraction_source: "shop_link" as const,
+        image_url: null as string | null,
+      }));
+    detectedProducts = [...aiDetectedProducts, ...urlExtracted];
+    if (detectedProducts.length) console.log(`[INGEST] detected_products: ${detectedProducts.length} items`);
+
     travelDetails =
       ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
         ? ai.travel_details
@@ -853,6 +915,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   if (productCategory != null)    enrichmentPayload.product_category    = productCategory;
   if (productDescription != null) enrichmentPayload.product_description = productDescription;
   if (productImageUrl != null)    enrichmentPayload.product_image_url   = productImageUrl;
+  if (detectedProducts.length)    enrichmentPayload.detected_products   = detectedProducts;
   if (travelDetails != null)  enrichmentPayload.travel_details    = travelDetails;
   if (confidence != null)     enrichmentPayload.confidence_score  = confidence;
 
@@ -1085,6 +1148,27 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
   if (urlMeta?.product_category) { productCategoryRe = urlMeta.product_category; console.log(`[RECATEGORIZE] JSON-LD product_category: ${productCategoryRe}`); }
   if (urlMeta?.product_description) { productDescriptionRe = urlMeta.product_description; }
   if (urlMeta?.product_image_url) { productImageUrlRe = urlMeta.product_image_url; }
+
+  // Merge AI-extracted + URL-scanned product links
+  const aiDetectedProductsRe = Array.isArray(ai?.detected_products) ? ai.detected_products : [];
+  const reTextToScan = [item.original_caption, item.transcript].filter(Boolean).join(" ");
+  const reUrlExtracted = reTextToScan
+    ? extractProductLinksFromText(reTextToScan)
+        .filter((link: { url: string }) => !aiDetectedProductsRe.some((p: any) => p.original_product_url === link.url))
+        .map((link: { url: string; retailer: string | null }) => ({
+          product_name: bestTitleFromUrl(link.url) ?? link.retailer ?? "Product",
+          brand: null as string | null,
+          retailer: link.retailer,
+          price: null as string | null,
+          original_product_url: link.url,
+          confidence_score: 0.6,
+          extraction_source: "shop_link" as const,
+          image_url: null as string | null,
+        }))
+    : [];
+  const detectedProductsRe = [...aiDetectedProductsRe, ...reUrlExtracted];
+  if (detectedProductsRe.length) console.log(`[RECATEGORIZE] detected_products: ${detectedProductsRe.length} items`);
+
   const travelDetails =
     ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
       ? ai.travel_details : null;
@@ -1123,6 +1207,7 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     product_category: productCategoryRe,
     product_description: productDescriptionRe,
     ...(productImageUrlRe ? { product_image_url: productImageUrlRe } : {}),
+    ...(detectedProductsRe.length ? { detected_products: detectedProductsRe } : {}),
     travel_details: travelDetails,
     confidence_score: confidence,
     processing_status: "ai_processed",
@@ -1139,7 +1224,7 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     .update(updatePayload as any)
     .eq("id", itemId)
     .eq("user_id", userId)
-    .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,recipe_nutrition,product_names,product_brand,product_price,product_retailer,product_category,product_description,product_image_url,confidence_score,processing_status")
+    .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,recipe_nutrition,product_names,product_brand,product_price,product_retailer,product_category,product_description,product_image_url,detected_products,confidence_score,processing_status")
     .single();
 
   // Fallback: if update failed (likely a missing column from pending migration), retry without enrichment fields
