@@ -304,6 +304,8 @@ CRITICAL ANTI-HALLUCINATION RULES:
 - recipe_ingredients / recipe_steps: ONLY populate when the ingredient list or step-by-step instructions are EXPLICITLY written out in the provided text (caption, transcript, description). For video sources (TikTok, Instagram, YouTube, Reels, Shorts) never infer or invent ingredients/steps from a dish name or title alone — if no explicit list appears in the text, return empty arrays. Recipe websites with schema data are the only reliable source; AI inference from a video title is forbidden.
 - recipe_nutrition: ONLY populate if the content explicitly states nutrition facts per serving. Otherwise null. Provide numbers only (no units in values).
 - product_names: ONLY populate if the content recommends specific named products. Otherwise empty array.
+- product_brand: ONLY populate when a specific brand name is explicitly mentioned for the primary product. Otherwise null.
+- product_price: ONLY populate when a specific price is explicitly mentioned. Include currency symbol. Otherwise null.
 - travel_details: ONLY populate if content is travel-related. Object with optional destination, location, activities[]. Otherwise null.
 - confidence_score: 0..1 — how confident you are in the categorization based on provided evidence.
 - notes: helpful concise note (max 220 chars) based ONLY on provided text.
@@ -342,6 +344,8 @@ ${collectionsHint}` },
               },
             },
             product_names: { type: "array", items: { type: "string" } },
+            product_brand: { type: ["string", "null"], description: "Primary brand name for the product. null if not a product or brand not mentioned." },
+            product_price: { type: ["string", "null"], description: "Price with currency symbol e.g. '$29.99'. null if price not mentioned." },
             travel_details: {
               type: ["object", "null"],
               properties: {
@@ -356,7 +360,7 @@ ${collectionsHint}` },
             "category", "content_type", "media_format", "generated_title", "subcategory", "tags",
             "summary", "notes", "suggested_collection",
             "key_takeaways", "recipe_ingredients", "recipe_steps",
-            "product_names", "confidence_score", "recipe_nutrition",
+            "product_names", "product_brand", "product_price", "confidence_score", "recipe_nutrition",
           ],
         },
       },
@@ -654,6 +658,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   let recipeSteps: string[];
   let recipeNutrition: any;
   let productNames: string[];
+  let productBrand: string | null;
+  let productPrice: string | null;
   let travelDetails: any;
   let confidence: number | null;
   let subcategory: string | null;
@@ -673,6 +679,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     recipeIngredients = [];
     recipeSteps = [];
     productNames = [];
+    productBrand = null;
+    productPrice = null;
     travelDetails = null;
     confidence = null;
     subcategory = null;
@@ -747,6 +755,11 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
       console.log(`[INGEST] JSON-LD nutrition: ${JSON.stringify(meta.recipe_nutrition)}`);
     }
     productNames = cleanArr(ai?.product_names, 20, 200);
+    productBrand = ai?.product_brand ? String(ai.product_brand).slice(0, 200) : null;
+    productPrice = ai?.product_price ? String(ai.product_price).slice(0, 100) : null;
+    // JSON-LD Product fields override AI
+    if (meta?.product_brand) { productBrand = meta.product_brand; console.log(`[INGEST] JSON-LD product_brand: ${productBrand}`); }
+    if (meta?.product_price) { productPrice = meta.product_price; console.log(`[INGEST] JSON-LD product_price: ${productPrice}`); }
     travelDetails =
       ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
         ? ai.travel_details
@@ -810,6 +823,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   if (recipeSteps.length)     enrichmentPayload.recipe_steps      = recipeSteps;
   if (recipeNutrition != null) enrichmentPayload.recipe_nutrition  = recipeNutrition;
   if (productNames.length)    enrichmentPayload.product_names     = productNames;
+  if (productBrand != null)   enrichmentPayload.product_brand     = productBrand;
+  if (productPrice != null)   enrichmentPayload.product_price     = productPrice;
   if (travelDetails != null)  enrichmentPayload.travel_details    = travelDetails;
   if (confidence != null)     enrichmentPayload.confidence_score  = confidence;
 
@@ -1030,6 +1045,10 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     recipeNutritionRe = urlMeta.recipe_nutrition as Record<string, unknown>;
   }
   const productNames = cleanArr(ai?.product_names, 20, 200);
+  let productBrandRe: string | null = ai?.product_brand ? String(ai.product_brand).slice(0, 200) : null;
+  let productPriceRe: string | null = ai?.product_price ? String(ai.product_price).slice(0, 100) : null;
+  if (urlMeta?.product_brand) { productBrandRe = urlMeta.product_brand; console.log(`[RECATEGORIZE] JSON-LD product_brand: ${productBrandRe}`); }
+  if (urlMeta?.product_price) { productPriceRe = urlMeta.product_price; console.log(`[RECATEGORIZE] JSON-LD product_price: ${productPriceRe}`); }
   const travelDetails =
     ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
       ? ai.travel_details : null;
@@ -1062,6 +1081,8 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     recipe_steps: recipeSteps,
     recipe_nutrition: recipeNutritionRe,
     product_names: productNames,
+    product_brand: productBrandRe,
+    product_price: productPriceRe,
     travel_details: travelDetails,
     confidence_score: confidence,
     processing_status: "ai_processed",
@@ -1078,7 +1099,7 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     .update(updatePayload as any)
     .eq("id", itemId)
     .eq("user_id", userId)
-    .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,recipe_nutrition,product_names,confidence_score,processing_status")
+    .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,recipe_nutrition,product_names,product_brand,product_price,confidence_score,processing_status")
     .single();
 
   // Fallback: if update failed (likely a missing column from pending migration), retry without enrichment fields

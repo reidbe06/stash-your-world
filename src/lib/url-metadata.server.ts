@@ -8,6 +8,8 @@ export type UrlMetadata = {
   recipe_ingredients?: string[] | null;
   recipe_steps?: string[] | null;
   recipe_nutrition?: Record<string, unknown> | null;
+  product_brand?: string | null;
+  product_price?: string | null;
 };
 
 const BLOCKED_OR_PLACEHOLDER = /^(auto-filled from the page.*|untitled|title|description|notes?|thumbnail image url|robot or human\??|are you a robot\??|access denied|just a moment|attention required|pardon our interruption|captcha|cloudflare)$/i;
@@ -251,7 +253,43 @@ export function pickJsonLd(html: string): Partial<UrlMetadata & { _method: strin
   const nodes = parseJsonLd(html);
   if (!nodes.length) return {};
 
-  // Pass 0: dedicated Recipe extraction — captures full structured recipe data
+  // Pass 0a: dedicated Product extraction — captures brand and price from structured product data
+  for (const node of nodes) {
+    const nodeTypes: string[] = [node["@type"]].flat().map(String);
+    if (!nodeTypes.some((t) => t === "Product" || t.endsWith("/Product"))) continue;
+
+    const rawImage = readJsonImage(node.image || node.thumbnailUrl);
+    const image = rawImage && !isRejectedImageUrl(rawImage) ? rawImage : null;
+    const title = normalizeText(node.name || node.headline || node.title);
+    const description = normalizeText(node.description);
+
+    const brandRaw = node.brand;
+    const product_brand: string | null = brandRaw
+      ? normalizeText(typeof brandRaw === "object" ? (brandRaw as any).name : String(brandRaw))
+      : null;
+
+    let product_price: string | null = null;
+    const offers = Array.isArray(node.offers) ? node.offers[0] : node.offers;
+    if (offers) {
+      const raw = offers.price ?? offers.lowPrice ?? null;
+      const currency = offers.priceCurrency ?? "";
+      if (raw != null) {
+        const sym = currency === "USD" ? "$" : currency === "EUR" ? "€" : currency === "GBP" ? "£" : currency ? `${currency} ` : "";
+        product_price = `${sym}${raw}`;
+      }
+    }
+
+    if (title || product_brand || product_price) {
+      console.log(`[url-metadata] json-ld: Product matched brand=${product_brand ?? "none"} price=${product_price ?? "none"}`);
+      return {
+        title, description, image, _method: "json-ld:Product",
+        ...(product_brand && { product_brand }),
+        ...(product_price && { product_price }),
+      };
+    }
+  }
+
+  // Pass 0b: dedicated Recipe extraction — captures full structured recipe data
   for (const node of nodes) {
     const nodeTypes: string[] = [node["@type"]].flat().map(String);
     if (!nodeTypes.some((t) => t === "Recipe" || t.endsWith("/Recipe"))) continue;
@@ -762,5 +800,7 @@ export async function fetchMetadata(rawUrl: string): Promise<UrlMetadata> {
     ...(jsonLd.recipe_ingredients?.length && { recipe_ingredients: jsonLd.recipe_ingredients }),
     ...(jsonLd.recipe_steps?.length && { recipe_steps: jsonLd.recipe_steps }),
     ...(jsonLd.recipe_nutrition && { recipe_nutrition: jsonLd.recipe_nutrition }),
+    ...(jsonLd.product_brand && { product_brand: jsonLd.product_brand }),
+    ...(jsonLd.product_price && { product_price: jsonLd.product_price }),
   };
 }

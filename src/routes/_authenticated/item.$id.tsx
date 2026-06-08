@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronLeft, ExternalLink, FolderPlus, Pencil, Sparkles,
   Bell, CheckCircle2, Folder, Trash2, UtensilsCrossed, ChefHat,
-  ChevronDown, ChevronUp, RefreshCw,
+  ChevronDown, ChevronUp, RefreshCw, ShoppingBag, Tag,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -44,6 +44,8 @@ type FullItem = Item & {
   media_format?: string | null;
   travel_details?: Record<string, unknown> | null;
   recipe_nutrition?: RecipeNutrition | null;
+  product_brand?: string | null;
+  product_price?: string | null;
 };
 
 function formatDate(iso: string) {
@@ -180,6 +182,7 @@ function ItemDetailPage() {
     );
   }
 
+  const isProduct = item.category === "Products" || item.category === "Product";
   const isRecipe = item.category === "Recipes" || item.category === "Recipe";
   const hasIngredients = Array.isArray(item.recipe_ingredients) && item.recipe_ingredients.length > 0;
   const hasSteps = Array.isArray(item.recipe_steps) && item.recipe_steps.length > 0;
@@ -431,8 +434,41 @@ function ItemDetailPage() {
         );
       })()}
 
-      {/* ── Product names ── */}
-      {item.product_names && item.product_names.length > 0 && (
+      {/* ── Product card ── */}
+      {isProduct && (item.product_brand || item.product_price || item.ai_summary) && (
+        <div className="rounded-2xl border border-border/40 bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="space-y-1">
+              {item.product_brand && (
+                <div className="flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-sm font-semibold text-foreground">{item.product_brand}</span>
+                </div>
+              )}
+              {item.product_price && (
+                <p className="text-2xl font-bold text-primary">{item.product_price}</p>
+              )}
+            </div>
+            {item.url && (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noreferrer"
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90 transition"
+              >
+                <ShoppingBag className="h-4 w-4" />
+                Buy Now
+              </a>
+            )}
+          </div>
+          {item.ai_summary && (
+            <p className="text-sm text-muted-foreground leading-relaxed">{item.ai_summary}</p>
+          )}
+        </div>
+      )}
+
+      {/* ── Product names (related products mentioned in content) ── */}
+      {!isProduct && item.product_names && item.product_names.length > 0 && (
         <div className="rounded-2xl border border-border/40 bg-white p-4 shadow-sm space-y-2">
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             Products
@@ -471,6 +507,21 @@ function ItemDetailPage() {
         <p className="px-4 pt-4 pb-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           Actions
         </p>
+
+        {isProduct && item.url && (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            className="flex w-full items-center gap-3 border-t border-border/20 px-4 py-3.5 text-left transition hover:bg-accent/20"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <ShoppingBag className="h-4 w-4 text-primary" />
+            </span>
+            <span className="flex-1 text-sm font-semibold text-primary">Buy Now</span>
+            <ExternalLink className="h-4 w-4 text-primary/60" />
+          </a>
+        )}
 
         <div className="flex items-center gap-3 border-t border-border/20 px-4 py-3.5">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100">
