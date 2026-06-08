@@ -58,6 +58,14 @@ function ItemDetailPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate({ to: -1 as never });
+    } else {
+      navigate({ to: "/search" });
+    }
+  };
+
   const [editOpen, setEditOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -205,7 +213,7 @@ function ItemDetailPage() {
       {/* Back button */}
       <button
         type="button"
-        onClick={() => navigate({ to: -1 as never })}
+        onClick={handleBack}
         className="flex items-center gap-1.5 text-sm text-muted-foreground transition hover:text-foreground"
       >
         <ChevronLeft className="h-4 w-4" />
