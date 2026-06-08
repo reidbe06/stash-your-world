@@ -234,23 +234,29 @@ function ItemDetailPage() {
 
       {/* ── Title + meta ── */}
       <div className="space-y-1.5 px-0.5">
-        <div className="flex items-start justify-between gap-3">
-          <h1 className="text-xl font-extrabold leading-snug tracking-tight flex-1">
-            {item.title}
-          </h1>
-          {isProduct && item.url && (
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noreferrer"
-              className="shrink-0 inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm hover:opacity-90 transition"
-            >
-              <ShoppingBag className="h-4 w-4" />
-              Buy Now
-            </a>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+        {isProduct && item.product_brand && (
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            {item.product_brand}
+          </p>
+        )}
+        <h1 className="text-xl font-extrabold leading-snug tracking-tight">
+          {item.title}
+        </h1>
+        {isProduct && item.product_price && (
+          <p className="text-2xl font-bold text-primary">{item.product_price}</p>
+        )}
+        {isProduct && item.url && (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm hover:opacity-90 active:scale-[0.98] transition mt-1"
+          >
+            <ShoppingBag className="h-5 w-5" />
+            Buy Now
+          </a>
+        )}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground pt-0.5">
           {host && <span className="font-medium">{host}</span>}
           {host && <span aria-hidden>·</span>}
           <span>{formatDate(item.created_at)}</span>
@@ -447,25 +453,6 @@ function ItemDetailPage() {
         );
       })()}
 
-      {/* ── Product details (brand + price) ── */}
-      {isProduct && (item.product_brand || item.product_price) && (
-        <div className="rounded-2xl border border-border/40 bg-white p-4 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-            Product Details
-          </p>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-            {item.product_brand && (
-              <div className="flex items-center gap-1.5">
-                <Tag className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-sm font-semibold text-foreground">{item.product_brand}</span>
-              </div>
-            )}
-            {item.product_price && (
-              <span className="text-xl font-bold text-primary">{item.product_price}</span>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* ── Product names (related products mentioned in content) ── */}
       {!isProduct && item.product_names && item.product_names.length > 0 && (
