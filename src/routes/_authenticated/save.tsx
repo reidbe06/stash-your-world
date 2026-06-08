@@ -170,6 +170,13 @@ function SavePage() {
   const [extracting, setExtracting] = useState(false);
   const lastFetchedUrl = useRef<string>("");
   const lastAiKey = useRef<string>("");
+  const productFieldsRef = useRef<{
+    product_brand: string | null;
+    product_price: string | null;
+    product_retailer: string | null;
+    product_category: string | null;
+    product_description: string | null;
+  }>({ product_brand: null, product_price: null, product_retailer: null, product_category: null, product_description: null });
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const aiDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -316,6 +323,13 @@ function SavePage() {
         `subcategory=${ai.subcategory} tags=${ai.tags.join(",")} title=${JSON.stringify(ai.generated_title)}`,
       );
 
+      productFieldsRef.current = {
+        product_brand: ai.product_brand ?? null,
+        product_price: ai.product_price ?? null,
+        product_retailer: ai.product_retailer ?? null,
+        product_category: ai.product_category ?? null,
+        product_description: ai.product_description ?? null,
+      };
       setForm((cur) => ({
         ...cur,
         title: cur.title || ai.generated_title || "",
@@ -420,6 +434,7 @@ function SavePage() {
         `aiLoaded=${aiLoaded} extraction_method=${extractedMethod ?? "none"}`,
       );
 
+      const pf = productFieldsRef.current;
       const { data: inserted, error } = await supabase.from("items").insert({
         user_id: user.id,
         title: form.title.trim() || fallbackTitle,
@@ -439,6 +454,11 @@ function SavePage() {
         original_caption: captionToStore,
         ai_subcategory: form.subcategory || null,
         ai_tags: tags,
+        ...(pf.product_brand      ? { product_brand:       pf.product_brand }      : {}),
+        ...(pf.product_price      ? { product_price:       pf.product_price }      : {}),
+        ...(pf.product_retailer   ? { product_retailer:    pf.product_retailer }   : {}),
+        ...(pf.product_category   ? { product_category:    pf.product_category }   : {}),
+        ...(pf.product_description? { product_description: pf.product_description }: {}),
       }).select("id").single();
       if (error) throw error;
       const finalStatusMessage = finalCategory === "Uncategorized" ? "Saved as Uncategorized" : "AI organized this save";

@@ -202,6 +202,15 @@ function ItemDetailPage() {
   const isProduct = item.category === "Products" || item.category === "Product";
   const isFashion = item.category === "Fashion";
   const isRecipe = item.category === "Recipes" || item.category === "Recipe";
+  const hasProductData = !!(
+    item.product_brand ||
+    item.product_price ||
+    item.product_retailer ||
+    item.product_description ||
+    item.product_image_url ||
+    item.affiliate_url
+  );
+  const showProductUI = isProduct || isFashion || hasProductData;
   const hasIngredients = Array.isArray(item.recipe_ingredients) && item.recipe_ingredients.length > 0;
   const hasSteps = Array.isArray(item.recipe_steps) && item.recipe_steps.length > 0;
   const hasRecipeContent = hasIngredients || hasSteps;
@@ -258,7 +267,7 @@ function ItemDetailPage() {
 
       {/* ── Title + meta ── */}
       <div className="space-y-1.5 px-0.5">
-        {isProduct && (item.product_brand || item.product_retailer) && (
+        {showProductUI && (item.product_brand || item.product_retailer) && (
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             {[item.product_brand, item.product_retailer].filter(Boolean).join(" · ")}
           </p>
@@ -266,10 +275,15 @@ function ItemDetailPage() {
         <h1 className="text-xl font-extrabold leading-snug tracking-tight">
           {item.title}
         </h1>
-        {isProduct && item.product_price && (
+        {showProductUI && item.product_price && (
           <p className="text-2xl font-bold text-primary">{item.product_price}</p>
         )}
-        {isProduct && (item.affiliate_url || item.url) && (
+        {showProductUI && item.product_description && (
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {item.product_description}
+          </p>
+        )}
+        {showProductUI && (item.affiliate_url || item.url) && (
           <a
             href={item.affiliate_url || item.url!}
             target="_blank"

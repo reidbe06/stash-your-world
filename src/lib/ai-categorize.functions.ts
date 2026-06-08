@@ -19,6 +19,11 @@ export type AiCategorization = {
   notes: string;
   suggested_collection: string;
   suggested_collections: string[];
+  product_brand: string | null;
+  product_price: string | null;
+  product_retailer: string | null;
+  product_category: string | null;
+  product_description: string | null;
 };
 
 const inputSchema = z.object({
@@ -84,6 +89,7 @@ CRITICAL ANTI-HALLUCINATION RULES:
 - notes: concise note, max 220 chars, based only on provided text.
 - suggested_collection: single best short title (2-4 words) for organizing this item.
 - suggested_collections: 3 short collection names (2-4 words each), first matching suggested_collection.
+- product_brand/price/retailer/category/description: only for Products or Fashion items. Populate only from explicitly stated text. Leave null if not clearly present.
 ${collectionsHint}`;
 
     const body = {
@@ -111,8 +117,13 @@ ${collectionsHint}`;
                 notes: { type: "string" },
                 suggested_collection: { type: "string" },
                 suggested_collections: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+                product_brand: { type: ["string", "null"], description: "Brand name if explicitly stated in title/description. null otherwise." },
+                product_price: { type: ["string", "null"], description: "Price with currency symbol if explicitly stated (e.g. '$49.99'). null otherwise." },
+                product_retailer: { type: ["string", "null"], description: "Retailer name from URL or text (e.g. 'Amazon', 'Target'). null otherwise." },
+                product_category: { type: ["string", "null"], description: "Specific product sub-category (e.g. 'Skincare', 'Kitchen Mat'). null if unclear." },
+                product_description: { type: ["string", "null"], description: "One factual sentence about what the product is, grounded in provided text. null if not a product." },
               },
-              required: ["category", "content_type", "media_format", "generated_title", "subcategory", "tags", "summary", "notes", "suggested_collection", "suggested_collections"],
+              required: ["category", "content_type", "media_format", "generated_title", "subcategory", "tags", "summary", "notes", "suggested_collection", "suggested_collections", "product_brand", "product_price", "product_retailer", "product_category", "product_description"],
               additionalProperties: false,
             },
           },
@@ -183,5 +194,10 @@ ${collectionsHint}`;
       notes: (parsed.notes || parsed.summary || "").slice(0, 500),
       suggested_collection: suggestedCollection,
       suggested_collections: merged,
+      product_brand: parsed.product_brand ? String(parsed.product_brand).slice(0, 200) : null,
+      product_price: parsed.product_price ? String(parsed.product_price).slice(0, 100) : null,
+      product_retailer: parsed.product_retailer ? String(parsed.product_retailer).slice(0, 200) : null,
+      product_category: parsed.product_category ? String(parsed.product_category).slice(0, 200) : null,
+      product_description: parsed.product_description ? String(parsed.product_description).slice(0, 500) : null,
     };
   });
