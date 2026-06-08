@@ -46,6 +46,11 @@ type FullItem = Item & {
   recipe_nutrition?: RecipeNutrition | null;
   product_brand?: string | null;
   product_price?: string | null;
+  product_retailer?: string | null;
+  product_category?: string | null;
+  product_description?: string | null;
+  product_image_url?: string | null;
+  affiliate_url?: string | null;
 };
 
 function formatDate(iso: string) {
@@ -234,9 +239,9 @@ function ItemDetailPage() {
 
       {/* ── Title + meta ── */}
       <div className="space-y-1.5 px-0.5">
-        {isProduct && item.product_brand && (
+        {isProduct && (item.product_brand || item.product_retailer) && (
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-            {item.product_brand}
+            {[item.product_brand, item.product_retailer].filter(Boolean).join(" · ")}
           </p>
         )}
         <h1 className="text-xl font-extrabold leading-snug tracking-tight">
@@ -245,9 +250,9 @@ function ItemDetailPage() {
         {isProduct && item.product_price && (
           <p className="text-2xl font-bold text-primary">{item.product_price}</p>
         )}
-        {isProduct && item.url && (
+        {isProduct && (item.affiliate_url || item.url) && (
           <a
-            href={item.url}
+            href={item.affiliate_url || item.url!}
             target="_blank"
             rel="noreferrer"
             className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm hover:opacity-90 active:scale-[0.98] transition mt-1"

@@ -306,6 +306,9 @@ CRITICAL ANTI-HALLUCINATION RULES:
 - product_names: ONLY populate if the content recommends specific named products. Otherwise empty array.
 - product_brand: ONLY populate when a specific brand name is explicitly mentioned for the primary product. Otherwise null.
 - product_price: ONLY populate when a specific price is explicitly mentioned. Include currency symbol. Otherwise null.
+- product_retailer: The retailer/seller name (Amazon, Target, Etsy, etc.), derivable from URL or description. Otherwise null.
+- product_category: Specific product sub-category (Skincare, Blender, etc.) grounded in provided text. Otherwise null.
+- product_description: One factual sentence about what the product is/does, grounded strictly in provided text. Otherwise null.
 - travel_details: ONLY populate if content is travel-related. Object with optional destination, location, activities[]. Otherwise null.
 - confidence_score: 0..1 — how confident you are in the categorization based on provided evidence.
 - notes: helpful concise note (max 220 chars) based ONLY on provided text.
@@ -346,6 +349,9 @@ ${collectionsHint}` },
             product_names: { type: "array", items: { type: "string" } },
             product_brand: { type: ["string", "null"], description: "Primary brand name for the product. null if not a product or brand not mentioned." },
             product_price: { type: ["string", "null"], description: "Price with currency symbol e.g. '$29.99'. null if price not mentioned." },
+            product_retailer: { type: ["string", "null"], description: "Retailer or seller name (e.g. 'Amazon', 'Target', 'Nordstrom'). null if not identifiable." },
+            product_category: { type: ["string", "null"], description: "Specific product category (e.g. 'Skincare', 'Blender', 'Running Shoes'). null if unclear." },
+            product_description: { type: ["string", "null"], description: "One sentence product description grounded in provided text. null if not a product." },
             travel_details: {
               type: ["object", "null"],
               properties: {
@@ -360,7 +366,9 @@ ${collectionsHint}` },
             "category", "content_type", "media_format", "generated_title", "subcategory", "tags",
             "summary", "notes", "suggested_collection",
             "key_takeaways", "recipe_ingredients", "recipe_steps",
-            "product_names", "product_brand", "product_price", "confidence_score", "recipe_nutrition",
+            "product_names", "product_brand", "product_price",
+            "product_retailer", "product_category", "product_description",
+            "confidence_score", "recipe_nutrition",
           ],
         },
       },
@@ -660,6 +668,10 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   let productNames: string[];
   let productBrand: string | null;
   let productPrice: string | null;
+  let productRetailer: string | null;
+  let productCategory: string | null;
+  let productDescription: string | null;
+  let productImageUrl: string | null;
   let travelDetails: any;
   let confidence: number | null;
   let subcategory: string | null;
@@ -681,6 +693,10 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     productNames = [];
     productBrand = null;
     productPrice = null;
+    productRetailer = null;
+    productCategory = null;
+    productDescription = null;
+    productImageUrl = null;
     travelDetails = null;
     confidence = null;
     subcategory = null;
@@ -757,9 +773,17 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     productNames = cleanArr(ai?.product_names, 20, 200);
     productBrand = ai?.product_brand ? String(ai.product_brand).slice(0, 200) : null;
     productPrice = ai?.product_price ? String(ai.product_price).slice(0, 100) : null;
+    productRetailer = ai?.product_retailer ? String(ai.product_retailer).slice(0, 200) : null;
+    productCategory = ai?.product_category ? String(ai.product_category).slice(0, 200) : null;
+    productDescription = ai?.product_description ? String(ai.product_description).slice(0, 500) : null;
+    productImageUrl = null; // set from JSON-LD only
     // JSON-LD Product fields override AI
     if (meta?.product_brand) { productBrand = meta.product_brand; console.log(`[INGEST] JSON-LD product_brand: ${productBrand}`); }
     if (meta?.product_price) { productPrice = meta.product_price; console.log(`[INGEST] JSON-LD product_price: ${productPrice}`); }
+    if (meta?.product_retailer) { productRetailer = meta.product_retailer; console.log(`[INGEST] JSON-LD product_retailer: ${productRetailer}`); }
+    if (meta?.product_category) { productCategory = meta.product_category; console.log(`[INGEST] JSON-LD product_category: ${productCategory}`); }
+    if (meta?.product_description) { productDescription = meta.product_description; console.log(`[INGEST] JSON-LD product_description length: ${productDescription.length}`); }
+    if (meta?.product_image_url) { productImageUrl = meta.product_image_url; console.log(`[INGEST] JSON-LD product_image_url: ${productImageUrl}`); }
     travelDetails =
       ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
         ? ai.travel_details
@@ -823,8 +847,12 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   if (recipeSteps.length)     enrichmentPayload.recipe_steps      = recipeSteps;
   if (recipeNutrition != null) enrichmentPayload.recipe_nutrition  = recipeNutrition;
   if (productNames.length)    enrichmentPayload.product_names     = productNames;
-  if (productBrand != null)   enrichmentPayload.product_brand     = productBrand;
-  if (productPrice != null)   enrichmentPayload.product_price     = productPrice;
+  if (productBrand != null)       enrichmentPayload.product_brand       = productBrand;
+  if (productPrice != null)       enrichmentPayload.product_price       = productPrice;
+  if (productRetailer != null)    enrichmentPayload.product_retailer    = productRetailer;
+  if (productCategory != null)    enrichmentPayload.product_category    = productCategory;
+  if (productDescription != null) enrichmentPayload.product_description = productDescription;
+  if (productImageUrl != null)    enrichmentPayload.product_image_url   = productImageUrl;
   if (travelDetails != null)  enrichmentPayload.travel_details    = travelDetails;
   if (confidence != null)     enrichmentPayload.confidence_score  = confidence;
 
@@ -1047,8 +1075,16 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
   const productNames = cleanArr(ai?.product_names, 20, 200);
   let productBrandRe: string | null = ai?.product_brand ? String(ai.product_brand).slice(0, 200) : null;
   let productPriceRe: string | null = ai?.product_price ? String(ai.product_price).slice(0, 100) : null;
+  let productRetailerRe: string | null = ai?.product_retailer ? String(ai.product_retailer).slice(0, 200) : null;
+  let productCategoryRe: string | null = ai?.product_category ? String(ai.product_category).slice(0, 200) : null;
+  let productDescriptionRe: string | null = ai?.product_description ? String(ai.product_description).slice(0, 500) : null;
+  let productImageUrlRe: string | null = null;
   if (urlMeta?.product_brand) { productBrandRe = urlMeta.product_brand; console.log(`[RECATEGORIZE] JSON-LD product_brand: ${productBrandRe}`); }
   if (urlMeta?.product_price) { productPriceRe = urlMeta.product_price; console.log(`[RECATEGORIZE] JSON-LD product_price: ${productPriceRe}`); }
+  if (urlMeta?.product_retailer) { productRetailerRe = urlMeta.product_retailer; console.log(`[RECATEGORIZE] JSON-LD product_retailer: ${productRetailerRe}`); }
+  if (urlMeta?.product_category) { productCategoryRe = urlMeta.product_category; console.log(`[RECATEGORIZE] JSON-LD product_category: ${productCategoryRe}`); }
+  if (urlMeta?.product_description) { productDescriptionRe = urlMeta.product_description; }
+  if (urlMeta?.product_image_url) { productImageUrlRe = urlMeta.product_image_url; }
   const travelDetails =
     ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
       ? ai.travel_details : null;
@@ -1083,6 +1119,10 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     product_names: productNames,
     product_brand: productBrandRe,
     product_price: productPriceRe,
+    product_retailer: productRetailerRe,
+    product_category: productCategoryRe,
+    product_description: productDescriptionRe,
+    ...(productImageUrlRe ? { product_image_url: productImageUrlRe } : {}),
     travel_details: travelDetails,
     confidence_score: confidence,
     processing_status: "ai_processed",
@@ -1099,7 +1139,7 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     .update(updatePayload as any)
     .eq("id", itemId)
     .eq("user_id", userId)
-    .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,recipe_nutrition,product_names,product_brand,product_price,confidence_score,processing_status")
+    .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,recipe_nutrition,product_names,product_brand,product_price,product_retailer,product_category,product_description,product_image_url,confidence_score,processing_status")
     .single();
 
   // Fallback: if update failed (likely a missing column from pending migration), retry without enrichment fields

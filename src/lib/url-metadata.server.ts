@@ -10,6 +10,10 @@ export type UrlMetadata = {
   recipe_nutrition?: Record<string, unknown> | null;
   product_brand?: string | null;
   product_price?: string | null;
+  product_retailer?: string | null;
+  product_category?: string | null;
+  product_description?: string | null;
+  product_image_url?: string | null;
 };
 
 const BLOCKED_OR_PLACEHOLDER = /^(auto-filled from the page.*|untitled|title|description|notes?|thumbnail image url|robot or human\??|are you a robot\??|access denied|just a moment|attention required|pardon our interruption|captcha|cloudflare)$/i;
@@ -279,12 +283,29 @@ export function pickJsonLd(html: string): Partial<UrlMetadata & { _method: strin
       }
     }
 
+    const sellerRaw = offers?.seller ?? node.seller ?? node.manufacturer ?? null;
+    const product_retailer: string | null = sellerRaw
+      ? normalizeText(typeof sellerRaw === "object" ? (sellerRaw as any).name : String(sellerRaw))
+      : null;
+
+    const categoryRaw = node.category ?? node.productSubtype ?? null;
+    const product_category: string | null = categoryRaw
+      ? normalizeText(typeof categoryRaw === "string" ? categoryRaw : JSON.stringify(categoryRaw))
+      : null;
+
+    const product_description: string | null = description;
+    const product_image_url: string | null = image;
+
     if (title || product_brand || product_price) {
-      console.log(`[url-metadata] json-ld: Product matched brand=${product_brand ?? "none"} price=${product_price ?? "none"}`);
+      console.log(`[url-metadata] json-ld: Product matched brand=${product_brand ?? "none"} price=${product_price ?? "none"} retailer=${product_retailer ?? "none"}`);
       return {
         title, description, image, _method: "json-ld:Product",
         ...(product_brand && { product_brand }),
         ...(product_price && { product_price }),
+        ...(product_retailer && { product_retailer }),
+        ...(product_category && { product_category }),
+        ...(product_description && { product_description }),
+        ...(product_image_url && { product_image_url }),
       };
     }
   }

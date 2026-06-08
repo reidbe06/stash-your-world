@@ -79,6 +79,13 @@ export type Database = {
           subcategory: string | null
           tags: string[]
           media_format: string | null
+          product_brand: string | null
+          product_price: string | null
+          product_retailer: string | null
+          product_category: string | null
+          product_description: string | null
+          product_image_url: string | null
+          affiliate_url: string | null
           title: string
           transcript: string | null
           travel_details: Json | null
@@ -117,6 +124,13 @@ export type Database = {
           subcategory?: string | null
           tags?: string[]
           media_format?: string | null
+          product_brand?: string | null
+          product_price?: string | null
+          product_retailer?: string | null
+          product_category?: string | null
+          product_description?: string | null
+          product_image_url?: string | null
+          affiliate_url?: string | null
           title: string
           transcript?: string | null
           travel_details?: Json | null
@@ -155,6 +169,13 @@ export type Database = {
           subcategory?: string | null
           tags?: string[]
           media_format?: string | null
+          product_brand?: string | null
+          product_price?: string | null
+          product_retailer?: string | null
+          product_category?: string | null
+          product_description?: string | null
+          product_image_url?: string | null
+          affiliate_url?: string | null
           title?: string
           transcript?: string | null
           travel_details?: Json | null
