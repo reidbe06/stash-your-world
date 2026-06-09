@@ -478,6 +478,8 @@ export type IngestInput = {
   skip_ai?: boolean | null;
   collection_id?: string | null;
   share_source: ShareSource;
+  /** When set, UPDATE this existing item ID instead of INSERT (used by instant mode). */
+  _preInsertedId?: string;
 };
 
 export type IngestResult = {
@@ -556,26 +558,27 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   console.log(`[INGEST] Source:   ${input.share_source}`);
 
   // ── Idempotency check ───────────────────────────────────────────────────────
-  // If this user already has an item for this canonical URL, return it immediately
-  // without running the (expensive) metadata / AI pipeline again.
-  const { data: existingItem } = await supabaseAdmin
-    .from("items")
-    .select("id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,source_platform,processing_status,confidence_score")
-    .eq("user_id", input.userId)
-    .eq("url", canonicalUrl)
-    .maybeSingle();
+  // Skip when called in background mode (_preInsertedId already exists).
+  if (!input._preInsertedId) {
+    const { data: existingItem } = await supabaseAdmin
+      .from("items")
+      .select("id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,source_platform,processing_status,confidence_score")
+      .eq("user_id", input.userId)
+      .eq("url", canonicalUrl)
+      .maybeSingle();
 
-  if (existingItem) {
-    console.log(`[INGEST] Duplicate — returning existing item ${existingItem.id}`);
-    const cat = existingItem.category ?? "Uncategorized";
-    return {
-      item: existingItem,
-      suggested_collection: null,
-      fetched_metadata: false,
-      ai_status: cat !== "Uncategorized" ? "organized" : "uncategorized",
-      needs_info: false,
-      processing_status: (existingItem.processing_status as ProcessingStatus) ?? "ai_processed",
-    };
+    if (existingItem) {
+      console.log(`[INGEST] Duplicate — returning existing item ${existingItem.id}`);
+      const cat = existingItem.category ?? "Uncategorized";
+      return {
+        item: existingItem,
+        suggested_collection: null,
+        fetched_metadata: false,
+        ai_status: cat !== "Uncategorized" ? "organized" : "uncategorized",
+        needs_info: false,
+        processing_status: (existingItem.processing_status as ProcessingStatus) ?? "ai_processed",
+      };
+    }
   }
 
   let processingStatus: ProcessingStatus = "pending";
@@ -928,39 +931,77 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
 
   const SELECT_COLS = "id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,source_platform,processing_status,confidence_score";
 
-  // Attempt 1: full payload
-  let { data: inserted, error: insErr } = await supabaseAdmin
-    .from("items")
-    .insert({ ...corePayload, ...enrichmentPayload })
-    .select(SELECT_COLS)
-    .single();
+  let inserted: any;
 
-  // Attempt 2: if full insert failed, strip columns that are likely missing from the DB
-  // (e.g. media_format from unapplied migration) but KEEP all recipe/enrichment data
-  if (insErr || !inserted) {
-    console.warn(`[INGEST] Full insert failed (${insErr?.message}) — retrying without media_format`);
-    const { media_format: _mf, ...enrichWithoutMediaFormat } = enrichmentPayload;
-    const attempt2 = await supabaseAdmin
+  if (input._preInsertedId) {
+    // ── Background enrichment mode: UPDATE the pre-inserted item ──────────────
+    console.log(`[INGEST] Background UPDATE for item ${input._preInsertedId}`);
+    const { user_id: _uid, url: _u, share_source: _ss, ...updateableCore } = corePayload;
+    const updateData = { ...updateableCore, ...enrichmentPayload };
+
+    let { data: updated, error: updErr } = await supabaseAdmin
       .from("items")
-      .insert({ ...corePayload, ...enrichWithoutMediaFormat })
+      .update(updateData)
+      .eq("id", input._preInsertedId)
+      .eq("user_id", input.userId)
       .select(SELECT_COLS)
       .single();
-    if (!attempt2.error && attempt2.data) {
-      inserted = attempt2.data as typeof inserted;
-      insErr = null;
-    } else {
-      // Attempt 3: last resort — core payload only
-      console.warn(`[INGEST] Attempt 2 also failed (${attempt2.error?.message}) — falling back to core payload`);
-      const fallback = await supabaseAdmin
+
+    if (updErr || !updated) {
+      console.warn(`[INGEST-BG] Full update failed (${updErr?.message}) — retrying without media_format`);
+      const { media_format: _mf, ...withoutMf } = updateData;
+      const attempt2 = await supabaseAdmin
         .from("items")
-        .insert(corePayload)
-        .select("id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,processing_status")
+        .update(withoutMf)
+        .eq("id", input._preInsertedId)
+        .eq("user_id", input.userId)
+        .select(SELECT_COLS)
         .single();
-      if (fallback.error || !fallback.data) {
-        throw new Error(fallback.error?.message || insErr?.message || "Failed to save item");
+      if (!attempt2.error && attempt2.data) {
+        updated = attempt2.data as typeof updated;
+        updErr = null;
+      } else {
+        console.warn(`[INGEST-BG] Update failed entirely for ${input._preInsertedId}: ${attempt2.error?.message}`);
       }
-      inserted = fallback.data as typeof inserted;
-      insErr = null;
+    }
+    inserted = updated ?? { id: input._preInsertedId };
+  } else {
+    // ── Normal INSERT mode ──────────────────────────────────────────────────────
+    let insErr: any;
+    // Attempt 1: full payload
+    let insResult = await supabaseAdmin
+      .from("items")
+      .insert({ ...corePayload, ...enrichmentPayload })
+      .select(SELECT_COLS)
+      .single();
+    inserted = insResult.data;
+    insErr = insResult.error;
+
+    // Attempt 2: strip media_format (unapplied migration)
+    if (insErr || !inserted) {
+      console.warn(`[INGEST] Full insert failed (${insErr?.message}) — retrying without media_format`);
+      const { media_format: _mf, ...enrichWithoutMediaFormat } = enrichmentPayload;
+      const attempt2 = await supabaseAdmin
+        .from("items")
+        .insert({ ...corePayload, ...enrichWithoutMediaFormat })
+        .select(SELECT_COLS)
+        .single();
+      if (!attempt2.error && attempt2.data) {
+        inserted = attempt2.data as typeof inserted;
+        insErr = null;
+      } else {
+        // Attempt 3: core payload only
+        console.warn(`[INGEST] Attempt 2 also failed (${attempt2.error?.message}) — falling back to core payload`);
+        const fallback = await supabaseAdmin
+          .from("items")
+          .insert(corePayload)
+          .select("id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,processing_status")
+          .single();
+        if (fallback.error || !fallback.data) {
+          throw new Error(fallback.error?.message || insErr?.message || "Failed to save item");
+        }
+        inserted = fallback.data as typeof inserted;
+      }
     }
   }
 
@@ -1274,4 +1315,105 @@ export async function getUserIdFromBearer(request: Request): Promise<string | nu
   const { data, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !data.user) return null;
   return data.user.id;
+}
+
+/**
+ * Resolves a user ID from either:
+ *   - `Authorization: Bearer <supabase_jwt>` (standard session token)
+ *   - `X-Save-Token: stv1_<userId>_<hmac>` (long-lived personal save token)
+ */
+export async function getUserIdFromRequest(request: Request): Promise<string | null> {
+  const saveToken = request.headers.get("x-save-token") || "";
+  if (saveToken) {
+    const { validateSaveToken } = await import("./save-token.server");
+    return validateSaveToken(saveToken);
+  }
+  return getUserIdFromBearer(request);
+}
+
+/**
+ * Instant save: insert a skeleton item immediately (processing_status = "pending"),
+ * then fire the full enrichment pipeline in the background.
+ * Returns in ~200 ms — the user sees "Saved" right away.
+ */
+export async function ingestSharedUrlInstant(input: IngestInput): Promise<IngestResult> {
+  if (!input.url) throw new Error("URL is required");
+  const canonicalUrl = normalizeUrl(input.url);
+  const platform = detectPlatform(canonicalUrl);
+  const host = new URL(canonicalUrl).hostname.replace(/^www\./, "");
+
+  // Dedup check — still important to avoid double-saves
+  const { data: existingItem } = await supabaseAdmin
+    .from("items")
+    .select("id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,source_platform,processing_status,confidence_score")
+    .eq("user_id", input.userId)
+    .eq("url", canonicalUrl)
+    .maybeSingle();
+
+  if (existingItem) {
+    console.log(`[INGEST-INSTANT] Duplicate — returning existing item ${existingItem.id}`);
+    const cat = existingItem.category ?? "Uncategorized";
+    return {
+      item: existingItem,
+      suggested_collection: null,
+      fetched_metadata: false,
+      ai_status: cat !== "Uncategorized" ? "organized" : "uncategorized",
+      needs_info: false,
+      processing_status: (existingItem.processing_status as ProcessingStatus) ?? "ai_processed",
+    };
+  }
+
+  const platformDefaultTitle: Record<string, string> = {
+    instagram_reel: "Instagram Reel",
+    instagram: "Instagram Post",
+    tiktok: "TikTok Video",
+    youtube_short: "YouTube Short",
+    youtube: "YouTube Video",
+    vimeo: "Vimeo Video",
+    pinterest: "Pinterest Pin",
+  };
+
+  const quickTitle = (
+    (isMeaningfulMetadataValue(input.title, canonicalUrl) ? input.title!.trim() : null) ||
+    platformDefaultTitle[platform] ||
+    bestTitleFromUrl(canonicalUrl) ||
+    host
+  ).slice(0, 500);
+
+  console.log(`[INGEST-INSTANT] Fast insert: url=${canonicalUrl} title=${JSON.stringify(quickTitle)}`);
+
+  const { data: newItem, error: insErr } = await supabaseAdmin
+    .from("items")
+    .insert({
+      user_id: input.userId,
+      url: canonicalUrl,
+      title: quickTitle,
+      source: host,
+      type: "Other",
+      tags: [],
+      category: "Uncategorized",
+      processing_status: "pending" as ProcessingStatus,
+      share_source: input.share_source,
+      source_platform: platform,
+    })
+    .select("id,title,category,subcategory,tags,ai_summary,collection_id,image_url,source,source_platform,processing_status,confidence_score")
+    .single();
+
+  if (insErr || !newItem) throw new Error(insErr?.message || "Fast insert failed");
+
+  console.log(`[INGEST-INSTANT] Inserted ${newItem.id} — firing background enrichment`);
+
+  // Fire background enrichment — do not await
+  void ingestSharedUrl({ ...input, url: canonicalUrl, _preInsertedId: newItem.id }).catch((err) => {
+    console.error(`[INGEST-INSTANT] Background enrichment failed for ${newItem.id}:`, err);
+  });
+
+  return {
+    item: newItem,
+    suggested_collection: null,
+    fetched_metadata: false,
+    ai_status: "uncategorized",
+    needs_info: false,
+    processing_status: "pending",
+  };
 }

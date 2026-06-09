@@ -4,21 +4,27 @@
 // - iOS Shortcuts (share via Shortcut → POST URL)
 // - Any future native mobile app's Share Extension / Sharesheet handler
 //
-// Authentication: Bearer <supabase_access_token> (per-user).
+// Authentication: Bearer <supabase_access_token> (per-user)
+//             OR: X-Save-Token: stv1_<userId>_<hmac> (permanent personal token)
+//
 // Minimum input: { url }. Everything else is optional — server fetches
 // metadata and runs AI categorization automatically.
+//
+// Set instant: true for an immediate "Saved" response (~200 ms).
+// AI categorization then runs as a fire-and-forget background task.
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import {
   SHARE_SOURCES,
   ingestSharedUrl,
-  getUserIdFromBearer,
+  ingestSharedUrlInstant,
+  getUserIdFromRequest,
 } from "@/lib/share-ingest.server";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Save-Token",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -42,6 +48,7 @@ const Schema = z.object({
   note: z.string().trim().max(2000).nullable().optional(),
   context_type: z.string().trim().max(80).nullable().optional(),
   skip_ai: z.boolean().optional().default(false),
+  instant: z.boolean().optional().default(false),
   collection_id: z.string().uuid().nullable().optional(),
   share_source: z.enum(SHARE_SOURCES).optional().default("pwa_share"),
 });
@@ -51,7 +58,7 @@ export const Route = createFileRoute("/api/public/share/save")({
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: CORS }),
       POST: async ({ request }) => {
-        const userId = await getUserIdFromBearer(request);
+        const userId = await getUserIdFromRequest(request);
         if (!userId) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401, headers: { "Content-Type": "application/json", ...CORS },
@@ -76,7 +83,7 @@ export const Route = createFileRoute("/api/public/share/save")({
         }
 
         try {
-          const result = await ingestSharedUrl({
+          const ingestInput = {
             userId,
             url,
             title: payload.title ?? null,
@@ -88,7 +95,12 @@ export const Route = createFileRoute("/api/public/share/save")({
             skip_ai: payload.skip_ai ?? false,
             collection_id: payload.collection_id ?? null,
             share_source: payload.share_source ?? "pwa_share",
-          });
+          };
+
+          const result = payload.instant
+            ? await ingestSharedUrlInstant(ingestInput)
+            : await ingestSharedUrl(ingestInput);
+
           return new Response(JSON.stringify({ ok: true, ...result }), {
             status: 200, headers: { "Content-Type": "application/json", ...CORS },
           });

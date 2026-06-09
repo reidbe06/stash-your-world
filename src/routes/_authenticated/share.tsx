@@ -1,20 +1,21 @@
-// PWA Web Share Target landing page.
-// Receives a shared URL/title/text from the OS share sheet (Android/Chromium),
-// then POSTs to /api/public/share/save which runs AI categorization + save.
+// PWA Web Share Target landing page + iOS Shortcut / clipboard fallback.
 //
-// Flow:
-//   1) Mobile user taps Share in Instagram/TikTok/Pinterest/YouTube/Safari etc.
-//   2) OS share sheet shows "STASHd" (because manifest.webmanifest declares share_target)
-//   3) Browser navigates to /share?url=...&title=...&text=...
-//   4) This page extracts the URL, calls the share API as the signed-in user,
-//      and shows a success/failure confirmation.
+// Flow A — share sheet (Android PWA, Safari Web Share):
+//   1. User taps Share → STASHd in share sheet
+//   2. OS navigates to /share?url=...&title=...&text=...
+//   3. Page auto-saves with instant=true → "Saved!" appears in ~500 ms
+//   4. AI enriches in background; page redirects to dashboard after 3 s
 //
-// On iOS (no Web Share Target API support), users get a clipboard-paste
-// fallback: this same page also accepts a manual paste.
-import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
+// Flow B — iOS Shortcut (direct API call, no browser):
+//   The Shortcut POSTs directly to /api/public/share/save.
+//   This page is not involved.
+//
+// Flow C — clipboard paste (iOS fallback when Shortcut isn't installed):
+//   User opens STASHd, navigates to /save (or /share), pastes URL.
+import { createFileRoute, Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { z } from "zod";
-import { Loader2, CheckCircle2, AlertTriangle, Sparkles, Clipboard } from "lucide-react";
+import { Loader2, CheckCircle2, AlertTriangle, Sparkles, Clipboard, ArrowRight } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -39,11 +40,9 @@ type Status =
 function SharePage() {
   const params = useSearch({ from: "/_authenticated/share" });
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [status, setStatus] = useState<Status>({ state: "idle" });
   const [manualUrl, setManualUrl] = useState("");
-  // Ref-based guard: set synchronously before the async save() call so that
-  // any re-run of the effect (e.g. Supabase auth state refresh firing while
-  // React's state update is still pending) cannot trigger a second request.
   const saveCalledRef = useRef(false);
 
   const incomingUrl = (() => {
@@ -58,9 +57,8 @@ function SharePage() {
     if (incomingUrl) sessionStorage.setItem("stashd_pending_share", incomingUrl);
   }, [incomingUrl]);
 
-  async function save(url: string, options?: { skipAi?: boolean }) {
+  async function save(url: string, options?: { instant?: boolean }) {
     if (!url || !user) return;
-    // Clear the pending buffer — we're processing it now.
     sessionStorage.removeItem("stashd_pending_share");
     setStatus({ state: "saving" });
     try {
@@ -74,7 +72,7 @@ function SharePage() {
           url,
           title: params.title,
           text: params.text,
-          skip_ai: options?.skipAi || false,
+          instant: options?.instant ?? true,
           share_source: "pwa_share",
         }),
       });
@@ -91,9 +89,15 @@ function SharePage() {
       saveCalledRef.current = true;
       void save(incomingUrl);
     }
-    // user in deps so we wait for auth to resolve before saving
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incomingUrl, user]);
+
+  // Auto-redirect to dashboard 3 s after a successful save
+  useEffect(() => {
+    if (status.state !== "saved") return;
+    const t = setTimeout(() => navigate({ to: "/dashboard" }), 3000);
+    return () => clearTimeout(t);
+  }, [status.state, navigate]);
 
   async function pasteFromClipboard() {
     try {
@@ -108,52 +112,65 @@ function SharePage() {
 
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center px-4 text-center">
+
       {status.state === "saving" && (
         <>
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-gradient text-primary-foreground shadow-brand">
             <Loader2 className="h-7 w-7 animate-spin" />
           </div>
-          <h1 className="mt-4 text-xl font-bold">Saving to STASHd…</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Fetching metadata and categorizing with AI.</p>
+          <h1 className="mt-4 text-xl font-bold">Saving…</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Just a second.</p>
         </>
       )}
 
       {status.state === "saved" && (() => {
+        const isPending = status.item?.processing_status === "pending";
         const cat = status.item?.category;
         const sub = status.item?.subcategory;
         const collection = status.suggested;
         const destination =
           cat && cat !== "Uncategorized" && cat !== "Needs Review"
             ? [cat, sub].filter(Boolean).join(" · ")
-            : collection || "Inbox";
+            : collection || null;
         return (
           <>
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-gradient text-primary-foreground shadow-brand">
               <CheckCircle2 className="h-8 w-8" />
             </div>
             <h1 className="mt-4 text-2xl font-bold">Saved to STASHd.</h1>
-            <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
-              <Sparkles className="h-3 w-3" />
-              {destination}
-            </div>
-            <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{status.item?.title}</p>
-            {status.item?.tags?.length ? (
+
+            {isPending ? (
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
+                <Sparkles className="h-3 w-3 animate-pulse" />
+                AI is organizing in the background…
+              </div>
+            ) : destination ? (
+              <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
+                <Sparkles className="h-3 w-3" />
+                {destination}
+              </div>
+            ) : null}
+
+            {status.item?.title && (
+              <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{status.item.title}</p>
+            )}
+
+            {!isPending && status.item?.tags?.length ? (
               <div className="mt-3 flex flex-wrap justify-center gap-1.5">
                 {status.item.tags.slice(0, 6).map((t: string) => (
                   <span key={t} className="rounded-full border bg-card px-2 py-0.5 text-[11px] text-muted-foreground">#{t}</span>
                 ))}
               </div>
             ) : null}
+
             <div className="mt-6 flex w-full flex-col gap-2">
-              <Link to="/dashboard" className="rounded-full bg-brand-gradient py-3 text-sm font-semibold text-primary-foreground shadow-brand">
-                View in STASHd
-              </Link>
-              <button
-                onClick={() => { saveCalledRef.current = false; setStatus({ state: "idle" }); setManualUrl(""); }}
-                className="rounded-full border bg-card py-3 text-sm font-semibold text-muted-foreground hover:text-foreground"
+              <Link
+                to="/dashboard"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-brand-gradient py-3 text-sm font-semibold text-primary-foreground shadow-brand"
               >
-                Save another
-              </button>
+                View in STASHd <ArrowRight className="h-4 w-4" />
+              </Link>
+              <p className="text-xs text-muted-foreground">Redirecting in a moment…</p>
             </div>
           </>
         );
@@ -179,7 +196,7 @@ function SharePage() {
           </div>
           <h1 className="mt-4 text-xl font-bold">Share to STASHd</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Paste a link or use your device's share sheet to send content here.
+            Paste a link or use the iOS Shortcut to send content here.
           </p>
           <button
             onClick={pasteFromClipboard}

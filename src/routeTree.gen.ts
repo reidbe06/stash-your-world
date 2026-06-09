@@ -24,6 +24,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
 import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
 import { Route as ApiPublicUrlMetadataRouteImport } from './routes/api/public/url-metadata'
+import { Route as ApiMeSaveTokenRouteImport } from './routes/api/me.save-token'
 import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
 import { Route as AuthenticatedCollectionsIdRouteImport } from './routes/_authenticated/collections.$id'
 import { Route as AuthenticatedCategoryTypeRouteImport } from './routes/_authenticated/category.$type'
@@ -107,6 +108,11 @@ const ApiPublicUrlMetadataRoute = ApiPublicUrlMetadataRouteImport.update({
   path: '/api/public/url-metadata',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMeSaveTokenRoute = ApiMeSaveTokenRouteImport.update({
+  id: '/api/me/save-token',
+  path: '/api/me/save-token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedItemIdRoute = AuthenticatedItemIdRouteImport.update({
   id: '/item/$id',
   path: '/item/$id',
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
+  '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
@@ -187,6 +194,7 @@ export interface FileRoutesByTo {
   '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
+  '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   '/_authenticated/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
+  '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
@@ -237,6 +246,7 @@ export interface FileRouteTypes {
     | '/category/$type'
     | '/collections/$id'
     | '/item/$id'
+    | '/api/me/save-token'
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
@@ -260,6 +270,7 @@ export interface FileRouteTypes {
     | '/category/$type'
     | '/collections/$id'
     | '/item/$id'
+    | '/api/me/save-token'
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
@@ -284,6 +295,7 @@ export interface FileRouteTypes {
     | '/_authenticated/category/$type'
     | '/_authenticated/collections/$id'
     | '/_authenticated/item/$id'
+    | '/api/me/save-token'
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
@@ -297,6 +309,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   SetupRoute: typeof SetupRoute
   ShareSlugRoute: typeof ShareSlugRoute
+  ApiMeSaveTokenRoute: typeof ApiMeSaveTokenRoute
   ApiPublicUrlMetadataRoute: typeof ApiPublicUrlMetadataRoute
   ApiPublicExtensionCollectionsRoute: typeof ApiPublicExtensionCollectionsRoute
   ApiPublicExtensionSaveRoute: typeof ApiPublicExtensionSaveRoute
@@ -411,6 +424,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicUrlMetadataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/me/save-token': {
+      id: '/api/me/save-token'
+      path: '/api/me/save-token'
+      fullPath: '/api/me/save-token'
+      preLoaderRoute: typeof ApiMeSaveTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/item/$id': {
       id: '/_authenticated/item/$id'
       path: '/item/$id'
@@ -515,6 +535,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   SetupRoute: SetupRoute,
   ShareSlugRoute: ShareSlugRoute,
+  ApiMeSaveTokenRoute: ApiMeSaveTokenRoute,
   ApiPublicUrlMetadataRoute: ApiPublicUrlMetadataRoute,
   ApiPublicExtensionCollectionsRoute: ApiPublicExtensionCollectionsRoute,
   ApiPublicExtensionSaveRoute: ApiPublicExtensionSaveRoute,
