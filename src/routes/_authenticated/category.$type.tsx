@@ -72,13 +72,6 @@ function CImg({
   );
 }
 
-// Radial mask centred at the play-button hotspot — placed as a sibling div
-// inside each slot so the img itself remains a plain block element.
-const PLAY_MASK = {
-  background:
-    "radial-gradient(ellipse at 50% 50%, rgba(250,247,242,0.58) 0%, rgba(250,247,242,0.22) 30%, transparent 62%)",
-} as const;
-
 // ── Gradient slot (placeholder panel inside collage) ──────────────────────────
 function GradientSlot({ bgFrom, bgTo }: { bgFrom: string; bgTo: string }) {
   return (
@@ -90,7 +83,7 @@ function GradientSlot({ bgFrom, bgTo }: { bgFrom: string; bgTo: string }) {
 }
 
 // ── 3-image premium collage ────────────────────────────────────────────────────
-// Layout: large hero (69%) left + two stacked thumbnails right.
+// Layout: large hero (65%) left + two stacked thumbnails right.
 // 0 imgs → gradient; 1 → full bleed; 2 → hero+one+slot; 3+ → hero+two.
 function CollageCover({
   images,
@@ -127,14 +120,12 @@ function CollageCover({
   if (imgs.length === 2) {
     return (
       <div className="flex h-full w-full gap-[2px]">
-        <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
-          <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
-          <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
+        <div className="h-full overflow-hidden" style={{ width: "65%" }}>
+          <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} />
         </div>
         <div className="flex h-full flex-1 flex-col gap-[2px]">
-          <div className="relative flex-1 overflow-hidden">
-            <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
-            <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
+          <div className="flex-1 overflow-hidden">
+            <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} />
           </div>
           <div className="flex-1 overflow-hidden"><GradientSlot bgFrom={bgFrom} bgTo={bgTo} /></div>
         </div>
@@ -144,18 +135,15 @@ function CollageCover({
 
   return (
     <div className="flex h-full w-full gap-[2px]">
-      <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
-        <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
-        <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
+      <div className="h-full overflow-hidden" style={{ width: "65%" }}>
+        <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} />
       </div>
       <div className="flex h-full flex-1 flex-col gap-[2px]">
-        <div className="relative flex-1 overflow-hidden">
-          <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
-          <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
+        <div className="flex-1 overflow-hidden">
+          <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} />
         </div>
-        <div className="relative flex-1 overflow-hidden">
-          <CImg src={imgs[2]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
-          <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
+        <div className="flex-1 overflow-hidden">
+          <CImg src={imgs[2]} bgFrom={bgFrom} bgTo={bgTo} />
         </div>
       </div>
     </div>
@@ -230,37 +218,19 @@ function CategorySubcategoryPage() {
     },
   });
 
-  // Platforms that produce rich full-frame thumbnails (video covers)
-  const VIDEO_PLATFORMS = new Set(["tiktok", "instagram_reel", "youtube", "youtube_short"]);
-
-  // Score item for hero slot: video first, product cutouts last
-  function heroScore(it: Item): number {
-    if (VIDEO_PLATFORMS.has((it as any).source_platform ?? "")) return 2;
-    if (it.type === "Product") return 0;
-    return 1;
-  }
-
-  // Subcategory map: name → { count, images } — hero slot prefers lifestyle/video
+  // Subcategory map: name → { count, images }
   const subcategories = useMemo(() => {
-    // Collect up to 6 candidate items per subcategory, then pick the best 3
-    const map: Record<string, { count: number; candidates: Item[] }> = {};
+    const map: Record<string, { count: number; images: string[] }> = {};
     for (const it of items) {
       const sub = (it as any).subcategory ?? (it as any).ai_subcategory ?? null;
       if (!sub) continue;
-      if (!map[sub]) map[sub] = { count: 0, candidates: [] };
+      if (!map[sub]) map[sub] = { count: 0, images: [] };
       map[sub].count += 1;
-      if (it.image_url && map[sub].candidates.length < 6) map[sub].candidates.push(it);
+      if (it.image_url && map[sub].images.length < 3) map[sub].images.push(it.image_url);
     }
     return Object.entries(map)
       .sort((a, b) => b[1].count - a[1].count)
-      .map(([name, { count, candidates }]) => ({
-        name,
-        count,
-        images: candidates
-          .sort((a, b) => heroScore(b) - heroScore(a))
-          .slice(0, 3)
-          .map((it) => it.image_url as string),
-      }));
+      .map(([name, data]) => ({ name, ...data }));
   }, [items]);
 
   const filteredItems = useMemo(() => {
