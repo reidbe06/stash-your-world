@@ -26,6 +26,46 @@ export type ShareSource = (typeof SHARE_SOURCES)[number];
 const THUMBNAIL_BUCKET = "thumbnails";
 
 /**
+ * Matches TikTok thumbnail URLs that contain a burned-in play overlay:
+ *   - tiktok.com/api/img  — ephemeral api/img placeholder
+ *   - photomode-video-share-card — TikTok's 1200×630 social "share card" with
+ *     a play button, creator handle, and stats baked into the JPEG
+ */
+const DIRTY_TT_RE = /tiktok\.com\/api\/img|photomode-video-share-card/i;
+
+/**
+ * Fetches the clean static poster frame from Instagram's oEmbed endpoint.
+ * Returns thumbnail_url on success, null on any failure.
+ * Instagram oEmbed is unauthenticated for public content and returns the raw
+ * cover image without a play-button overlay.
+ */
+async function fetchInstagramOembedThumbnail(url: string): Promise<string | null> {
+  try {
+    const endpoint = `https://www.instagram.com/oembed?url=${encodeURIComponent(url)}&maxwidth=640`;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 6_000);
+    const res = await fetch(endpoint, {
+      signal: ctrl.signal,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
+      },
+    });
+    clearTimeout(t);
+    if (!res.ok) {
+      console.log(`[IG-OEMBED] HTTP ${res.status} for ${url.slice(0, 80)}`);
+      return null;
+    }
+    const json: Record<string, unknown> = await res.json();
+    const thumb = typeof json.thumbnail_url === "string" ? json.thumbnail_url.trim() : null;
+    console.log(`[IG-OEMBED] thumbnail_url=${thumb ? thumb.slice(0, 80) : "null"}`);
+    return thumb || null;
+  } catch (err) {
+    console.log(`[IG-OEMBED] failed: ${err}`);
+    return null;
+  }
+}
+
+/**
  * Downloads a hotlink-protected CDN image server-side and uploads it to
  * Supabase Storage so the browser can load it without CORS / hotlink errors.
  *
@@ -128,53 +168,68 @@ async function refreshThumbnailBackground(
   let thumbnail: string | null = null;
 
   if (platform === "tiktok") {
-    // Attempt 1: TikTok oEmbed
-    for (let i = 1; i <= 3 && !thumbnail; i++) {
-      try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 6000);
-        const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
-        const res = await fetch(endpoint, {
-          signal: ctrl.signal,
-          headers: { "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" },
-        });
-        clearTimeout(t);
-        if (res.ok) {
-          const json: any = await res.json();
-          if (json.thumbnail_url) {
-            thumbnail = json.thumbnail_url;
-            logThumbnail(platform, url, "oembed", i, true, thumbnail);
-          }
-        }
-      } catch (err) {
-        log(`oEmbed attempt ${i} failed: ${err}`);
+    // Attempt 1: Apify coverUrl — raw video cover, no burned-in play overlay
+    try {
+      const result = await fetchTikTokApify(url);
+      if (result?.thumbnail && !DIRTY_TT_RE.test(result.thumbnail)) {
+        thumbnail = result.thumbnail;
+        logThumbnail(platform, url, "apify_cover", 1, true, thumbnail);
       }
-      if (!thumbnail && i < 3) await new Promise(r => setTimeout(r, 400 * i));
+    } catch (err) {
+      log(`Apify failed: ${err}`);
     }
-    // Attempt 2: Apify coverUrl
+    // Attempt 2: TikTok oEmbed — fallback only; reject photomode-video-share-card URLs
     if (!thumbnail) {
-      try {
-        const result = await fetchTikTokApify(url);
-        if (result?.thumbnail) {
-          thumbnail = result.thumbnail;
-          logThumbnail(platform, url, "apify_cover", 1, true, thumbnail);
+      for (let i = 1; i <= 3 && !thumbnail; i++) {
+        try {
+          const ctrl = new AbortController();
+          const t = setTimeout(() => ctrl.abort(), 6000);
+          const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+          const res = await fetch(endpoint, {
+            signal: ctrl.signal,
+            headers: { "User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)" },
+          });
+          clearTimeout(t);
+          if (res.ok) {
+            const json: Record<string, unknown> = await res.json();
+            const candidate = typeof json.thumbnail_url === "string" ? json.thumbnail_url : null;
+            if (candidate && !DIRTY_TT_RE.test(candidate)) {
+              thumbnail = candidate;
+              logThumbnail(platform, url, "oembed", i, true, thumbnail);
+            } else if (candidate) {
+              log(`oEmbed attempt ${i}: rejected dirty URL (share-card/api-img)`);
+            }
+          }
+        } catch (err) {
+          log(`oEmbed attempt ${i} failed: ${err}`);
         }
-      } catch (err) {
-        log(`Apify failed: ${err}`);
+        if (!thumbnail && i < 3) await new Promise(r => setTimeout(r, 400 * i));
       }
     }
   }
 
   if (platform === "instagram" || platform === "instagram_reel") {
-    // Attempt: Apify displayUrl
+    // Attempt 1: Instagram oEmbed — returns clean static poster frame without play overlay
     try {
-      const result = await fetchInstagramApify(url);
-      if (result?.thumbnail) {
-        thumbnail = result.thumbnail;
-        logThumbnail(platform, url, "apify_display", 1, true, thumbnail);
+      const oembedThumb = await fetchInstagramOembedThumbnail(url);
+      if (oembedThumb) {
+        thumbnail = oembedThumb;
+        logThumbnail(platform, url, "ig_oembed", 1, true, thumbnail);
       }
     } catch (err) {
-      log(`Apify failed: ${err}`);
+      log(`Instagram oEmbed failed: ${err}`);
+    }
+    // Attempt 2: Apify displayUrl — fallback if oEmbed fails
+    if (!thumbnail) {
+      try {
+        const result = await fetchInstagramApify(url);
+        if (result?.thumbnail) {
+          thumbnail = result.thumbnail;
+          logThumbnail(platform, url, "apify_display", 1, true, thumbnail);
+        }
+      } catch (err) {
+        log(`Apify failed: ${err}`);
+      }
     }
   }
 
@@ -666,13 +721,35 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     // Thumbnail: prefer incoming → Apify/yt-dlp → meta
     // For TikTok, meta?.image is an ephemeral api/img URL rejected at the metadata layer,
     // so image will be null and ytEnrich.thumbnail (a stable CDN URL) is used.
-    // If somehow api/img slipped through, replace it with the Apify thumbnail.
-    const imageIsTikTokApiImg = !!image && /tiktok\.com\/api\/img/i.test(image);
-    if (ytEnrich.thumbnail && (!image || imageIsTikTokApiImg)) {
-      image = ytEnrich.thumbnail;
-      logThumbnail(platform, input.url, transcriptResult?.method ?? "ytEnrich", 1, true, image);
+    // Reject any TikTok thumbnail that matches DIRTY_TT_RE (api/img OR photomode-video-share-card),
+    // as both contain burned-in play overlays and are unsuitable for collage covers.
+    const imageIsDirtyTikTok = !!image && platform === "tiktok" && DIRTY_TT_RE.test(image);
+    if (ytEnrich.thumbnail && (!image || imageIsDirtyTikTok)) {
+      // For TikTok: ytEnrich.thumbnail = Apify videoMeta.coverUrl (clean raw frame)
+      // For Instagram: ytEnrich.thumbnail = Apify displayUrl (may have play overlay;
+      //   superseded by the oEmbed step below if oEmbed succeeds)
+      if (platform === "tiktok" && DIRTY_TT_RE.test(ytEnrich.thumbnail)) {
+        // Apify somehow returned a dirty URL too — log and skip
+        logThumbnail(platform, input.url, "ytEnrich_dirty_rejected", 1, false, null);
+      } else {
+        image = ytEnrich.thumbnail;
+        logThumbnail(platform, input.url, transcriptResult?.method ?? "ytEnrich", 1, true, image);
+      }
     } else {
       logThumbnail(platform, input.url, transcriptResult?.method ?? "ytEnrich", 1, false, null);
+    }
+  }
+
+  // ── Instagram: prefer oEmbed clean poster over Apify/og:image ────────────────
+  // Both Apify displayUrl and Instagram's og:image for video posts can include a
+  // burned-in play overlay. Instagram oEmbed returns a raw static poster frame
+  // without any UI overlays. Only run for Instagram; YouTube and TikTok have clean
+  // sources already (yt-dlp maxresdefault and Apify coverUrl respectively).
+  if (platform === "instagram_reel" || platform === "instagram") {
+    const oembedThumb = await fetchInstagramOembedThumbnail(canonicalUrl);
+    if (oembedThumb) {
+      image = oembedThumb;
+      logThumbnail(platform, input.url, "ig_oembed", 1, true, image);
     }
   }
 
