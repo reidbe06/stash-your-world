@@ -127,7 +127,7 @@ function CollageCover({
   if (imgs.length === 2) {
     return (
       <div className="flex h-full w-full gap-[2px]">
-        <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
+        <div className="relative h-full overflow-hidden" style={{ width: "70%" }}>
           <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
           <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
         </div>
@@ -144,7 +144,7 @@ function CollageCover({
 
   return (
     <div className="flex h-full w-full gap-[2px]">
-      <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
+      <div className="relative h-full overflow-hidden" style={{ width: "70%" }}>
         <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
         <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
       </div>
@@ -187,7 +187,7 @@ function SubcategoryTile({
       className="flex flex-col overflow-hidden rounded-[20px] bg-white text-left transition-transform active:scale-[0.97]"
       style={TILE_STYLE}
     >
-      <div className="aspect-[3/2] w-full overflow-hidden">
+      <div className="aspect-[4/3] w-full overflow-hidden">
         <CollageCover images={images} bgFrom={bgFrom} bgTo={bgTo} emoji={emoji} />
       </div>
       <div className="px-3.5 pb-3.5 pt-3">

@@ -148,12 +148,12 @@ function CollageCover({
   if (imgs.length === 2) {
     return (
       <div className="flex h-full w-full gap-[2px]">
-        {/* Hero — 65 % wide, full height */}
-        <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
+        {/* Hero — 70% wide, full height */}
+        <div className="relative h-full overflow-hidden" style={{ width: "70%" }}>
           <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
           <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
         </div>
-        {/* Stacked column — 35 % wide */}
+        {/* Stacked column — 30% wide */}
         <div className="flex h-full flex-1 flex-col gap-[2px]">
           <div className="relative flex-1 overflow-hidden">
             <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
@@ -167,15 +167,15 @@ function CollageCover({
     );
   }
 
-  // ── 3 images — hero left (65%) + two stacked right ──
+  // ── 3 images — hero left (70%) + two stacked right ──
   return (
     <div className="flex h-full w-full gap-[2px]">
-      {/* Hero — 65 % wide, full height */}
-      <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
+      {/* Hero — 70% wide, full height */}
+      <div className="relative h-full overflow-hidden" style={{ width: "70%" }}>
         <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
         <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
       </div>
-      {/* Stacked column — 35 % wide, two equal slots */}
+      {/* Stacked column — 30% wide, two equal slots */}
       <div className="flex h-full flex-1 flex-col gap-[2px]">
         <div className="relative flex-1 overflow-hidden">
           <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
@@ -194,7 +194,7 @@ function CollageCover({
 function TileSkeleton() {
   return (
     <div className="overflow-hidden rounded-[20px] bg-white" style={TILE_STYLE}>
-      <div className="aspect-[3/2] w-full animate-pulse bg-[#f2ede9]" />
+      <div className="aspect-[4/3] w-full animate-pulse bg-[#f2ede9]" />
       <div className="px-3.5 py-3">
         <div className="h-3.5 w-20 animate-pulse rounded-full bg-[#f0ebe7]" />
         <div className="mt-1.5 h-2.5 w-12 animate-pulse rounded-full bg-[#f5f1ee]" />
@@ -229,7 +229,7 @@ function CategoryTile({
       style={TILE_STYLE}
     >
       {/* Hero + two-stack collage */}
-      <div className="aspect-[3/2] w-full overflow-hidden">
+      <div className="aspect-[4/3] w-full overflow-hidden">
         <CollageCover images={images} bgFrom={bgFrom} bgTo={bgTo} emoji={emoji} />
       </div>
       {/* Label footer */}
