@@ -1,56 +1,62 @@
 #!/usr/bin/env python3
 """
-Generates public/STASHd.shortcut — an iOS Shortcut that:
-  1. Extracts a URL from the Share Sheet input (handles URLs, text blobs, captions
-     from Instagram, TikTok, Pinterest, YouTube, and Safari)
-  2. POSTs directly to /api/public/share/save with the user's permanent save token
-     (no Safari, no sign-in prompt — one-time token setup via import question)
-  3. Shows a native iOS notification "Saved to STASHd ✓"
+Generates a STASHd iOS Shortcut binary plist.
 
-On first install, iOS prompts the user to paste their STASHd save token
-(visible in Profile → iOS Shortcut section). After that, the shortcut works
-instantly from any app's share sheet with zero taps beyond "Save to STASHd".
+Two modes:
 
-Run: python3 scripts/generate_shortcut.py [APP_URL]
-Regenerate whenever the app URL changes.
+  1. Static (CI / one-time):
+       python3 scripts/generate_shortcut.py [APP_URL]
+       → writes public/STASHd.shortcut (generic, prompts for token at install time)
+
+  2. Personalised (server-side, per user):
+       python3 scripts/generate_shortcut.py APP_URL --token stv1_xxx_xxx --stdout
+       → writes binary plist to stdout (token is pre-embedded, zero install prompts)
+
+The shortcut:
+  - Extracts a URL from any share sheet input (URL, text blobs, Instagram captions)
+  - POSTs directly to /api/public/share/save with X-Save-Token + instant=true
+  - Shows a native iOS notification "Saved ✓" — no Safari, no sign-in prompt
 """
 import plistlib
 import uuid
 import os
 import sys
+import argparse
 
-dev_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
-if dev_domain:
-    APP_URL = f"https://{dev_domain}"
+# ── CLI ───────────────────────────────────────────────────────────────────────
+parser = argparse.ArgumentParser()
+parser.add_argument("app_url", nargs="?", default=None, help="Base app URL (https://...)")
+parser.add_argument("--token", default=None, help="Embed this save token directly (skip import question)")
+parser.add_argument("--stdout", action="store_true", help="Write binary plist to stdout instead of a file")
+args = parser.parse_args()
+
+# ── App URL resolution ────────────────────────────────────────────────────────
+if args.app_url:
+    APP_URL = args.app_url.rstrip("/")
 else:
-    APP_URL = "https://4fba965c-de88-4489-aab4-b71526ddcfe1-00-z6dfy1539wj5.kirk.replit.dev"
-
-if len(sys.argv) > 1:
-    APP_URL = sys.argv[1].rstrip("/")
+    dev_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
+    APP_URL = f"https://{dev_domain}" if dev_domain else "https://stashd.replit.app"
 
 SAVE_ENDPOINT = f"{APP_URL}/api/public/share/save"
+PERSONAL = args.token is not None
+TOKEN_VALUE = args.token or ""
 
-# Stable action UUIDs (regenerated per-run is fine for Shortcuts)
+# ── UUIDs ─────────────────────────────────────────────────────────────────────
 MATCH_UUID      = str(uuid.uuid4()).upper()
 GET_ITEM_UUID   = str(uuid.uuid4()).upper()
 TOKEN_TEXT_UUID = str(uuid.uuid4()).upper()
 HTTP_UUID       = str(uuid.uuid4()).upper()
 NOTIF_UUID      = str(uuid.uuid4()).upper()
 
-# JSON body template — \uFFFC is the Shortcuts Object Replacement Character
-# used as a placeholder where a variable value is injected.
+# ── Helpers ───────────────────────────────────────────────────────────────────
+# JSON body: \uFFFC = Shortcuts Object Replacement Character (variable placeholder)
 JSON_BODY = '{"url":"\uFFFC","instant":true,"share_source":"ios_shortcut"}'
-URL_PLACEHOLDER_OFFSET = JSON_BODY.index('\uFFFC')  # offset of the URL variable in the string
+URL_OFFSET = JSON_BODY.index('\uFFFC')
 
-def text_token(string: str) -> dict:
-    """Plain literal text value (no variable attachments)."""
-    return {
-        "Value": {"string": string},
-        "WFSerializationType": "WFTextTokenString",
-    }
+def text_token(string):
+    return {"Value": {"string": string}, "WFSerializationType": "WFTextTokenString"}
 
-def action_output_ref(output_name: str, output_uuid: str) -> dict:
-    """Reference to a previous action's output (variable attachment)."""
+def action_ref(output_name, output_uuid):
     return {
         "Value": {
             "Aggrandizements": [],
@@ -61,8 +67,7 @@ def action_output_ref(output_name: str, output_uuid: str) -> dict:
         "WFSerializationType": "WFTextTokenAttachment",
     }
 
-def token_string_with_var(template: str, offset: int, output_name: str, output_uuid: str) -> dict:
-    """A text token string that embeds one variable at `offset`."""
+def token_string_with_var(template, offset, output_name, output_uuid):
     return {
         "Value": {
             "attachmentsByRange": {
@@ -78,96 +83,84 @@ def token_string_with_var(template: str, offset: int, output_name: str, output_u
         "WFSerializationType": "WFTextTokenString",
     }
 
+# ── Shortcut actions ──────────────────────────────────────────────────────────
+actions = [
+    # 0 — Extract URLs from share sheet (handles text blobs and clean URLs)
+    {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.matchtext",
+        "WFWorkflowActionParameters": {
+            "UUID": MATCH_UUID,
+            "WFMatchTextPattern": "https?://[^\\s<>\"'\\u0000-\\u001f]+",
+            "WFMatchTextCaseSensitive": False,
+            "WFInput": {
+                "Value": {"Aggrandizements": [], "Type": "ExtensionInput"},
+                "WFSerializationType": "WFTextTokenAttachment",
+            },
+        },
+    },
+    # 1 — Get first matched URL
+    {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.getitemfromlist",
+        "WFWorkflowActionParameters": {
+            "UUID": GET_ITEM_UUID,
+            "WFItemIndex": 0,
+            "WFInput": action_ref("Match Text", MATCH_UUID),
+        },
+    },
+    # 2 — Save token (either pre-embedded or filled by import question)
+    {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.text",
+        "WFWorkflowActionParameters": {
+            "UUID": TOKEN_TEXT_UUID,
+            "WFTextActionText": {
+                "Value": {"string": TOKEN_VALUE},
+                "WFSerializationType": "WFTextTokenString",
+            },
+        },
+    },
+    # 3 — POST to /api/public/share/save
+    {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.downloadurl",
+        "WFWorkflowActionParameters": {
+            "UUID": HTTP_UUID,
+            "WFHTTPMethod": "POST",
+            "WFURL": SAVE_ENDPOINT,
+            "WFHTTPHeaders": {
+                "Value": {
+                    "WFDictionaryFieldValueItems": [
+                        {
+                            "WFItemType": 0,
+                            "WFKey": text_token("X-Save-Token"),
+                            "WFValue": token_string_with_var("\uFFFC", 0, "Text", TOKEN_TEXT_UUID),
+                        },
+                        {
+                            "WFItemType": 0,
+                            "WFKey": text_token("Content-Type"),
+                            "WFValue": text_token("application/json"),
+                        },
+                    ]
+                },
+                "WFSerializationType": "WFDictionaryFieldValue",
+            },
+            "WFHTTPBodyType": "File",
+            "WFHTTPBody": token_string_with_var(JSON_BODY, URL_OFFSET, "Get Item from List", GET_ITEM_UUID),
+        },
+    },
+    # 4 — Native notification
+    {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.notification",
+        "WFWorkflowActionParameters": {
+            "UUID": NOTIF_UUID,
+            "WFNotificationActionTitle": "STASHd",
+            "WFNotificationActionBody": "Saved ✓  AI is organizing it…",
+            "WFNotificationActionPlaySound": False,
+        },
+    },
+]
+
+# ── Full shortcut dict ────────────────────────────────────────────────────────
 shortcut = {
-    "WFWorkflowActions": [
-        # ── Action 0: Extract URL(s) from share sheet input ────────────────────
-        # Works on URL content items (Safari, most apps) AND on text blobs
-        # that contain an embedded URL (Instagram, TikTok caption shares).
-        {
-            "WFWorkflowActionIdentifier": "is.workflow.actions.matchtext",
-            "WFWorkflowActionParameters": {
-                "UUID": MATCH_UUID,
-                "WFMatchTextPattern": "https?://[^\\s<>\"'\\u0000-\\u001f]+",
-                "WFMatchTextCaseSensitive": False,
-                "WFInput": {
-                    "Value": {
-                        "Aggrandizements": [],
-                        "Type": "ExtensionInput",
-                    },
-                    "WFSerializationType": "WFTextTokenAttachment",
-                },
-            },
-        },
-
-        # ── Action 1: Get first matched URL ─────────────────────────────────────
-        {
-            "WFWorkflowActionIdentifier": "is.workflow.actions.getitemfromlist",
-            "WFWorkflowActionParameters": {
-                "UUID": GET_ITEM_UUID,
-                "WFItemIndex": 0,
-                "WFInput": action_output_ref("Match Text", MATCH_UUID),
-            },
-        },
-
-        # ── Action 2: Save token (populated by import question at install time) ──
-        {
-            "WFWorkflowActionIdentifier": "is.workflow.actions.text",
-            "WFWorkflowActionParameters": {
-                "UUID": TOKEN_TEXT_UUID,
-                "WFTextActionText": {
-                    "Value": {"string": ""},
-                    "WFSerializationType": "WFTextTokenString",
-                },
-            },
-        },
-
-        # ── Action 3: POST to /api/public/share/save ─────────────────────────────
-        {
-            "WFWorkflowActionIdentifier": "is.workflow.actions.downloadurl",
-            "WFWorkflowActionParameters": {
-                "UUID": HTTP_UUID,
-                "WFHTTPMethod": "POST",
-                "WFURL": SAVE_ENDPOINT,
-                # Headers: X-Save-Token (from token text action) + Content-Type
-                "WFHTTPHeaders": {
-                    "Value": {
-                        "WFDictionaryFieldValueItems": [
-                            {
-                                "WFItemType": 0,
-                                "WFKey": text_token("X-Save-Token"),
-                                "WFValue": token_string_with_var(
-                                    "\uFFFC", 0, "Text", TOKEN_TEXT_UUID
-                                ),
-                            },
-                            {
-                                "WFItemType": 0,
-                                "WFKey": text_token("Content-Type"),
-                                "WFValue": text_token("application/json"),
-                            },
-                        ]
-                    },
-                    "WFSerializationType": "WFDictionaryFieldValue",
-                },
-                # Body: JSON with URL variable embedded at URL_PLACEHOLDER_OFFSET
-                "WFHTTPBodyType": "File",
-                "WFHTTPBody": token_string_with_var(
-                    JSON_BODY, URL_PLACEHOLDER_OFFSET, "Get Item from List", GET_ITEM_UUID
-                ),
-            },
-        },
-
-        # ── Action 4: Show native notification ──────────────────────────────────
-        {
-            "WFWorkflowActionIdentifier": "is.workflow.actions.notification",
-            "WFWorkflowActionParameters": {
-                "UUID": NOTIF_UUID,
-                "WFNotificationActionTitle": "STASHd",
-                "WFNotificationActionBody": "Saved ✓  AI is organizing it…",
-                "WFNotificationActionPlaySound": False,
-            },
-        },
-    ],
-
+    "WFWorkflowActions": actions,
     "WFWorkflowClientVersion": "1105",
     "WFWorkflowHasOutputFallback": False,
     "WFWorkflowHasShortcutInputVariables": True,
@@ -175,54 +168,47 @@ shortcut = {
         "WFWorkflowIconGlyphNumber": 59511,
         "WFWorkflowIconStartColor": -1524983041,  # pink
     },
-
-    # ── Import question: ask for save token once at install time ──────────────
-    "WFWorkflowImportQuestions": [
-        {
-            "ActionIndex": 2,          # The "Text" (token) action at index 2
-            "DefaultValue": "",
-            "ParameterKey": "WFTextActionText",
-            "Prompt": "Open STASHd → Profile → iOS Shortcut, then copy and paste your save token here.",
-            "Text": "STASHd Save Token",
-        }
-    ],
-
-    # Accept URLs, plain text (Instagram captions), and rich text
+    # Import question only needed for the generic (non-personalised) shortcut
+    **({"WFWorkflowImportQuestions": []} if PERSONAL else {
+        "WFWorkflowImportQuestions": [
+            {
+                "ActionIndex": 2,
+                "DefaultValue": "",
+                "ParameterKey": "WFTextActionText",
+                "Prompt": "Open STASHd → Profile → iOS Shortcut, then copy and paste your save token here.",
+                "Text": "STASHd Save Token",
+            }
+        ]
+    }),
     "WFWorkflowInputContentItemClasses": [
         "WFURLContentItem",
         "WFTextContentItem",
         "WFStringContentItem",
         "WFRichTextContentItem",
     ],
-
     "WFWorkflowMinimumClientVersion": 900,
     "WFWorkflowMinimumClientVersionString": "900",
     "WFWorkflowName": "Save to STASHd",
-
-    # When run without input (e.g. from home screen): ask for a URL
     "WFWorkflowNoInputBehavior": {
         "Name": "WFTextInputBehavior",
-        "Parameters": {
-            "Ask": True,
-            "Prompt": "Enter a URL to save to STASHd",
-        },
+        "Parameters": {"Ask": True, "Prompt": "Enter a URL to save to STASHd"},
     },
-
     "WFWorkflowOutputContentItemClasses": [],
     "WFWorkflowTypes": ["ShareExtension"],
 }
 
-out_path = os.path.join(os.path.dirname(__file__), "..", "public", "STASHd.shortcut")
-out_path = os.path.normpath(out_path)
+# ── Output ────────────────────────────────────────────────────────────────────
+plist_bytes = plistlib.dumps(shortcut, fmt=plistlib.FMT_BINARY)
 
-with open(out_path, "wb") as f:
-    plistlib.dump(shortcut, f, fmt=plistlib.FMT_BINARY)
-
-print(f"Generated: {out_path}")
-print(f"App URL:   {APP_URL}")
-print(f"Endpoint:  {SAVE_ENDPOINT}")
-print(f"Shortcut:  Save to STASHd")
-print(f"  - Accepts: URL, text (Instagram captions), rich text")
-print(f"  - Auth:    X-Save-Token header (permanent, from Profile)")
-print(f"  - Mode:    instant=true (background AI)")
-print(f"  - UX:      native notification, no Safari")
+if args.stdout:
+    sys.stdout.buffer.write(plist_bytes)
+else:
+    out_path = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), "..", "public", "STASHd.shortcut")
+    )
+    with open(out_path, "wb") as f:
+        f.write(plist_bytes)
+    print(f"Generated: {out_path}", file=sys.stderr)
+    print(f"App URL:   {APP_URL}", file=sys.stderr)
+    print(f"Endpoint:  {SAVE_ENDPOINT}", file=sys.stderr)
+    print(f"Mode:      {'personalised (token embedded)' if PERSONAL else 'generic (import question)'}", file=sys.stderr)

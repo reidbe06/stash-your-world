@@ -24,6 +24,7 @@ const MIME = {
   ttf:         "font/ttf",
   otf:         "font/otf",
   zip:         "application/zip",
+  shortcut:    "application/octet-stream",
 };
 
 Bun.serve({

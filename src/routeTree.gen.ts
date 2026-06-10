@@ -25,6 +25,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
 import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
 import { Route as ApiPublicUrlMetadataRouteImport } from './routes/api/public/url-metadata'
+import { Route as ApiMeShortcutRouteImport } from './routes/api/me.shortcut'
 import { Route as ApiMeSaveTokenRouteImport } from './routes/api/me.save-token'
 import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
 import { Route as AuthenticatedCollectionsIdRouteImport } from './routes/_authenticated/collections.$id'
@@ -114,6 +115,11 @@ const ApiPublicUrlMetadataRoute = ApiPublicUrlMetadataRouteImport.update({
   path: '/api/public/url-metadata',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMeShortcutRoute = ApiMeShortcutRouteImport.update({
+  id: '/api/me/shortcut',
+  path: '/api/me/shortcut',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMeSaveTokenRoute = ApiMeSaveTokenRouteImport.update({
   id: '/api/me/save-token',
   path: '/api/me/save-token',
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
+  '/api/me/shortcut': typeof ApiMeShortcutRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
@@ -203,6 +210,7 @@ export interface FileRoutesByTo {
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
+  '/api/me/shortcut': typeof ApiMeShortcutRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
@@ -230,6 +238,7 @@ export interface FileRoutesById {
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
+  '/api/me/shortcut': typeof ApiMeShortcutRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
@@ -257,6 +266,7 @@ export interface FileRouteTypes {
     | '/collections/$id'
     | '/item/$id'
     | '/api/me/save-token'
+    | '/api/me/shortcut'
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
@@ -282,6 +292,7 @@ export interface FileRouteTypes {
     | '/collections/$id'
     | '/item/$id'
     | '/api/me/save-token'
+    | '/api/me/shortcut'
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
@@ -308,6 +319,7 @@ export interface FileRouteTypes {
     | '/_authenticated/collections/$id'
     | '/_authenticated/item/$id'
     | '/api/me/save-token'
+    | '/api/me/shortcut'
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
@@ -323,6 +335,7 @@ export interface RootRouteChildren {
   ShortcutRoute: typeof ShortcutRoute
   ShareSlugRoute: typeof ShareSlugRoute
   ApiMeSaveTokenRoute: typeof ApiMeSaveTokenRoute
+  ApiMeShortcutRoute: typeof ApiMeShortcutRoute
   ApiPublicUrlMetadataRoute: typeof ApiPublicUrlMetadataRoute
   ApiPublicExtensionCollectionsRoute: typeof ApiPublicExtensionCollectionsRoute
   ApiPublicExtensionSaveRoute: typeof ApiPublicExtensionSaveRoute
@@ -444,6 +457,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicUrlMetadataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/me/shortcut': {
+      id: '/api/me/shortcut'
+      path: '/api/me/shortcut'
+      fullPath: '/api/me/shortcut'
+      preLoaderRoute: typeof ApiMeShortcutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/me/save-token': {
       id: '/api/me/save-token'
       path: '/api/me/save-token'
@@ -557,6 +577,7 @@ const rootRouteChildren: RootRouteChildren = {
   ShortcutRoute: ShortcutRoute,
   ShareSlugRoute: ShareSlugRoute,
   ApiMeSaveTokenRoute: ApiMeSaveTokenRoute,
+  ApiMeShortcutRoute: ApiMeShortcutRoute,
   ApiPublicUrlMetadataRoute: ApiPublicUrlMetadataRoute,
   ApiPublicExtensionCollectionsRoute: ApiPublicExtensionCollectionsRoute,
   ApiPublicExtensionSaveRoute: ApiPublicExtensionSaveRoute,
