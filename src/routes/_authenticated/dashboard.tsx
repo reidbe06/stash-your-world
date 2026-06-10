@@ -194,7 +194,7 @@ function CollageCover({
 function TileSkeleton() {
   return (
     <div className="overflow-hidden rounded-[20px] bg-white" style={TILE_STYLE}>
-      <div className="aspect-[4/3] w-full animate-pulse bg-[#f2ede9]" />
+      <div className="aspect-[16/9] w-full animate-pulse bg-[#f2ede9]" />
       <div className="px-3.5 py-3">
         <div className="h-3.5 w-20 animate-pulse rounded-full bg-[#f0ebe7]" />
         <div className="mt-1.5 h-2.5 w-12 animate-pulse rounded-full bg-[#f5f1ee]" />
@@ -229,7 +229,7 @@ function CategoryTile({
       style={TILE_STYLE}
     >
       {/* Hero + two-stack collage */}
-      <div className="aspect-[4/3] w-full overflow-hidden">
+      <div className="aspect-[16/9] w-full overflow-hidden">
         <CollageCover images={images} bgFrom={bgFrom} bgTo={bgTo} emoji={emoji} />
       </div>
       {/* Label footer */}

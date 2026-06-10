@@ -187,7 +187,7 @@ function SubcategoryTile({
       className="flex flex-col overflow-hidden rounded-[20px] bg-white text-left transition-transform active:scale-[0.97]"
       style={TILE_STYLE}
     >
-      <div className="aspect-[4/3] w-full overflow-hidden">
+      <div className="aspect-[16/9] w-full overflow-hidden">
         <CollageCover images={images} bgFrom={bgFrom} bgTo={bgTo} emoji={emoji} />
       </div>
       <div className="px-3.5 pb-3.5 pt-3">
