@@ -17,31 +17,40 @@ type CategoryMeta = {
   label: string;
   description: string;
   emoji: string;
-  gradient: string;
+  bgFrom: string;
+  bgTo: string;
 };
 
 const CATEGORY_META: CategoryMeta[] = [
-  { key: "Recipe",    label: "Recipes",       description: "All your recipe finds, organized by AI",      emoji: "🍝", gradient: "from-orange-100 to-amber-50"  },
-  { key: "Fashion",   label: "Fashion",       description: "All your fashion finds, organized by AI",      emoji: "👗", gradient: "from-violet-100 to-pink-50"   },
-  { key: "Travel",    label: "Travel",        description: "All your travel inspiration, organized by AI", emoji: "✈️", gradient: "from-sky-100 to-teal-50"      },
-  { key: "Product",   label: "Products",      description: "All your product saves, organized by AI",      emoji: "🛍️", gradient: "from-blue-100 to-indigo-50"   },
-  { key: "Fitness",   label: "Workouts",      description: "All your workout saves, organized by AI",      emoji: "🏃", gradient: "from-lime-100 to-green-50"    },
-  { key: "Home",      label: "Home & Decor",  description: "All your home inspiration, organized by AI",   emoji: "🏡", gradient: "from-amber-100 to-yellow-50"  },
-  { key: "Beauty",    label: "Beauty",        description: "All your beauty finds, organized by AI",       emoji: "✨", gradient: "from-pink-100 to-rose-50"     },
-  { key: "Tutorial",  label: "Tutorials",     description: "All your tutorial saves, organized by AI",     emoji: "💡", gradient: "from-indigo-100 to-blue-50"   },
-  { key: "Business",  label: "Business",      description: "All your business saves, organized by AI",     emoji: "💼", gradient: "from-stone-100 to-gray-50"    },
-  { key: "Parenting", label: "Parenting",     description: "All your parenting saves, organized by AI",    emoji: "👶", gradient: "from-red-100 to-pink-50"      },
+  { key: "Recipe",    label: "Recipes",      description: "All your recipe finds, organized by AI",      emoji: "🍝", bgFrom: "#FFF3E8", bgTo: "#FFF9F2" },
+  { key: "Fashion",   label: "Fashion",      description: "All your fashion finds, organized by AI",      emoji: "👗", bgFrom: "#F5EEFF", bgTo: "#FEF2F8" },
+  { key: "Travel",    label: "Travel",       description: "All your travel inspiration, organized by AI", emoji: "✈️", bgFrom: "#E8F5FF", bgTo: "#F0FAF5" },
+  { key: "Product",   label: "Products",     description: "All your product saves, organized by AI",      emoji: "🛍️", bgFrom: "#EBF0FF", bgTo: "#F3F8FF" },
+  { key: "Fitness",   label: "Workouts",     description: "All your workout saves, organized by AI",      emoji: "🏃", bgFrom: "#EDFAED", bgTo: "#F4FFF0" },
+  { key: "Home",      label: "Home & Decor", description: "All your home inspiration, organized by AI",   emoji: "🏡", bgFrom: "#FFF8E1", bgTo: "#FFFBF0" },
+  { key: "Beauty",    label: "Beauty",       description: "All your beauty finds, organized by AI",       emoji: "✨", bgFrom: "#FFF0F5", bgTo: "#FFF5FA" },
+  { key: "Tutorial",  label: "Tutorials",    description: "All your tutorial saves, organized by AI",     emoji: "💡", bgFrom: "#F0EEFF", bgTo: "#F6F3FF" },
+  { key: "Business",  label: "Business",     description: "All your business saves, organized by AI",     emoji: "💼", bgFrom: "#F5F5F0", bgTo: "#FAFAF7" },
+  { key: "Parenting", label: "Parenting",    description: "All your parenting saves, organized by AI",    emoji: "👶", bgFrom: "#FFF0F0", bgTo: "#FFF7F7" },
 ];
 
-function getFirstName(email?: string | null): string {
-  if (email) return email.split("@")[0];
-  return "";
-}
+// Apple Wallet–style tile elevation
+const TILE_STYLE: React.CSSProperties = {
+  boxShadow: "0 4px 12px rgba(0,0,0,0.04), 0 12px 32px rgba(0,0,0,0.06)",
+  border: "1px solid rgba(250,247,242,0.9)",
+};
 
-// ── Image component with silent fallback ──────────────────────────────────────
-function CImg({ src }: { src: string }) {
+// ── Collage image with warm fallback ──────────────────────────────────────────
+function CImg({ src, bgFrom, bgTo }: { src: string; bgFrom: string; bgTo: string }) {
   const [failed, setFailed] = useState(false);
-  if (failed) return null;
+  if (failed) {
+    return (
+      <div
+        className="h-full w-full"
+        style={{ background: `linear-gradient(160deg, ${bgFrom}, ${bgTo})` }}
+      />
+    );
+  }
   return (
     <img
       src={src}
@@ -52,61 +61,93 @@ function CImg({ src }: { src: string }) {
   );
 }
 
-// ── Collage cover ─────────────────────────────────────────────────────────────
-function CollageCover({ images, gradient, emoji }: { images: string[]; gradient: string; emoji: string }) {
-  const imgs = images.slice(0, 4);
+// ── Gradient slot (placeholder panel inside collage) ──────────────────────────
+function GradientSlot({ bgFrom, bgTo }: { bgFrom: string; bgTo: string }) {
+  return (
+    <div
+      className="h-full w-full"
+      style={{ background: `linear-gradient(160deg, ${bgFrom}, ${bgTo})` }}
+    />
+  );
+}
+
+// ── 3-image premium collage ────────────────────────────────────────────────────
+// Layout: large hero (69%) left + two stacked thumbnails right.
+// 0 imgs → gradient; 1 → full bleed; 2 → hero+one+slot; 3+ → hero+two.
+function CollageCover({
+  images,
+  bgFrom,
+  bgTo,
+  emoji,
+}: {
+  images: string[];
+  bgFrom: string;
+  bgTo: string;
+  emoji: string;
+}) {
+  const imgs = images.slice(0, 3);
 
   if (imgs.length === 0) {
     return (
-      <div className={`flex h-full w-full items-center justify-center bg-gradient-to-br ${gradient}`}>
-        <span className="text-4xl leading-none opacity-60">{emoji}</span>
+      <div
+        className="flex h-full w-full items-center justify-center"
+        style={{ background: `linear-gradient(160deg, ${bgFrom}, ${bgTo})` }}
+      >
+        <span className="select-none text-4xl leading-none opacity-40">{emoji}</span>
       </div>
     );
   }
+
   if (imgs.length === 1) {
-    return <div className="h-full w-full overflow-hidden"><CImg src={imgs[0]} /></div>;
+    return (
+      <div className="h-full w-full overflow-hidden">
+        <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} />
+      </div>
+    );
   }
+
   if (imgs.length === 2) {
     return (
-      <div className="grid h-full grid-cols-2 gap-[1.5px]">
-        <div className="overflow-hidden"><CImg src={imgs[0]} /></div>
-        <div className="overflow-hidden"><CImg src={imgs[1]} /></div>
-      </div>
-    );
-  }
-  if (imgs.length === 3) {
-    return (
-      <div className="flex h-full gap-[1.5px]">
-        <div className="h-full w-[55%] overflow-hidden"><CImg src={imgs[0]} /></div>
-        <div className="flex h-full flex-1 flex-col gap-[1.5px]">
-          <div className="h-1/2 overflow-hidden"><CImg src={imgs[1]} /></div>
-          <div className="h-1/2 overflow-hidden"><CImg src={imgs[2]} /></div>
+      <div className="flex h-full w-full gap-[2px]">
+        <div className="h-full overflow-hidden" style={{ width: "69%" }}>
+          <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} />
+        </div>
+        <div className="flex h-full flex-1 flex-col gap-[2px]">
+          <div className="flex-1 overflow-hidden"><CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} /></div>
+          <div className="flex-1 overflow-hidden"><GradientSlot bgFrom={bgFrom} bgTo={bgTo} /></div>
         </div>
       </div>
     );
   }
+
   return (
-    <div className="grid h-full grid-cols-2 grid-rows-2 gap-[1.5px]">
-      {imgs.map((src, i) => (
-        <div key={i} className="overflow-hidden"><CImg src={src} /></div>
-      ))}
+    <div className="flex h-full w-full gap-[2px]">
+      <div className="h-full overflow-hidden" style={{ width: "69%" }}>
+        <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} />
+      </div>
+      <div className="flex h-full flex-1 flex-col gap-[2px]">
+        <div className="flex-1 overflow-hidden"><CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} /></div>
+        <div className="flex-1 overflow-hidden"><CImg src={imgs[2]} bgFrom={bgFrom} bgTo={bgTo} /></div>
+      </div>
     </div>
   );
 }
 
-// ── Subcategory tile ──────────────────────────────────────────────────────────
+// ── Subcategory tile ───────────────────────────────────────────────────────────
 function SubcategoryTile({
   name,
   count,
   images,
-  gradient,
+  bgFrom,
+  bgTo,
   emoji,
   onClick,
 }: {
   name: string;
   count: number;
   images: string[];
-  gradient: string;
+  bgFrom: string;
+  bgTo: string;
   emoji: string;
   onClick: () => void;
 }) {
@@ -114,32 +155,36 @@ function SubcategoryTile({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col overflow-hidden rounded-[18px] bg-white text-left shadow-[0_2px_16px_rgba(0,0,0,0.07)] transition active:scale-[0.98]"
+      className="flex flex-col overflow-hidden rounded-[20px] bg-white text-left transition-transform active:scale-[0.97]"
+      style={TILE_STYLE}
     >
-      <div className="aspect-[4/3] w-full overflow-hidden rounded-t-[18px]">
-        <CollageCover images={images} gradient={gradient} emoji={emoji} />
+      <div className="aspect-[3/2] w-full overflow-hidden">
+        <CollageCover images={images} bgFrom={bgFrom} bgTo={bgTo} emoji={emoji} />
       </div>
-      <div className="px-3 py-2.5">
+      <div className="px-3.5 pb-3.5 pt-3">
         <p className="text-[13px] font-bold leading-snug text-[#1a1a1a]">{name}</p>
-        <p className="mt-0.5 text-[11px] text-[#9a8fa0]">{count} save{count !== 1 ? "s" : ""}</p>
+        <p className="mt-[3px] text-[11px] font-medium text-[#b0a5b8]">
+          {count} save{count !== 1 ? "s" : ""}
+        </p>
       </div>
     </button>
   );
 }
 
-// ── Page component ────────────────────────────────────────────────────────────
+// ── Page ───────────────────────────────────────────────────────────────────────
 function CategorySubcategoryPage() {
   const { type } = Route.useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
 
-  const meta = CATEGORY_META.find((c) => c.key === type) ?? {
+  const meta: CategoryMeta = CATEGORY_META.find((c) => c.key === type) ?? {
     key: type,
     label: type,
     description: `All your ${type.toLowerCase()} saves, organized by AI`,
     emoji: "📌",
-    gradient: "from-pink-100 to-rose-50",
+    bgFrom: "#FFF0F5",
+    bgTo: "#FEF2F8",
   };
 
   const { data: items = [], isLoading } = useQuery({
@@ -156,7 +201,7 @@ function CategorySubcategoryPage() {
     },
   });
 
-  // Subcategory data: name → count + images
+  // Subcategory map: name → { count, images }
   const subcategories = useMemo(() => {
     const map: Record<string, { count: number; images: string[] }> = {};
     for (const it of items) {
@@ -164,16 +209,13 @@ function CategorySubcategoryPage() {
       if (!sub) continue;
       if (!map[sub]) map[sub] = { count: 0, images: [] };
       map[sub].count += 1;
-      if (it.image_url && map[sub].images.length < 4) {
-        map[sub].images.push(it.image_url);
-      }
+      if (it.image_url && map[sub].images.length < 3) map[sub].images.push(it.image_url);
     }
     return Object.entries(map)
       .sort((a, b) => b[1].count - a[1].count)
       .map(([name, data]) => ({ name, ...data }));
   }, [items]);
 
-  // Filter all saves by search term
   const filteredItems = useMemo(() => {
     if (!search.trim()) return items;
     const q = search.trim().toLowerCase();
@@ -189,31 +231,26 @@ function CategorySubcategoryPage() {
 
   return (
     <div className="space-y-5">
-      {/* Back + page header */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => navigate({ to: "/dashboard" })}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_1px_6px_rgba(0,0,0,0.08)] transition hover:shadow-[0_2px_10px_rgba(0,0,0,0.12)]"
-          aria-label="Back"
-        >
-          <ChevronLeft className="h-5 w-5 text-[#1a1a1a]" />
-        </button>
+      {/* Back button */}
+      <button
+        type="button"
+        onClick={() => navigate({ to: "/dashboard" })}
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white transition"
+        style={{ boxShadow: "0 1px 8px rgba(0,0,0,0.08)", border: "1px solid rgba(250,247,242,0.9)" }}
+        aria-label="Back"
+      >
+        <ChevronLeft className="h-5 w-5 text-[#1a1a1a]" />
+      </button>
+
+      {/* Header */}
+      <div>
+        <h1 className="text-[32px] font-extrabold leading-tight tracking-tight text-[#1a1a1a]">
+          {meta.label}
+        </h1>
+        <p className="mt-1 text-[13px] text-[#9a8fa0]">{meta.description}</p>
       </div>
 
-      {/* Category title + description */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-[32px] font-extrabold leading-tight tracking-tight text-[#1a1a1a]">
-            {meta.label}
-          </h1>
-          <p className="mt-1 flex items-center gap-1.5 text-[13px] text-[#9a8fa0]">
-            {meta.description}
-          </p>
-        </div>
-      </div>
-
-      {/* Search bar */}
+      {/* Search */}
       <div className="relative">
         <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#c8bfcf]" />
         <input
@@ -221,47 +258,47 @@ function CategorySubcategoryPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={`Search ${meta.label.toLowerCase()}…`}
-          className="w-full rounded-full border border-[#ede8e3] bg-white py-3 pl-11 pr-4 text-sm text-[#1a1a1a] placeholder:text-[#b0a8b2] shadow-[0_1px_6px_rgba(0,0,0,0.05)] outline-none focus:border-[#FD5897]/30 focus:ring-2 focus:ring-[#FD5897]/10"
+          className="w-full rounded-full bg-white py-3 pl-11 pr-4 text-sm text-[#1a1a1a] placeholder:text-[#b0a8b2] outline-none focus:ring-2 focus:ring-[#FD5897]/10"
+          style={{ boxShadow: "0 1px 8px rgba(0,0,0,0.05)", border: "1px solid rgba(250,247,242,0.95)" }}
         />
       </div>
 
       {/* AI Collections */}
       {subcategories.length > 0 && !search && (
-        <div className="space-y-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#c0b8ca]">
+        <div className="space-y-4">
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#c8bfd2]">
             AI Collections
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             {subcategories.map(({ name, count, images }) => (
               <SubcategoryTile
                 key={name}
                 name={name}
                 count={count}
                 images={images}
-                gradient={meta.gradient}
+                bgFrom={meta.bgFrom}
+                bgTo={meta.bgTo}
                 emoji={meta.emoji}
                 onClick={() => navigate({ to: "/search", search: { type, sub: name } as never })}
               />
             ))}
           </div>
-
-          {/* View all saves link */}
           <button
             type="button"
             onClick={() => navigate({ to: "/search", search: { type } as never })}
-            className="w-full rounded-full border border-[#FD5897]/25 py-2.5 text-sm font-semibold text-[#FD5897] transition hover:bg-[#FD5897]/5"
+            className="w-full rounded-full py-2.5 text-sm font-semibold text-[#FD5897] transition hover:bg-[#FD5897]/5"
+            style={{ border: "1px solid rgba(253,88,151,0.2)" }}
           >
             View all {items.length} {meta.label} →
           </button>
         </div>
       )}
 
-      {/* All Saves section */}
+      {/* All Saves */}
       <div className="space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#c0b8ca]">
+        <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#c8bfd2]">
           {search ? `Results (${filteredItems.length})` : "All Saves"}
         </p>
-
         {isLoading ? (
           <div className="grid grid-cols-2 gap-3">
             {[...Array(4)].map((_, i) => (

@@ -1,0 +1,140 @@
+Using the approved STASHd mockup as the design reference, refine the Home Dashboard category cards and background to create a more premium, lifestyle-focused experience.
+
+Do not modify:
+
+* Save ingestion
+* AI categorization
+* Collections logic
+* Search functionality
+* Authentication
+* Navigation structure
+* Database schema
+* API integrations
+
+VISUAL REFINEMENTS ONLY
+
+1. Stronger STASHd Background Gradient
+
+The current background feels too white and flat.
+
+Update the page background to:
+
+* Top: #FAF7F2
+* Mid-section: #FFF3F8
+* Bottom: #FAF7F2
+
+Increase visibility approximately 20–30% from the current gradient.
+
+Goals:
+
+* Warm
+* Feminine
+* Premium
+* Soft
+
+Avoid:
+
+* Bright pink
+* Obvious gradients
+* Instagram-style color effects
+
+The background should feel like a luxury lifestyle brand, not a productivity app.
+
+⸻
+
+2. Replace 4-Image Covers with Premium 3-Image Collages
+
+Current category covers feel busy.
+
+Update all category cards to use:
+
+* 1 large hero image (approximately 70% width)
+* 2 smaller stacked images on the right
+
+Layout:
+
+[ LARGE IMAGE ]
+[ SMALL ]
+[ SMALL ]
+
+Examples:
+
+* Recipes = main dish + 2 supporting food images
+* Fashion = outfit + accessories
+* Travel = destination + supporting scenes
+* Products = hero product + supporting products
+
+Goal:
+Cleaner visual hierarchy and stronger imagery.
+
+⸻
+
+3. Remove Video Play Icons
+
+Category cover images should feel like magazine covers, not video thumbnails.
+
+For all category collage covers:
+
+* Remove play icons
+* Remove video overlays
+* Remove social platform UI elements
+* Remove timestamps
+* Remove creator watermarks when possible
+
+Use:
+
+* Video poster frame
+* Thumbnail image
+* Extracted hero frame
+
+The category cover should display only clean imagery.
+
+⸻
+
+4. Add Apple Wallet Style Card Depth
+
+Category cards currently blend into the page.
+
+Keep:
+
+* White card background
+* Rounded corners
+
+Add:
+
+Border:
+1px solid rgba(250,247,242,0.9)
+
+Shadow:
+0 4px 12px rgba(0,0,0,0.04)
+0 12px 32px rgba(0,0,0,0.06)
+
+Increase spacing between cards slightly.
+
+Goals:
+
+* Soft elevation
+* Premium feel
+* Floating card effect
+
+Reference:
+Apple Wallet cards.
+
+Avoid:
+
+* Dark shadows
+* Harsh borders
+* Colored shadows
+* Glassmorphism
+* Gradient cards
+
+⸻
+
+Success Criteria
+
+The dashboard should feel less like a folder system and more like a curated collection of things the user loves.
+
+Visual inspiration:
+Pinterest + Anthropologie + Apple Wallet
+
+The category imagery should become the primary visual focus while maintaining STASHd brand colors and existing functionality.
