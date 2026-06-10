@@ -1,0 +1,70 @@
+STOP and revert the last tile-layout change. The latest update broke the card proportions and image cropping.
+
+The dashboard category tiles must NOT become tall/vertical cards. Restore the previous card size/proportions before the last update, then apply the following exact refinements only.
+
+CRITICAL REQUIREMENTS:
+
+1. Fixed card shape
+- Keep each category card the same width and height as the previous better version.
+- Do not allow cards to stretch vertically based on image size.
+- All cards must be uniform height.
+- Use overflow: hidden.
+- Use object-fit: cover for images.
+- Do not show blank white image areas inside the collage.
+
+2. 3-image collage layout
+Each category cover should have exactly 3 image slots:
+- Left image: 65% width, full cover height
+- Right column: 35% width
+- Top-right image: 50% height
+- Bottom-right image: 50% height
+- Small 2px white divider lines between images
+- Entire collage clipped to the card’s top rounded corners
+
+Do NOT stack images in a way that makes the whole card taller.
+
+3. Remove play icons from dashboard/category covers
+The play icons are still showing. Remove ALL video play overlays from dashboard category collage covers and AI collection tile covers.
+
+Important:
+- This applies only to collage covers.
+- Do not remove video functionality from actual save detail pages.
+- Do not show play triangle icons, timestamps, TikTok/Instagram overlays, or video UI on category covers.
+- Category covers should look like clean still images.
+
+If the overlay is coming from a shared thumbnail component, add a prop such as:
+showVideoOverlay={false}
+or
+hidePlayIcon={true}
+for category/collection cover usage.
+
+4. All Saves tile image selection
+The All Saves tile should not duplicate the Recipes tile.
+All Saves should pick a diverse mix:
+- 1 recipe/food thumbnail
+- 1 fashion/product thumbnail
+- 1 home/travel/workout/product thumbnail if available
+
+Avoid duplicate thumbnails inside the same tile.
+Avoid using the exact same 3 thumbnails as another category tile.
+
+5. Do not change anything else
+Do not modify:
+- routing
+- save logic
+- AI categorization
+- database schema
+- auth
+- API calls
+- bottom nav
+- header
+- search behavior
+
+This is a visual fix only.
+
+Success criteria:
+- Cards are uniform and premium-looking
+- Images are cropped cleanly, not squeezed
+- No play icons appear on dashboard category covers
+- All Saves uses mixed-category thumbnails
+- The layout looks closer to the approved mockup, not taller or more cluttered

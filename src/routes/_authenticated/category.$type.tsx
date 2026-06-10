@@ -40,7 +40,7 @@ const TILE_STYLE: React.CSSProperties = {
   border: "1px solid rgba(250,247,242,0.9)",
 };
 
-// ── Collage image with warm fallback ──────────────────────────────────────────
+// ── Collage image — plain img so flex/height inheritance is never broken ──────
 function CImg({
   src,
   bgFrom,
@@ -62,19 +62,22 @@ function CImg({
     );
   }
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <img
-        src={src}
-        className="h-full w-full object-cover"
-        style={{ objectPosition }}
-        loading="lazy"
-        onError={() => setFailed(true)}
-      />
-      {/* Editorial wash — suppresses baked-in platform UI (play icons, watermarks) */}
-      <div className="pointer-events-none absolute inset-0" style={{ background: "rgba(250,247,242,0.08)" }} />
-    </div>
+    <img
+      src={src}
+      className="h-full w-full object-cover"
+      style={{ objectPosition }}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
   );
 }
+
+// Radial mask centred at the play-button hotspot — placed as a sibling div
+// inside each slot so the img itself remains a plain block element.
+const PLAY_MASK = {
+  background:
+    "radial-gradient(ellipse at 50% 50%, rgba(250,247,242,0.58) 0%, rgba(250,247,242,0.22) 30%, transparent 62%)",
+} as const;
 
 // ── Gradient slot (placeholder panel inside collage) ──────────────────────────
 function GradientSlot({ bgFrom, bgTo }: { bgFrom: string; bgTo: string }) {
@@ -124,11 +127,15 @@ function CollageCover({
   if (imgs.length === 2) {
     return (
       <div className="flex h-full w-full gap-[2px]">
-        <div className="h-full overflow-hidden" style={{ width: "69%" }}>
+        <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
           <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
+          <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
         </div>
         <div className="flex h-full flex-1 flex-col gap-[2px]">
-          <div className="flex-1 overflow-hidden"><CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" /></div>
+          <div className="relative flex-1 overflow-hidden">
+            <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
+            <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
+          </div>
           <div className="flex-1 overflow-hidden"><GradientSlot bgFrom={bgFrom} bgTo={bgTo} /></div>
         </div>
       </div>
@@ -137,12 +144,19 @@ function CollageCover({
 
   return (
     <div className="flex h-full w-full gap-[2px]">
-      <div className="h-full overflow-hidden" style={{ width: "69%" }}>
+      <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
         <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
+        <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
       </div>
       <div className="flex h-full flex-1 flex-col gap-[2px]">
-        <div className="flex-1 overflow-hidden"><CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" /></div>
-        <div className="flex-1 overflow-hidden"><CImg src={imgs[2]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" /></div>
+        <div className="relative flex-1 overflow-hidden">
+          <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
+          <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
+        </div>
+        <div className="relative flex-1 overflow-hidden">
+          <CImg src={imgs[2]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
+          <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
+        </div>
       </div>
     </div>
   );

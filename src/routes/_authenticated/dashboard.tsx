@@ -56,10 +56,7 @@ function getFirstName(profile: any, email?: string | null): string {
   return "there";
 }
 
-// ── Single collage image with warm fallback ────────────────────────────────────
-// objectPosition="top" on small thumbnails crops below the center where
-// baked-in video play icons typically live, giving a magazine-clean result.
-// The thin warm overlay further suppresses any remaining platform UI chrome.
+// ── Single collage image — plain img so flex/height inheritance is never broken
 function CImg({
   src,
   bgFrom,
@@ -81,19 +78,24 @@ function CImg({
     );
   }
   return (
-    <div className="relative h-full w-full overflow-hidden">
-      <img
-        src={src}
-        className="h-full w-full object-cover"
-        style={{ objectPosition }}
-        loading="lazy"
-        onError={() => setFailed(true)}
-      />
-      {/* Editorial wash — softens baked-in platform UI (play icons, watermarks) */}
-      <div className="pointer-events-none absolute inset-0" style={{ background: "rgba(250,247,242,0.08)" }} />
-    </div>
+    <img
+      src={src}
+      className="h-full w-full object-cover"
+      style={{ objectPosition }}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
   );
 }
+
+// Radial overlay placed as a sibling to CImg inside each slot container.
+// The ellipse is centred at 50% 50% — exactly where platform play icons live.
+// 55 % warm cream at core fades to transparent at edges, washing out the icon
+// without meaningfully affecting the image corners that frame the collage.
+const PLAY_MASK = {
+  background:
+    "radial-gradient(ellipse at 50% 50%, rgba(250,247,242,0.58) 0%, rgba(250,247,242,0.22) 30%, transparent 62%)",
+} as const;
 
 // ── Gradient placeholder panel ─────────────────────────────────────────────────
 function GradientSlot({ bgFrom, bgTo, emoji, large }: {
@@ -142,16 +144,20 @@ function CollageCover({
     );
   }
 
-  // ── 2 images — hero left (70%) + one stacked right ──
+  // ── 2 images — hero left (65%) + one stacked right ──
   if (imgs.length === 2) {
     return (
       <div className="flex h-full w-full gap-[2px]">
-        <div className="h-full overflow-hidden" style={{ width: "69%" }}>
+        {/* Hero — 65 % wide, full height */}
+        <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
           <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
+          <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
         </div>
+        {/* Stacked column — 35 % wide */}
         <div className="flex h-full flex-1 flex-col gap-[2px]">
-          <div className="flex-1 overflow-hidden">
+          <div className="relative flex-1 overflow-hidden">
             <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
+            <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
           </div>
           <div className="flex-1 overflow-hidden">
             <GradientSlot bgFrom={bgFrom} bgTo={bgTo} emoji={emoji} />
@@ -161,18 +167,23 @@ function CollageCover({
     );
   }
 
-  // ── 3 images — hero left (70%) + two stacked right ──
+  // ── 3 images — hero left (65%) + two stacked right ──
   return (
     <div className="flex h-full w-full gap-[2px]">
-      <div className="h-full overflow-hidden" style={{ width: "69%" }}>
+      {/* Hero — 65 % wide, full height */}
+      <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
         <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
+        <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
       </div>
+      {/* Stacked column — 35 % wide, two equal slots */}
       <div className="flex h-full flex-1 flex-col gap-[2px]">
-        <div className="flex-1 overflow-hidden">
+        <div className="relative flex-1 overflow-hidden">
           <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
+          <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
         </div>
-        <div className="flex-1 overflow-hidden">
+        <div className="relative flex-1 overflow-hidden">
           <CImg src={imgs[2]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
+          <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
         </div>
       </div>
     </div>
