@@ -34,6 +34,20 @@ const THUMBNAIL_BUCKET = "thumbnails";
 const DIRTY_TT_RE = /tiktok\.com\/api\/img|photomode-video-share-card/i;
 
 /**
+ * Minimum byte size for a usable thumbnail.
+ * Actual content thumbnails are always well above this; anything below is an
+ * icon, a placeholder, or a broken asset (e.g. Instagram's 32×32 rsrc.php icon).
+ */
+const MIN_THUMB_BYTES = 10_000;
+
+/**
+ * Matches Instagram's static-asset CDN used for site chrome (icons, logos,
+ * placeholder images). These are NOT content thumbnails.
+ * e.g. https://static.cdninstagram.com/rsrc.php/yr/r/rzWiSjZRxk5.webp
+ */
+const INSTAGRAM_STATIC_RE = /cdninstagram\.com\/rsrc\.php/i;
+
+/**
  * Fetches the clean static poster frame from Instagram's oEmbed endpoint.
  * Returns thumbnail_url on success, null on any failure.
  * Instagram oEmbed is unauthenticated for public content and returns the raw
@@ -78,7 +92,7 @@ async function cacheThumbnailToStorage(
   rawUrl: string,
   platform: string,
   seed: string,
-): Promise<string> {
+): Promise<string | null> {
   try {
     const refererMap: Record<string, string> = {
       instagram:       "https://www.instagram.com/",
@@ -113,6 +127,13 @@ async function cacheThumbnailToStorage(
     const storagePath = `${platform}/${Math.abs(hash).toString(36)}.${ext}`;
 
     const arrayBuffer = await res.arrayBuffer();
+
+    // Reject tiny images — icons/placeholders are always < 10 KB; real thumbs are not
+    if (arrayBuffer.byteLength < MIN_THUMB_BYTES) {
+      console.warn(`[THUMB-CACHE] rejected tiny image (${arrayBuffer.byteLength}B) for ${rawUrl.slice(0, 60)}`);
+      return null;
+    }
+
     const { error } = await supabaseAdmin.storage
       .from(THUMBNAIL_BUCKET)
       .upload(storagePath, arrayBuffer, {
@@ -236,14 +257,18 @@ async function refreshThumbnailBackground(
   if (thumbnail) {
     // Cache the CDN URL to storage so it loads in browsers without hotlink errors
     const cachedUrl = await cacheThumbnailToStorage(thumbnail, platform, url);
-    const { error } = await supabaseAdmin
-      .from("items")
-      .update({ image_url: cachedUrl })
-      .eq("id", itemId);
-    if (error) {
-      log(`DB update failed: ${error.message}`);
+    if (cachedUrl) {
+      const { error } = await supabaseAdmin
+        .from("items")
+        .update({ image_url: cachedUrl })
+        .eq("id", itemId);
+      if (error) {
+        log(`DB update failed: ${error.message}`);
+      } else {
+        log(`DB updated with cached thumbnail: ${cachedUrl}`);
+      }
     } else {
-      log(`DB updated with cached thumbnail: ${cachedUrl}`);
+      log(`thumbnail rejected as too small — keeping existing image_url unchanged`);
     }
   } else {
     log(`no thumbnail found — all methods exhausted`);
@@ -681,7 +706,11 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   let title = (incomingTitle || usableMetaTitle || urlDerivedTitle || platformDefault || bestTitleFromUrl(input.url) || host).slice(0, 500);
   const caption = incomingDescription || meta?.description || null;
   let description = caption || "";
-  let image = incomingImage || meta?.image || null;
+  // Filter known Instagram static-asset placeholders before treating as thumbnail
+  const rawMetaImage = meta?.image || null;
+  let image: string | null = incomingImage
+    || (rawMetaImage && !INSTAGRAM_STATIC_RE.test(rawMetaImage) ? rawMetaImage : null)
+    || null;
   const source = input.source || meta?.source || host;
   let creator = creatorFromUrl(input.url, platform);
 

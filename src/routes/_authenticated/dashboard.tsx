@@ -262,15 +262,30 @@ function Dashboard() {
     },
   });
 
-  // Per-category stats: count + first 3 images for hero collage
+  // Platforms that produce rich, full-frame lifestyle thumbnails (video covers)
+  const VIDEO_PLATFORMS = useMemo(
+    () => new Set(["tiktok", "instagram_reel", "youtube", "youtube_short"]),
+    []
+  );
+
+  // Score an item for hero (first/largest) slot: video-platform items first,
+  // product-cutout items last, everything else in between.
+  function heroScore(it: Item): number {
+    if (VIDEO_PLATFORMS.has((it as any).source_platform ?? "")) return 2;
+    if (it.type === "Product") return 0;
+    return 1;
+  }
+
+  // Per-category stats: count + best 3 images for hero collage
   const categoryData = useMemo(() => {
     const all = items ?? [];
     return CATEGORIES.map((cat) => {
       const matched = all.filter(cat.match);
-      const imgs = matched
+      // Sort so video-platform thumbnails appear as hero (leftmost/largest slot)
+      const withImages = matched
         .filter((it) => it.image_url)
-        .slice(0, 3)
-        .map((it) => it.image_url as string);
+        .sort((a, b) => heroScore(b) - heroScore(a));
+      const imgs = withImages.slice(0, 3).map((it) => it.image_url as string);
       const hasSubs = new Set(
         matched.map((it) => (it as any).subcategory ?? (it as any).ai_subcategory).filter(Boolean)
       ).size > 0;
@@ -280,26 +295,27 @@ function Dashboard() {
 
   const totalCount = items?.length ?? 0;
 
-  // All Saves cover: pick one image from each category in priority order so the
-  // collage shows visual variety (recipe + fashion + product…) rather than
-  // repeating the same thumbnails as the top category tile.
+  // All Saves cover: one image from each category, preferring video-platform
+  // thumbnails so the collage shows rich, diverse, lifestyle content.
   const allImages = useMemo(() => {
-    const all = (items ?? []).filter((it) => it.image_url);
-    if (all.length === 0) return [];
+    const allWithImg = (items ?? []).filter((it) => it.image_url);
+    if (allWithImg.length === 0) return [];
+    // Sort globally: video-platform items first within each category lookup
+    const sorted = [...allWithImg].sort((a, b) => heroScore(b) - heroScore(a));
     const PRIORITY_KEYS = [
-      "Recipe", "Fashion", "Product", "Travel",
-      "Home", "Beauty", "Fitness", "Tutorial", "Business", "Parenting",
+      "Recipe", "Fashion", "Travel", "Home", "Beauty",
+      "Product", "Fitness", "Tutorial", "Business", "Parenting",
     ];
     const picked: string[] = [];
     const usedUrls = new Set<string>();
-    // One image per category, highest-priority first
+    // One image per category, video-platform preferred
     for (const key of PRIORITY_KEYS) {
       if (picked.length >= 3) break;
-      const img = all.find((it) => it.type === key && !usedUrls.has(it.image_url!))?.image_url;
+      const img = sorted.find((it) => it.type === key && !usedUrls.has(it.image_url!))?.image_url;
       if (img) { picked.push(img); usedUrls.add(img); }
     }
-    // Pad with most-recent if fewer than 3 diverse categories found
-    for (const it of all) {
+    // Pad with best remaining if fewer than 3 diverse categories found
+    for (const it of sorted) {
       if (picked.length >= 3) break;
       if (!usedUrls.has(it.image_url!)) { picked.push(it.image_url!); usedUrls.add(it.image_url!); }
     }

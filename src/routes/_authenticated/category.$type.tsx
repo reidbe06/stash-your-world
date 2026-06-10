@@ -230,19 +230,37 @@ function CategorySubcategoryPage() {
     },
   });
 
-  // Subcategory map: name → { count, images }
+  // Platforms that produce rich full-frame thumbnails (video covers)
+  const VIDEO_PLATFORMS = new Set(["tiktok", "instagram_reel", "youtube", "youtube_short"]);
+
+  // Score item for hero slot: video first, product cutouts last
+  function heroScore(it: Item): number {
+    if (VIDEO_PLATFORMS.has((it as any).source_platform ?? "")) return 2;
+    if (it.type === "Product") return 0;
+    return 1;
+  }
+
+  // Subcategory map: name → { count, images } — hero slot prefers lifestyle/video
   const subcategories = useMemo(() => {
-    const map: Record<string, { count: number; images: string[] }> = {};
+    // Collect up to 6 candidate items per subcategory, then pick the best 3
+    const map: Record<string, { count: number; candidates: Item[] }> = {};
     for (const it of items) {
       const sub = (it as any).subcategory ?? (it as any).ai_subcategory ?? null;
       if (!sub) continue;
-      if (!map[sub]) map[sub] = { count: 0, images: [] };
+      if (!map[sub]) map[sub] = { count: 0, candidates: [] };
       map[sub].count += 1;
-      if (it.image_url && map[sub].images.length < 3) map[sub].images.push(it.image_url);
+      if (it.image_url && map[sub].candidates.length < 6) map[sub].candidates.push(it);
     }
     return Object.entries(map)
       .sort((a, b) => b[1].count - a[1].count)
-      .map(([name, data]) => ({ name, ...data }));
+      .map(([name, { count, candidates }]) => ({
+        name,
+        count,
+        images: candidates
+          .sort((a, b) => heroScore(b) - heroScore(a))
+          .slice(0, 3)
+          .map((it) => it.image_url as string),
+      }));
   }, [items]);
 
   const filteredItems = useMemo(() => {
