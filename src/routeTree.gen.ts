@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ShortcutRouteImport } from './routes/shortcut'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
@@ -33,6 +34,11 @@ import { Route as ApiPublicItemsRecategorizeRouteImport } from './routes/api/pub
 import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/extension.save'
 import { Route as ApiPublicExtensionCollectionsRouteImport } from './routes/api/public/extension.collections'
 
+const ShortcutRoute = ShortcutRouteImport.update({
+  id: '/shortcut',
+  path: '/shortcut',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SetupRoute = SetupRouteImport.update({
   id: '/setup',
   path: '/setup',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
+  '/shortcut': typeof ShortcutRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
+  '/shortcut': typeof ShortcutRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -207,6 +215,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
+  '/shortcut': typeof ShortcutRoute
   '/_authenticated/ask': typeof AuthenticatedAskRoute
   '/_authenticated/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -233,6 +242,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/setup'
+    | '/shortcut'
     | '/ask'
     | '/collections'
     | '/dashboard'
@@ -257,6 +267,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/setup'
+    | '/shortcut'
     | '/ask'
     | '/collections'
     | '/dashboard'
@@ -282,6 +293,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/setup'
+    | '/shortcut'
     | '/_authenticated/ask'
     | '/_authenticated/collections'
     | '/_authenticated/dashboard'
@@ -308,6 +320,7 @@ export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
   AuthRoute: typeof AuthRoute
   SetupRoute: typeof SetupRoute
+  ShortcutRoute: typeof ShortcutRoute
   ShareSlugRoute: typeof ShareSlugRoute
   ApiMeSaveTokenRoute: typeof ApiMeSaveTokenRoute
   ApiPublicUrlMetadataRoute: typeof ApiPublicUrlMetadataRoute
@@ -319,6 +332,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/shortcut': {
+      id: '/shortcut'
+      path: '/shortcut'
+      fullPath: '/shortcut'
+      preLoaderRoute: typeof ShortcutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/setup': {
       id: '/setup'
       path: '/setup'
@@ -534,6 +554,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
   AuthRoute: AuthRoute,
   SetupRoute: SetupRoute,
+  ShortcutRoute: ShortcutRoute,
   ShareSlugRoute: ShareSlugRoute,
   ApiMeSaveTokenRoute: ApiMeSaveTokenRoute,
   ApiPublicUrlMetadataRoute: ApiPublicUrlMetadataRoute,
