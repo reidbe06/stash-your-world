@@ -1,0 +1,108 @@
+The last change failed because it changed the Recipes page cards to match the smaller Home page cards. That is the opposite of what I requested.
+
+Please pause and do this carefully.
+
+GOAL:
+Use the original Recipes page AI Collection card proportions as the source of truth, then apply that larger/premium card style to the Home Dashboard category cards.
+
+DO NOT make the Recipes page match the Home page.
+DO NOT shrink the Recipes page cards.
+DO NOT standardize downward.
+
+The correct source of truth is:
+Recipes page → AI Collections cards → larger image area → premium 3-image collage.
+
+The incorrect version is:
+Home page → compressed category cards → smaller image area.
+
+TASKS:
+
+1. Revert the Recipes page AI Collection cards back to the larger/premium version if they were changed.
+2. Update the Home Dashboard category cards to match the Recipes page AI Collection card proportions.
+3. Use one consistent premium card system across both:
+
+* Home Dashboard category cards
+* Category detail AI Collection cards
+
+The card collage layout must be:
+
+┌─────────────┐
+│ LARGE │ S  │
+│ LARGE │ S  │
+└─────────────┘
+
+Technical requirements:
+
+* Exactly 3 images per tile when 3 images are available
+* Large image on left: 65–70% width
+* Two smaller images stacked on the right: 30–35% width
+* Collage height should match the original Recipes page AI Collection card height
+* Card should not stretch based on image dimensions
+* All cards must have uniform dimensions
+* Use object-fit: cover
+* Use overflow: hidden
+* No blank white areas inside collage
+* No squeezed or distorted images
+
+4. Remove video play icons from collage covers only.
+
+This is still not working. Please find the exact component rendering video thumbnails inside:
+
+* Home Dashboard category cards
+* AI Collection cards
+
+Then remove/hide the video overlay for these cover tiles only.
+
+If the overlay comes from a reusable video thumbnail component, add a prop:
+hideVideoOverlay={true}
+or
+showPlayIcon={false}
+
+Apply that prop only to category/collection cover tiles.
+
+Do NOT remove video playback functionality from:
+
+* save detail pages
+* video save pages
+* actual video viewing areas
+
+5. Fix All Saves tile thumbnail logic.
+
+All Saves should not duplicate Recipes.
+
+All Saves should select diverse thumbnails across categories:
+
+* 1 recipe/food save
+* 1 fashion/product save
+* 1 home/travel/workout/product save if available
+
+Avoid:
+
+* duplicate images inside the same tile
+* using the exact same thumbnail set as Recipes
+* showing only recipe thumbnails unless recipe is the only category with saves
+
+6. Before changing code, inspect and report:
+
+* Which component controls Home Dashboard category cards
+* Which component controls Recipe page AI Collection cards
+* Whether they share a component
+* Which component adds the play icon overlay
+* What files will be changed
+
+7. After changes, provide screenshots of:
+
+* Home Dashboard
+* Recipes page
+* Fashion page if available
+
+Success criteria:
+
+* Recipes page keeps the larger/premium AI Collection card size
+* Home page adopts that same larger/premium card style
+* Both pages use the 3-image layout with one large image and two stacked smaller images
+* No play icons appear on category or collection collage covers
+* All Saves uses mixed-category thumbnails
+* No backend, routing, save ingestion, auth, AI categorization, database schema, or API logic is changed
+
+This is a visual refinement only. Preserve existing functionality.

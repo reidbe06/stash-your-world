@@ -127,7 +127,7 @@ function CollageCover({
   if (imgs.length === 2) {
     return (
       <div className="flex h-full w-full gap-[2px]">
-        <div className="relative h-full overflow-hidden" style={{ width: "70%" }}>
+        <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
           <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
           <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
         </div>
@@ -144,7 +144,7 @@ function CollageCover({
 
   return (
     <div className="flex h-full w-full gap-[2px]">
-      <div className="relative h-full overflow-hidden" style={{ width: "70%" }}>
+      <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
         <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
         <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
       </div>

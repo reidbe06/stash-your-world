@@ -148,12 +148,12 @@ function CollageCover({
   if (imgs.length === 2) {
     return (
       <div className="flex h-full w-full gap-[2px]">
-        {/* Hero — 70% wide, full height */}
-        <div className="relative h-full overflow-hidden" style={{ width: "70%" }}>
+        {/* Hero — 65% wide, full height */}
+        <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
           <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
           <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
         </div>
-        {/* Stacked column — 30% wide */}
+        {/* Stacked column — 35% wide */}
         <div className="flex h-full flex-1 flex-col gap-[2px]">
           <div className="relative flex-1 overflow-hidden">
             <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
@@ -167,15 +167,15 @@ function CollageCover({
     );
   }
 
-  // ── 3 images — hero left (70%) + two stacked right ──
+  // ── 3 images — hero left (65%) + two stacked right (35%) ──
   return (
     <div className="flex h-full w-full gap-[2px]">
-      {/* Hero — 70% wide, full height */}
-      <div className="relative h-full overflow-hidden" style={{ width: "70%" }}>
+      {/* Hero — 65% wide, full height */}
+      <div className="relative h-full overflow-hidden" style={{ width: "65%" }}>
         <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
         <div className="pointer-events-none absolute inset-0" style={PLAY_MASK} />
       </div>
-      {/* Stacked column — 30% wide, two equal slots */}
+      {/* Stacked column — 35% wide, two equal-height slots */}
       <div className="flex h-full flex-1 flex-col gap-[2px]">
         <div className="relative flex-1 overflow-hidden">
           <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
