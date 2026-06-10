@@ -41,7 +41,17 @@ const TILE_STYLE: React.CSSProperties = {
 };
 
 // ── Collage image with warm fallback ──────────────────────────────────────────
-function CImg({ src, bgFrom, bgTo }: { src: string; bgFrom: string; bgTo: string }) {
+function CImg({
+  src,
+  bgFrom,
+  bgTo,
+  objectPosition = "center",
+}: {
+  src: string;
+  bgFrom: string;
+  bgTo: string;
+  objectPosition?: string;
+}) {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
@@ -52,12 +62,17 @@ function CImg({ src, bgFrom, bgTo }: { src: string; bgFrom: string; bgTo: string
     );
   }
   return (
-    <img
-      src={src}
-      className="h-full w-full object-cover"
-      loading="lazy"
-      onError={() => setFailed(true)}
-    />
+    <div className="relative h-full w-full overflow-hidden">
+      <img
+        src={src}
+        className="h-full w-full object-cover"
+        style={{ objectPosition }}
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+      {/* Editorial wash — suppresses baked-in platform UI (play icons, watermarks) */}
+      <div className="pointer-events-none absolute inset-0" style={{ background: "rgba(250,247,242,0.08)" }} />
+    </div>
   );
 }
 
@@ -110,10 +125,10 @@ function CollageCover({
     return (
       <div className="flex h-full w-full gap-[2px]">
         <div className="h-full overflow-hidden" style={{ width: "69%" }}>
-          <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} />
+          <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
         </div>
         <div className="flex h-full flex-1 flex-col gap-[2px]">
-          <div className="flex-1 overflow-hidden"><CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} /></div>
+          <div className="flex-1 overflow-hidden"><CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" /></div>
           <div className="flex-1 overflow-hidden"><GradientSlot bgFrom={bgFrom} bgTo={bgTo} /></div>
         </div>
       </div>
@@ -123,11 +138,11 @@ function CollageCover({
   return (
     <div className="flex h-full w-full gap-[2px]">
       <div className="h-full overflow-hidden" style={{ width: "69%" }}>
-        <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} />
+        <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
       </div>
       <div className="flex h-full flex-1 flex-col gap-[2px]">
-        <div className="flex-1 overflow-hidden"><CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} /></div>
-        <div className="flex-1 overflow-hidden"><CImg src={imgs[2]} bgFrom={bgFrom} bgTo={bgTo} /></div>
+        <div className="flex-1 overflow-hidden"><CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" /></div>
+        <div className="flex-1 overflow-hidden"><CImg src={imgs[2]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" /></div>
       </div>
     </div>
   );

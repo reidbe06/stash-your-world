@@ -57,7 +57,20 @@ function getFirstName(profile: any, email?: string | null): string {
 }
 
 // ── Single collage image with warm fallback ────────────────────────────────────
-function CImg({ src, bgFrom, bgTo }: { src: string; bgFrom: string; bgTo: string }) {
+// objectPosition="top" on small thumbnails crops below the center where
+// baked-in video play icons typically live, giving a magazine-clean result.
+// The thin warm overlay further suppresses any remaining platform UI chrome.
+function CImg({
+  src,
+  bgFrom,
+  bgTo,
+  objectPosition = "center",
+}: {
+  src: string;
+  bgFrom: string;
+  bgTo: string;
+  objectPosition?: string;
+}) {
   const [failed, setFailed] = useState(false);
   if (failed) {
     return (
@@ -68,12 +81,17 @@ function CImg({ src, bgFrom, bgTo }: { src: string; bgFrom: string; bgTo: string
     );
   }
   return (
-    <img
-      src={src}
-      className="h-full w-full object-cover"
-      loading="lazy"
-      onError={() => setFailed(true)}
-    />
+    <div className="relative h-full w-full overflow-hidden">
+      <img
+        src={src}
+        className="h-full w-full object-cover"
+        style={{ objectPosition }}
+        loading="lazy"
+        onError={() => setFailed(true)}
+      />
+      {/* Editorial wash — softens baked-in platform UI (play icons, watermarks) */}
+      <div className="pointer-events-none absolute inset-0" style={{ background: "rgba(250,247,242,0.08)" }} />
+    </div>
   );
 }
 
@@ -129,13 +147,12 @@ function CollageCover({
     return (
       <div className="flex h-full w-full gap-[2px]">
         <div className="h-full overflow-hidden" style={{ width: "69%" }}>
-          <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} />
+          <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
         </div>
         <div className="flex h-full flex-1 flex-col gap-[2px]">
           <div className="flex-1 overflow-hidden">
-            <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} />
+            <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
           </div>
-          {/* Fill second slot with warm gradient */}
           <div className="flex-1 overflow-hidden">
             <GradientSlot bgFrom={bgFrom} bgTo={bgTo} emoji={emoji} />
           </div>
@@ -148,14 +165,14 @@ function CollageCover({
   return (
     <div className="flex h-full w-full gap-[2px]">
       <div className="h-full overflow-hidden" style={{ width: "69%" }}>
-        <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} />
+        <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="center top" />
       </div>
       <div className="flex h-full flex-1 flex-col gap-[2px]">
         <div className="flex-1 overflow-hidden">
-          <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} />
+          <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
         </div>
         <div className="flex-1 overflow-hidden">
-          <CImg src={imgs[2]} bgFrom={bgFrom} bgTo={bgTo} />
+          <CImg src={imgs[2]} bgFrom={bgFrom} bgTo={bgTo} objectPosition="top" />
         </div>
       </div>
     </div>
@@ -251,14 +268,32 @@ function Dashboard() {
   }, [items]);
 
   const totalCount = items?.length ?? 0;
-  const allImages = useMemo(
-    () =>
-      (items ?? [])
-        .filter((it) => it.image_url)
-        .slice(0, 3)
-        .map((it) => it.image_url as string),
-    [items]
-  );
+
+  // All Saves cover: pick one image from each category in priority order so the
+  // collage shows visual variety (recipe + fashion + product…) rather than
+  // repeating the same thumbnails as the top category tile.
+  const allImages = useMemo(() => {
+    const all = (items ?? []).filter((it) => it.image_url);
+    if (all.length === 0) return [];
+    const PRIORITY_KEYS = [
+      "Recipe", "Fashion", "Product", "Travel",
+      "Home", "Beauty", "Fitness", "Tutorial", "Business", "Parenting",
+    ];
+    const picked: string[] = [];
+    const usedUrls = new Set<string>();
+    // One image per category, highest-priority first
+    for (const key of PRIORITY_KEYS) {
+      if (picked.length >= 3) break;
+      const img = all.find((it) => it.type === key && !usedUrls.has(it.image_url!))?.image_url;
+      if (img) { picked.push(img); usedUrls.add(img); }
+    }
+    // Pad with most-recent if fewer than 3 diverse categories found
+    for (const it of all) {
+      if (picked.length >= 3) break;
+      if (!usedUrls.has(it.image_url!)) { picked.push(it.image_url!); usedUrls.add(it.image_url!); }
+    }
+    return picked;
+  }, [items]);
 
   // Populated categories first, then empty (by count desc)
   const sortedCategories = useMemo(
