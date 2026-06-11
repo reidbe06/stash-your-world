@@ -394,6 +394,32 @@ export function pickImageFromHtml(html: string, target: URL): string | null {
     } catch {}
   };
 
+  // 0a. Amazon data-a-dynamic-image — JSON map of {url: [width, height]}.
+  //     Contains all resolution variants of the primary product photo;
+  //     we sort by area to pick the largest one (score 60 → beats everything else).
+  const dynImgRe = /data-a-dynamic-image\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
+  let dynMatch: RegExpExecArray | null;
+  while ((dynMatch = dynImgRe.exec(html))) {
+    const raw = (dynMatch[1] ?? dynMatch[2] ?? "").trim();
+    if (!raw) continue;
+    try {
+      const map = JSON.parse(decodeEntities(raw)) as Record<string, [number, number]>;
+      const best = Object.entries(map)
+        .map(([url, dims]) => ({ url, area: (dims?.[0] ?? 0) * (dims?.[1] ?? 0) }))
+        .filter((e) => !isRejectedImageUrl(e.url) && e.area > 0)
+        .sort((a, b) => b.area - a.area)[0];
+      if (best) push(best.url, 60, {}, "amazon:dynamic-image");
+    } catch {}
+  }
+
+  // 0b. Amazon data-old-hires — uncompressed full-resolution image URL on the same img tag.
+  const oldHiresRe = /data-old-hires\s*=\s*["']([^"']+)["']/gi;
+  let ohMatch: RegExpExecArray | null;
+  while ((ohMatch = oldHiresRe.exec(html))) {
+    const src = ohMatch[1].trim();
+    if (src.startsWith("http")) push(src, 55, {}, "amazon:old-hires");
+  }
+
   // 1. <link rel="image_src"> — intentional canonical image
   const linkSrc = pickLink(html, ["image_src"]);
   if (linkSrc) push(linkSrc, 10, {}, "link:image_src");
@@ -649,7 +675,14 @@ function absolutizeImage(image: string | null | undefined, target: URL): string 
   try { return new URL(image, target).toString(); } catch { return null; }
 }
 
-const SCRAPER_BLOCKED_HOSTS = new Set(["bestbuy.com", "costco.com", "samsclub.com"]);
+// Hosts that aggressively block bot scrapers — after Firecrawl fails, fall back to
+// CDN pattern construction and/or DuckDuckGo image search.
+const SCRAPER_BLOCKED_HOSTS = new Set([
+  "bestbuy.com", "costco.com", "samsclub.com",
+  "amazon.com", "amazon.co.uk", "amazon.ca", "amazon.de", "amazon.fr",
+  "amazon.it", "amazon.es", "amazon.co.jp", "amazon.in",
+  "amazon.com.au", "amazon.com.br", "amazon.com.mx",
+]);
 
 async function tryImageSearch(query: string): Promise<string | null> {
   try {
@@ -675,6 +708,23 @@ async function tryImageSearch(query: string): Promise<string | null> {
 async function tryKnownCdnImage(target: URL): Promise<string | null> {
   const host = target.hostname.replace(/^www\./, "");
   const path = target.pathname;
+
+  // Target: TCIN appears in URL as /A-{digits}. Scene7 CDN serves product images.
+  if (host === "target.com") {
+    const tcinMatch = path.match(/\/A-(\d+)/i);
+    if (tcinMatch) {
+      const tcin = tcinMatch[1];
+      const cdnUrl = `https://target.scene7.com/is/image/Target/${tcin}?fmt=webp&wid=800&qlt=80`;
+      try {
+        const head = await fetch(cdnUrl, { method: "HEAD", signal: AbortSignal.timeout(5000) });
+        if (head.ok) {
+          console.log(`[url-metadata] target scene7: ${cdnUrl}`);
+          return cdnUrl;
+        }
+      } catch {}
+    }
+  }
+
   if (host === "bestbuy.com") {
     const m = path.match(/\/([A-Z0-9]{6,})\.[a-z]$/i) || path.match(/\/product\/[^/]+\/([A-Z0-9]{6,})$/i);
     if (m) {

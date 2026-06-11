@@ -167,15 +167,11 @@ function logThumbnail(
   success: boolean,
   thumbnailUrl: string | null,
 ) {
-  console.log(
-    `[THUMBNAIL]\n` +
-    `  platform: ${platform}\n` +
-    `  url: ${url}\n` +
-    `  method: ${method}\n` +
-    `  attempt: ${attempt}\n` +
-    `  success/fail: ${success ? "success" : "fail"}\n` +
-    `  thumbnailUrl: ${thumbnailUrl ?? "null"}`,
-  );
+  console.log(`[THUMBNAIL] source=${url.slice(0, 100)}`);
+  console.log(`[THUMBNAIL] method=${method}`);
+  if (attempt > 1) console.log(`[THUMBNAIL] attempt=${attempt}`);
+  console.log(`[THUMBNAIL] success=${success}`);
+  if (thumbnailUrl) console.log(`[THUMBNAIL] url=${thumbnailUrl.slice(0, 100)}`);
 }
 
 async function refreshThumbnailBackground(
@@ -254,8 +250,27 @@ async function refreshThumbnailBackground(
     }
   }
 
+  // Non-social platforms (product, recipe, article, travel, etc.):
+  // If no thumbnail from the platform-specific paths above, re-fetch metadata.
+  // Firecrawl headless rendering may succeed on a second pass after the initial
+  // 12-second ingest window timed out or hit a rate limit.
+  if (!thumbnail && platform !== "tiktok" && platform !== "instagram" && platform !== "instagram_reel") {
+    log(`non-social platform — re-fetching metadata for image`);
+    try {
+      const meta = await fetchMetadata(url);
+      if (meta.image && !INSTAGRAM_STATIC_RE.test(meta.image)) {
+        thumbnail = meta.image;
+        logThumbnail(platform, url, "metadata_refetch", 1, true, thumbnail);
+      } else {
+        log(`metadata refetch: no image found`);
+      }
+    } catch (err) {
+      log(`metadata refetch failed: ${err}`);
+    }
+  }
+
+  // Final: cache whatever thumbnail we found and persist to DB
   if (thumbnail) {
-    // Cache the CDN URL to storage so it loads in browsers without hotlink errors
     const cachedUrl = await cacheThumbnailToStorage(thumbnail, platform, url);
     if (cachedUrl) {
       const { error } = await supabaseAdmin
@@ -266,13 +281,14 @@ async function refreshThumbnailBackground(
         log(`DB update failed: ${error.message}`);
       } else {
         log(`DB updated with cached thumbnail: ${cachedUrl}`);
+        logThumbnail(platform, url, "background_refresh", 1, true, cachedUrl);
       }
     } else {
       log(`thumbnail rejected as too small — keeping existing image_url unchanged`);
     }
   } else {
     log(`no thumbnail found — all methods exhausted`);
-    logThumbnail(platform, url, "background_refresh", 3, false, null);
+    logThumbnail(platform, url, "background_refresh", 1, false, null);
   }
 }
 
@@ -856,10 +872,14 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     }
   }
 
-  // Cache hotlink-protected thumbnails (Instagram/TikTok CDN URLs are blocked in browsers)
-  const isHotlinkProtected = platform === "tiktok" || platform === "instagram" || platform === "instagram_reel";
-  if (image && isHotlinkProtected) {
+  // Cache ALL thumbnails to Supabase Storage.
+  // Hotlink-protected CDN URLs (Instagram/TikTok) break in browsers without this.
+  // Product/recipe/article CDN URLs can also expire or become geo-blocked; caching
+  // to our own storage gives every save a persistent, browser-safe image URL.
+  if (image) {
+    logThumbnail(platform, canonicalUrl, "cache_to_storage", 1, true, image);
     image = await cacheThumbnailToStorage(image, platform, canonicalUrl);
+    logThumbnail(platform, canonicalUrl, "cache_to_storage", 1, !!image, image ?? null);
   }
 
   // Existing collection names (for AI hint)
@@ -1212,8 +1232,9 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     }
   }
 
-  // Background thumbnail refresh — fire-and-forget if image wasn't found at ingest time
-  if (!image && (platform === "tiktok" || platform === "instagram" || platform === "instagram_reel")) {
+  // Background thumbnail refresh — fire-and-forget for any save that has no image.
+  // Social platforms retry via platform APIs (Apify/oEmbed); web content retries via Firecrawl.
+  if (!image) {
     const itemIdForRefresh = inserted?.id;
     if (itemIdForRefresh) {
       refreshThumbnailBackground(itemIdForRefresh, input.url, platform).catch((err) => {
