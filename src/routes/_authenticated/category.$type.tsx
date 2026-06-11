@@ -343,7 +343,7 @@ function CategorySubcategoryPage() {
     if (item.folderId) {
       navigate({ to: "/folder/$id", params: { id: item.folderId } });
     } else {
-      navigate({ to: "/category/$type/$sub", params: { type, sub: item.name } });
+      navigate({ to: "/collection/$type/$sub", params: { type, sub: item.name } });
     }
   };
 

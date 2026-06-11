@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 import type { Item } from "@/components/ItemCard";
 import { ItemCard } from "@/components/ItemCard";
 
-export const Route = createFileRoute("/_authenticated/category/$type/$sub")({
+export const Route = createFileRoute("/_authenticated/collection/$type/$sub")({
   head: () => ({ meta: [{ title: "Collection — STASHd" }] }),
   component: CollectionPage,
 });

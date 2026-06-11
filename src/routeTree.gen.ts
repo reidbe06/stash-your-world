@@ -36,7 +36,7 @@ import { Route as ApiPublicItemsRecategorizeRouteImport } from './routes/api/pub
 import { Route as ApiPublicItemsBackfillTitlesRouteImport } from './routes/api/public/items.backfill-titles'
 import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/extension.save'
 import { Route as ApiPublicExtensionCollectionsRouteImport } from './routes/api/public/extension.collections'
-import { Route as AuthenticatedCategoryTypeSubRouteImport } from './routes/_authenticated/category.$type.$sub'
+import { Route as AuthenticatedCollectionTypeSubRouteImport } from './routes/_authenticated/collection.$type.$sub'
 
 const ShortcutRoute = ShortcutRouteImport.update({
   id: '/shortcut',
@@ -178,11 +178,11 @@ const ApiPublicExtensionCollectionsRoute =
     path: '/api/public/extension/collections',
     getParentRoute: () => rootRouteImport,
   } as any)
-const AuthenticatedCategoryTypeSubRoute =
-  AuthenticatedCategoryTypeSubRouteImport.update({
-    id: '/$sub',
-    path: '/$sub',
-    getParentRoute: () => AuthenticatedCategoryTypeRoute,
+const AuthenticatedCollectionTypeSubRoute =
+  AuthenticatedCollectionTypeSubRouteImport.update({
+    id: '/collection/$type/$sub',
+    path: '/collection/$type/$sub',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -200,14 +200,14 @@ export interface FileRoutesByFullPath {
   '/search': typeof AuthenticatedSearchRoute
   '/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
-  '/category/$type': typeof AuthenticatedCategoryTypeRouteWithChildren
+  '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/folder/$id': typeof AuthenticatedFolderIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
-  '/category/$type/$sub': typeof AuthenticatedCategoryTypeSubRoute
+  '/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
   '/api/public/items/backfill-titles': typeof ApiPublicItemsBackfillTitlesRoute
@@ -229,14 +229,14 @@ export interface FileRoutesByTo {
   '/search': typeof AuthenticatedSearchRoute
   '/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
-  '/category/$type': typeof AuthenticatedCategoryTypeRouteWithChildren
+  '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/folder/$id': typeof AuthenticatedFolderIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
-  '/category/$type/$sub': typeof AuthenticatedCategoryTypeSubRoute
+  '/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
   '/api/public/items/backfill-titles': typeof ApiPublicItemsBackfillTitlesRoute
@@ -260,14 +260,14 @@ export interface FileRoutesById {
   '/_authenticated/search': typeof AuthenticatedSearchRoute
   '/_authenticated/share': typeof AuthenticatedShareRoute
   '/share/$slug': typeof ShareSlugRoute
-  '/_authenticated/category/$type': typeof AuthenticatedCategoryTypeRouteWithChildren
+  '/_authenticated/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/_authenticated/folder/$id': typeof AuthenticatedFolderIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
-  '/_authenticated/category/$type/$sub': typeof AuthenticatedCategoryTypeSubRoute
+  '/_authenticated/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
   '/api/public/items/backfill-titles': typeof ApiPublicItemsBackfillTitlesRoute
@@ -298,7 +298,7 @@ export interface FileRouteTypes {
     | '/api/me/save-token'
     | '/api/me/shortcut'
     | '/api/public/url-metadata'
-    | '/category/$type/$sub'
+    | '/collection/$type/$sub'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
     | '/api/public/items/backfill-titles'
@@ -327,7 +327,7 @@ export interface FileRouteTypes {
     | '/api/me/save-token'
     | '/api/me/shortcut'
     | '/api/public/url-metadata'
-    | '/category/$type/$sub'
+    | '/collection/$type/$sub'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
     | '/api/public/items/backfill-titles'
@@ -357,7 +357,7 @@ export interface FileRouteTypes {
     | '/api/me/save-token'
     | '/api/me/shortcut'
     | '/api/public/url-metadata'
-    | '/_authenticated/category/$type/$sub'
+    | '/_authenticated/collection/$type/$sub'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
     | '/api/public/items/backfill-titles'
@@ -573,12 +573,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicExtensionCollectionsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/category/$type/$sub': {
-      id: '/_authenticated/category/$type/$sub'
-      path: '/$sub'
-      fullPath: '/category/$type/$sub'
-      preLoaderRoute: typeof AuthenticatedCategoryTypeSubRouteImport
-      parentRoute: typeof AuthenticatedCategoryTypeRoute
+    '/_authenticated/collection/$type/$sub': {
+      id: '/_authenticated/collection/$type/$sub'
+      path: '/collection/$type/$sub'
+      fullPath: '/collection/$type/$sub'
+      preLoaderRoute: typeof AuthenticatedCollectionTypeSubRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
   }
 }
@@ -597,20 +597,6 @@ const AuthenticatedCollectionsRouteWithChildren =
     AuthenticatedCollectionsRouteChildren,
   )
 
-interface AuthenticatedCategoryTypeRouteChildren {
-  AuthenticatedCategoryTypeSubRoute: typeof AuthenticatedCategoryTypeSubRoute
-}
-
-const AuthenticatedCategoryTypeRouteChildren: AuthenticatedCategoryTypeRouteChildren =
-  {
-    AuthenticatedCategoryTypeSubRoute: AuthenticatedCategoryTypeSubRoute,
-  }
-
-const AuthenticatedCategoryTypeRouteWithChildren =
-  AuthenticatedCategoryTypeRoute._addFileChildren(
-    AuthenticatedCategoryTypeRouteChildren,
-  )
-
 interface AuthenticatedRouteChildren {
   AuthenticatedAskRoute: typeof AuthenticatedAskRoute
   AuthenticatedCollectionsRoute: typeof AuthenticatedCollectionsRouteWithChildren
@@ -621,9 +607,10 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSaveRoute: typeof AuthenticatedSaveRoute
   AuthenticatedSearchRoute: typeof AuthenticatedSearchRoute
   AuthenticatedShareRoute: typeof AuthenticatedShareRoute
-  AuthenticatedCategoryTypeRoute: typeof AuthenticatedCategoryTypeRouteWithChildren
+  AuthenticatedCategoryTypeRoute: typeof AuthenticatedCategoryTypeRoute
   AuthenticatedFolderIdRoute: typeof AuthenticatedFolderIdRoute
   AuthenticatedItemIdRoute: typeof AuthenticatedItemIdRoute
+  AuthenticatedCollectionTypeSubRoute: typeof AuthenticatedCollectionTypeSubRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -636,9 +623,10 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSaveRoute: AuthenticatedSaveRoute,
   AuthenticatedSearchRoute: AuthenticatedSearchRoute,
   AuthenticatedShareRoute: AuthenticatedShareRoute,
-  AuthenticatedCategoryTypeRoute: AuthenticatedCategoryTypeRouteWithChildren,
+  AuthenticatedCategoryTypeRoute: AuthenticatedCategoryTypeRoute,
   AuthenticatedFolderIdRoute: AuthenticatedFolderIdRoute,
   AuthenticatedItemIdRoute: AuthenticatedItemIdRoute,
+  AuthenticatedCollectionTypeSubRoute: AuthenticatedCollectionTypeSubRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
