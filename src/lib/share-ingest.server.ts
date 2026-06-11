@@ -1011,9 +1011,13 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     if (ai?.category && userCategoryNames.includes(category)) {
       console.log(`[INGEST] AI selected user category: "${category}"`);
     }
-    contentType = ai?.content_type && (CONTENT_TYPES as readonly string[]).includes(ai.content_type)
-      ? ai.content_type
-      : contentTypeFromCategory(category);
+    // User-created category names are stored directly as the type key so all
+    // filtering (it.type === "Cleaning") works without any extra columns.
+    contentType = userCategoryNames.includes(category)
+      ? category
+      : (ai?.content_type && (CONTENT_TYPES as readonly string[]).includes(ai.content_type)
+        ? ai.content_type
+        : contentTypeFromCategory(category));
     mediaFormat = typeof ai?.media_format === "string" && ai.media_format.length > 0
       ? ai.media_format
       : (meta?.media_format ?? platformToMediaFormat(platform));
@@ -1486,9 +1490,11 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
   const summary = ai?.summary ? String(ai.summary).slice(0, 240) : null;
   const aiTitle = ai?.generated_title ? String(ai.generated_title).trim() : "";
 
-  const recategorizeContentType = ai?.content_type && (CONTENT_TYPES as readonly string[]).includes(ai.content_type)
-    ? ai.content_type
-    : contentTypeFromCategory(category);
+  const recategorizeContentType = userCategoryNamesRe.includes(category)
+    ? category
+    : (ai?.content_type && (CONTENT_TYPES as readonly string[]).includes(ai.content_type)
+      ? ai.content_type
+      : contentTypeFromCategory(category));
 
   // Build update payload.
   // When user_override=true the user has manually organized this save.
@@ -1877,9 +1883,11 @@ export async function reExtractItem(input: { userId: string; itemId: string }): 
     console.log(`[RE-EXTRACT] AI selected user category: "${newCategory}"`);
   }
   const newSubcategory = ai?.subcategory ? String(ai.subcategory).slice(0, 200) : null;
-  const newType = ai?.content_type && (CONTENT_TYPES as readonly string[]).includes(ai.content_type)
-    ? ai.content_type
-    : contentTypeFromCategory(newCategory);
+  const newType = userCategoryNamesEx.includes(newCategory)
+    ? newCategory
+    : (ai?.content_type && (CONTENT_TYPES as readonly string[]).includes(ai.content_type)
+      ? ai.content_type
+      : contentTypeFromCategory(newCategory));
 
   const tags = cleanArr(ai?.tags, 8, 60).map((t: string) => t.toLowerCase());
   const keyTakeaways = cleanArr(ai?.key_takeaways, 6, 240);

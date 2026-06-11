@@ -33,7 +33,7 @@ export const Route = createFileRoute("/_authenticated/search")({
 
 type SortKey = "newest" | "oldest" | "category";
 
-const CATEGORY_CHIPS = [
+const SYSTEM_CHIPS = [
   { key: "all",          label: "All" },
   { key: "Recipe",       label: "Recipes" },
   { key: "Product",      label: "Products" },
@@ -48,6 +48,9 @@ const CATEGORY_CHIPS = [
   { key: "Entertainment",label: "Entertainment" },
   { key: "Other",        label: "Other" },
 ];
+
+// Keep old name as alias so existing refs to categoryLabel still work
+const CATEGORY_CHIPS = SYSTEM_CHIPS;
 
 type ItemWithCollection = Item & { collection?: { id: string; name: string } | null };
 
@@ -74,9 +77,9 @@ function SearchPage() {
 
   // Sync URL search params → local state when navigating to this page
   // (TanStack Router doesn't remount the component on same-route navigation)
+  // Accept any non-empty type value — system types, user category names, and "all".
   useEffect(() => {
-    const resolved = CATEGORY_CHIPS.some((c) => c.key === type) ? type : "all";
-    setCategory(resolved);
+    setCategory(type || "all");
   }, [type]);
 
   useEffect(() => {
@@ -124,6 +127,27 @@ function SearchPage() {
       return data;
     },
   });
+
+  const { data: userCats = [] } = useQuery<{ id: string; name: string; emoji: string }[]>({
+    queryKey: ["user-categories", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("user_categories")
+        .select("id,name,emoji")
+        .order("created_at", { ascending: true });
+      return (data ?? []) as { id: string; name: string; emoji: string }[];
+    },
+  });
+
+  // Full chip list: system chips + user-created category chips
+  const allChips = useMemo(
+    () => [
+      ...SYSTEM_CHIPS,
+      ...userCats.map((c) => ({ key: c.name, label: `${c.emoji} ${c.name}` })),
+    ],
+    [userCats],
+  );
 
   const backfilledRef = useRef(false);
   useEffect(() => {
@@ -303,7 +327,7 @@ function SearchPage() {
 
   const sortLabel = sort === "newest" ? "Newest" : sort === "oldest" ? "Oldest" : "Category";
 
-  const categoryLabel = CATEGORY_CHIPS.find((c) => c.key === category)?.label ?? category;
+  const categoryLabel = allChips.find((c) => c.key === category)?.label ?? category;
 
   return (
     <div className="space-y-5">
@@ -441,10 +465,10 @@ function SearchPage() {
         </DropdownMenu>
       </div>
 
-      {/* Level 1: Content type chips */}
+      {/* Level 1: Content type chips (system + user-created) */}
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <div className="flex gap-2 pb-1">
-          {CATEGORY_CHIPS.map((c) => {
+          {allChips.map((c) => {
             const active = c.key === category;
             return (
               <button

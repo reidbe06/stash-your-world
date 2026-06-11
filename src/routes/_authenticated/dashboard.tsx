@@ -323,6 +323,24 @@ function Dashboard() {
     });
   }, [items]);
 
+  // Stats for user-created categories.
+  // An item belongs to a user category when its type matches the category name
+  // (set by AI or by the user via Edit Save) OR when user_override+user_category match.
+  const userCategoryData = useMemo(() => {
+    const all = items ?? [];
+    return userCategories.map((cat) => {
+      const matched = all.filter((it) =>
+        it.type === cat.name ||
+        ((it as any).user_override && (it as any).user_category === cat.name)
+      );
+      const withImages = matched
+        .filter((it) => it.image_url)
+        .sort((a, b) => heroScore(b) - heroScore(a));
+      const imgs = withImages.slice(0, 3).map((it) => it.image_url as string);
+      return { ...cat, count: matched.length, images: imgs };
+    });
+  }, [items, userCategories]);
+
   const totalCount = items?.length ?? 0;
 
   // All Saves cover: one image per category, lifestyle categories first, avoiding
@@ -379,8 +397,8 @@ function Dashboard() {
     }
   }
 
-  function handleUserCategoryTap(cat: UserCategory) {
-    navigate({ to: "/search", search: { q: cat.name } as never });
+  function handleUserCategoryTap(cat: typeof userCategoryData[number]) {
+    navigate({ to: "/search", search: { type: cat.name } as never });
   }
 
   const firstName = getFirstName(profile, user?.email);
@@ -441,12 +459,12 @@ function Dashboard() {
               onClick={() => handleCategoryTap(cat)}
             />
           ))}
-          {userCategories.map((cat) => (
+          {userCategoryData.map((cat) => (
             <CategoryTile
               key={cat.id}
               label={cat.name}
-              count={0}
-              images={[]}
+              count={cat.count}
+              images={cat.images}
               bgFrom={cat.bg_from}
               bgTo={cat.bg_to}
               emoji={cat.emoji}

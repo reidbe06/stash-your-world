@@ -7,24 +7,25 @@ import { useAuth } from "@/lib/auth";
 import { CATEGORIES, SUBCATEGORY_TAXONOMY } from "@/lib/taxonomy";
 import type { Item } from "./ItemCard";
 
-// Reverse map: type key → category display label used by this modal.
-// When user_override=true, user_category holds a type key (e.g. "Tutorial");
-// this map converts it to the display label the form expects (e.g. "Education").
+// Reverse map: system type key → display label.
+// Only needed for items that were categorized with the old type-key system.
 const TYPE_TO_CATEGORY_LABEL: Record<string, string> = {
-  Recipe: "Recipes",
+  Recipe: "Recipe",
   Fashion: "Fashion",
-  Product: "Products",
+  Product: "Product",
   Home: "Home",
   Travel: "Travel",
-  Tutorial: "Education",
+  Tutorial: "Tutorial",
   Fitness: "Fitness",
   Beauty: "Beauty",
   Parenting: "Parenting",
-  Business: "Business Ideas",
+  Business: "Business",
   Entertainment: "Entertainment",
   Other: "Other",
 };
 
+// Map display label → type key for system categories.
+// Custom user categories fall through to the identity fallback.
 const CATEGORY_TO_TYPE: Record<string, string> = {
   Recipes: "Recipe",
   Fashion: "Fashion",
@@ -88,7 +89,7 @@ export function EditItemModal({ item, open, onClose }: Props) {
   // not the original AI-assigned category that may still sit in item.category.
   const effectiveCategory = item.user_override && item.user_category
     ? (TYPE_TO_CATEGORY_LABEL[item.user_category] ?? item.user_category)
-    : (item.category ?? item.ai_category ?? "");
+    : (item.category ?? item.type ?? item.ai_category ?? "");
   const effectiveSubcategory = item.user_override
     ? (item.user_folder ?? "")
     : (item.subcategory ?? "");
@@ -119,6 +120,18 @@ export function EditItemModal({ item, open, onClose }: Props) {
     },
   });
 
+  const { data: userCats = [] } = useQuery<{ id: string; name: string; emoji: string }[]>({
+    queryKey: ["user-categories", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("user_categories")
+        .select("id,name,emoji")
+        .order("created_at", { ascending: true });
+      return (data ?? []) as { id: string; name: string; emoji: string }[];
+    },
+  });
+
   const { data: currentMemberships } = useQuery({
     queryKey: ["item-collections", item.id],
     enabled: open,
@@ -135,7 +148,7 @@ export function EditItemModal({ item, open, onClose }: Props) {
     if (open) {
       const effCat = item.user_override && item.user_category
         ? (TYPE_TO_CATEGORY_LABEL[item.user_category] ?? item.user_category)
-        : (item.category ?? item.ai_category ?? "");
+        : (item.category ?? item.type ?? item.ai_category ?? "");
       const effSub = item.user_override
         ? (item.user_folder ?? "")
         : (item.subcategory ?? "");
@@ -188,7 +201,9 @@ export function EditItemModal({ item, open, onClose }: Props) {
     setCreatingCol(false);
   };
 
-  const taxonomyKey = CATEGORY_TO_TAXONOMY_KEY[fields.category] ?? "";
+  // For system categories, look up taxonomy subcategories.
+  // Custom user categories don't have taxonomy subcategories.
+  const taxonomyKey = CATEGORY_TO_TAXONOMY_KEY[fields.category] ?? fields.category;
   const suggestedSubs: string[] = taxonomyKey ? (SUBCATEGORY_TAXONOMY[taxonomyKey] ?? []) : [];
 
   const categoryChanged = fields.category !== effectiveCategory;
@@ -204,7 +219,14 @@ export function EditItemModal({ item, open, onClose }: Props) {
   const handleSave = async () => {
     if (!user) return;
     setSaving(true);
-    const newType = CATEGORY_TO_TYPE[fields.category] ?? fields.category;
+
+    // For user-created categories the name IS the type key (e.g., "Cleaning").
+    // For system categories, map display label → type key.
+    const isUserCat = userCats.some((c) => c.name === fields.category);
+    const newType = isUserCat
+      ? fields.category
+      : (CATEGORY_TO_TYPE[fields.category] ?? fields.category);
+
     const parsedTags = parseTags(fields.tags);
     const now = new Date().toISOString();
 
@@ -219,8 +241,15 @@ export function EditItemModal({ item, open, onClose }: Props) {
       updated_at: now,
     };
 
+    // When user manually picks a custom category, lock it so AI re-extract
+    // won't overwrite it (user_override = true).
+    // For system categories, just update type/category directly.
+    const overrideFields: Record<string, unknown> = isUserCat
+      ? { user_override: true, user_category: newType, user_folder: null }
+      : {};
+
     const fullPayload = userEditing
-      ? { ...corePayload, user_edited: true, edited_at: now }
+      ? { ...corePayload, ...overrideFields, user_edited: true, edited_at: now }
       : corePayload;
 
     let { error } = await supabase
@@ -320,6 +349,19 @@ export function EditItemModal({ item, open, onClose }: Props) {
                   {c}
                 </option>
               ))}
+              {userCats.length > 0 && (
+                <>
+                  <option disabled>──────────────</option>
+                  <option disabled style={{ fontWeight: 600, color: "#FD5897" }}>
+                    My Categories
+                  </option>
+                  {userCats.map((c) => (
+                    <option key={c.id} value={c.name}>
+                      {c.emoji} {c.name}
+                    </option>
+                  ))}
+                </>
+              )}
             </select>
           </div>
 
