@@ -32,6 +32,7 @@ import { Route as AuthenticatedCollectionsIdRouteImport } from './routes/_authen
 import { Route as AuthenticatedCategoryTypeRouteImport } from './routes/_authenticated/category.$type'
 import { Route as ApiPublicShareSaveRouteImport } from './routes/api/public/share.save'
 import { Route as ApiPublicItemsRecategorizeRouteImport } from './routes/api/public/items.recategorize'
+import { Route as ApiPublicItemsBackfillTitlesRouteImport } from './routes/api/public/items.backfill-titles'
 import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/extension.save'
 import { Route as ApiPublicExtensionCollectionsRouteImport } from './routes/api/public/extension.collections'
 
@@ -153,6 +154,12 @@ const ApiPublicItemsRecategorizeRoute =
     path: '/api/public/items/recategorize',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicItemsBackfillTitlesRoute =
+  ApiPublicItemsBackfillTitlesRouteImport.update({
+    id: '/api/public/items/backfill-titles',
+    path: '/api/public/items/backfill-titles',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicExtensionSaveRoute = ApiPublicExtensionSaveRouteImport.update({
   id: '/api/public/extension/save',
   path: '/api/public/extension/save',
@@ -188,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/items/backfill-titles': typeof ApiPublicItemsBackfillTitlesRoute
   '/api/public/items/recategorize': typeof ApiPublicItemsRecategorizeRoute
   '/api/public/share/save': typeof ApiPublicShareSaveRoute
 }
@@ -214,6 +222,7 @@ export interface FileRoutesByTo {
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/items/backfill-titles': typeof ApiPublicItemsBackfillTitlesRoute
   '/api/public/items/recategorize': typeof ApiPublicItemsRecategorizeRoute
   '/api/public/share/save': typeof ApiPublicShareSaveRoute
 }
@@ -242,6 +251,7 @@ export interface FileRoutesById {
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/items/backfill-titles': typeof ApiPublicItemsBackfillTitlesRoute
   '/api/public/items/recategorize': typeof ApiPublicItemsRecategorizeRoute
   '/api/public/share/save': typeof ApiPublicShareSaveRoute
 }
@@ -270,6 +280,7 @@ export interface FileRouteTypes {
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/items/backfill-titles'
     | '/api/public/items/recategorize'
     | '/api/public/share/save'
   fileRoutesByTo: FileRoutesByTo
@@ -296,6 +307,7 @@ export interface FileRouteTypes {
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/items/backfill-titles'
     | '/api/public/items/recategorize'
     | '/api/public/share/save'
   id:
@@ -323,6 +335,7 @@ export interface FileRouteTypes {
     | '/api/public/url-metadata'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/items/backfill-titles'
     | '/api/public/items/recategorize'
     | '/api/public/share/save'
   fileRoutesById: FileRoutesById
@@ -339,6 +352,7 @@ export interface RootRouteChildren {
   ApiPublicUrlMetadataRoute: typeof ApiPublicUrlMetadataRoute
   ApiPublicExtensionCollectionsRoute: typeof ApiPublicExtensionCollectionsRoute
   ApiPublicExtensionSaveRoute: typeof ApiPublicExtensionSaveRoute
+  ApiPublicItemsBackfillTitlesRoute: typeof ApiPublicItemsBackfillTitlesRoute
   ApiPublicItemsRecategorizeRoute: typeof ApiPublicItemsRecategorizeRoute
   ApiPublicShareSaveRoute: typeof ApiPublicShareSaveRoute
 }
@@ -506,6 +520,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicItemsRecategorizeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/items/backfill-titles': {
+      id: '/api/public/items/backfill-titles'
+      path: '/api/public/items/backfill-titles'
+      fullPath: '/api/public/items/backfill-titles'
+      preLoaderRoute: typeof ApiPublicItemsBackfillTitlesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/extension/save': {
       id: '/api/public/extension/save'
       path: '/api/public/extension/save'
@@ -581,6 +602,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicUrlMetadataRoute: ApiPublicUrlMetadataRoute,
   ApiPublicExtensionCollectionsRoute: ApiPublicExtensionCollectionsRoute,
   ApiPublicExtensionSaveRoute: ApiPublicExtensionSaveRoute,
+  ApiPublicItemsBackfillTitlesRoute: ApiPublicItemsBackfillTitlesRoute,
   ApiPublicItemsRecategorizeRoute: ApiPublicItemsRecategorizeRoute,
   ApiPublicShareSaveRoute: ApiPublicShareSaveRoute,
 }

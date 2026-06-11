@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/dev-notes")({
   head: () => ({
@@ -170,6 +172,65 @@ function DevNotesPage() {
           <li>Block the save flow if extraction or AI fails — always save the link.</li>
         </ul>
       </Section>
+
+      <BackfillTitlesPanel />
     </div>
+  );
+}
+
+function BackfillTitlesPanel() {
+  const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle");
+  const [result, setResult] = useState<{ processed: number; updated: number; skipped: number; errors: number } | null>(null);
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+
+  async function runBackfill() {
+    setStatus("running");
+    setResult(null);
+    setErrMsg(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Not authenticated");
+      const res = await fetch("/api/public/items/backfill-titles", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+      setResult({ processed: json.processed, updated: json.updated, skipped: json.skipped, errors: json.errors });
+      setStatus("done");
+    } catch (e: any) {
+      setErrMsg(e?.message || "Backfill failed");
+      setStatus("error");
+    }
+  }
+
+  return (
+    <section className="space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+      <h2 className="text-xl font-semibold text-foreground">Backfill Video Titles</h2>
+      <p className="text-sm text-muted-foreground leading-relaxed">
+        Finds all your saves titled "Instagram Reel", "TikTok Video", etc. and regenerates
+        descriptive titles from stored caption, transcript, and category metadata.
+        Each updated title is logged with <code>[INGEST-TITLE]</code>.
+      </p>
+      <button
+        onClick={runBackfill}
+        disabled={status === "running"}
+        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+      >
+        {status === "running" ? "Running…" : "Run Backfill"}
+      </button>
+      {status === "done" && result && (
+        <div className="rounded-md border bg-background p-3 text-sm font-mono space-y-1">
+          <div>processed: <span className="font-semibold">{result.processed}</span></div>
+          <div className="text-green-600 dark:text-green-400">updated: <span className="font-semibold">{result.updated}</span></div>
+          <div>skipped: <span className="font-semibold">{result.skipped}</span></div>
+          {result.errors > 0 && <div className="text-destructive">errors: <span className="font-semibold">{result.errors}</span></div>}
+        </div>
+      )}
+      {status === "error" && (
+        <p className="text-sm text-destructive">{errMsg}</p>
+      )}
+    </section>
   );
 }

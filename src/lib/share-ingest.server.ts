@@ -342,6 +342,71 @@ function extractCaptionText(raw: string): string {
   return raw;
 }
 
+/**
+ * Focused GPT-4o-mini call that produces a short, specific title (3-6 words, Title Case)
+ * for a social video save. Used as:
+ *   1. Fallback in ingest when the AI categorizer also returned a generic title
+ *   2. Main source in the backfill flow for existing saves with generic titles
+ *
+ * Returns { title, basis } on success, null when there is insufficient context
+ * or no API key is configured.
+ */
+export async function generateSmartVideoTitle(opts: {
+  caption?: string | null;
+  transcript?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
+  platform: string;
+}): Promise<{ title: string; basis: string } | null> {
+  const { caption, transcript, category, subcategory, platform } = opts;
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) return null;
+
+  const sourceText = (caption || transcript || "").trim().slice(0, 500);
+  const basis = caption ? "caption" : transcript ? "transcript" : category ? "category" : null;
+  if (!basis) return null;
+
+  const contextParts = [
+    sourceText && `Text: "${sourceText}"`,
+    category && `Category: ${category}`,
+    subcategory && `Subcategory: ${subcategory}`,
+    `Platform: ${platform}`,
+  ].filter(Boolean).join("\n");
+
+  try {
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Generate a short, descriptive title (3-6 words, Title Case) for a saved social video.
+Rules:
+- Base it strictly on the provided text/context — never invent details
+- NEVER output generic platform names: "Instagram Reel", "TikTok Video", "Reel", "Short", "YouTube Video", "Instagram Post", "Untitled", "Video"
+- Be specific to the content topic (examples: "Summer Vacation Outfit Ideas", "Easy Pasta Carbonara", "Paris Travel Tips", "Target Fashion Haul")
+- Return ONLY the title text, no quotes, no trailing punctuation`,
+          },
+          { role: "user", content: contextParts },
+        ],
+        max_tokens: 25,
+        temperature: 0.2,
+      }),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const raw = (json.choices?.[0]?.message?.content ?? "").trim().replace(/^["']|["']$/g, "").trim();
+    if (!raw || raw.length < 3) return null;
+    const GENERIC_TITLE_RE = /^(instagram reel|tiktok video|reel|youtube short|youtube video|instagram post|vimeo video|untitled save|untitled|video|short)$/i;
+    if (GENERIC_TITLE_RE.test(raw)) return null;
+    return { title: raw.slice(0, 90), basis };
+  } catch {
+    return null;
+  }
+}
+
 async function aiCategorize(input: {
   url: string; title: string; description: string; source: string;
   platform: SourcePlatform;
@@ -416,6 +481,15 @@ CRITICAL ANTI-HALLUCINATION RULES:
 - confidence_score: 0..1 — how confident you are in the categorization based on provided evidence.
 - notes: helpful concise note (max 220 chars) based ONLY on provided text.
 - suggested_collection: 2-4 words; if unsure, use the platform name or category.
+
+TITLE GENERATION — CRITICAL FOR SOCIAL VIDEO SAVES:
+- generated_title MUST be specific and human-readable (3–90 chars)
+- NEVER output these as the title: "Instagram Reel", "TikTok Video", "Reel", "Short", "YouTube Video", "YouTube Short", "Instagram Post", "Untitled", "Video", or any bare platform name
+- Derive the title from the actual content present in caption/transcript/hashtags
+- Fashion saves: reference the specific style or occasion ("Summer Vacation Outfit Ideas", "Amazon Fashion Haul", "Target Denim Looks", "Resort Wear Haul")
+- Recipe saves: include the dish name ("Easy Pasta Carbonara", "Sheet Pan Chicken", "One Pot Orzo Recipe")
+- Travel saves: include the destination or activity ("Paris Weekend Travel Tips", "Bali Beach Day Vlog")
+- When caption is present, extract the most interesting 3-6 word concept from it
 ${collectionsHint}` },
 
       { role: "user", content: content || "No content. Use URL only." },
@@ -968,9 +1042,36 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     const aiTitle = ai?.generated_title ? String(ai.generated_title).trim() : "";
 
     const isPlatformDefaultTitle = Object.values(platformDefaultTitle).includes(title);
+    // Allow AI to override when: (a) no explicit incoming title, or (b) incoming title was itself a platform default
+    const incomingTitleIsDefault = !!incomingTitle && Object.values(platformDefaultTitle).includes(incomingTitle);
     if (aiTitle && isMeaningfulMetadataValue(aiTitle, input.url)) {
-      if (!incomingTitle && (!meta?.title || isPlatformDefaultTitle)) {
+      if ((!incomingTitle || incomingTitleIsDefault) && (!meta?.title || isPlatformDefaultTitle)) {
+        const _prevTitle = title;
         title = aiTitle.slice(0, 500);
+        if (isVideoPlatform(platform) && _prevTitle !== title) {
+          console.log(`[INGEST-TITLE] source=${platform} oldTitle=${JSON.stringify(_prevTitle)} generatedTitle=${JSON.stringify(title)} basis="ai_generated"`);
+        }
+      }
+    }
+    // Post-AI fallback: if title is still a platform default (e.g. AI also returned a generic name),
+    // make a focused title-generation call using caption/transcript/category
+    const GENERIC_TITLE_RE = /^(instagram reel|tiktok video|youtube short|youtube video|instagram post|vimeo video|reel|untitled save|untitled)$/i;
+    if (GENERIC_TITLE_RE.test(title) && isVideoPlatform(platform)) {
+      const captionForTitle = caption || transcript;
+      const catForTitle = typeof ai?.category === "string" ? ai.category : null;
+      const subForTitle = typeof ai?.subcategory === "string" ? ai.subcategory : null;
+      if (captionForTitle || catForTitle) {
+        const smart = await generateSmartVideoTitle({
+          caption: caption ?? null,
+          transcript,
+          category: catForTitle,
+          subcategory: subForTitle,
+          platform,
+        });
+        if (smart) {
+          console.log(`[INGEST-TITLE] source=${platform} oldTitle=${JSON.stringify(title)} generatedTitle=${JSON.stringify(smart.title)} basis="${smart.basis}"`);
+          title = smart.title;
+        }
       }
     }
     if (!description) description = userNote || aiNotes || summary || "";
@@ -1412,6 +1513,97 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
   } catch (err) { console.warn("[RECATEGORIZE] Embed failed", err); }
 
   return updated as RecategorizeResult;
+}
+
+// ─── Backfill: regenerate titles for existing saves with generic platform names ─
+
+const GENERIC_TITLE_PATTERNS = [
+  "Instagram Reel",
+  "TikTok Video",
+  "YouTube Short",
+  "YouTube Video",
+  "Instagram Post",
+  "Vimeo Video",
+  "Reel",
+  "Untitled Save",
+  "Untitled",
+];
+
+export type BackfillResult = {
+  processed: number;
+  updated: number;
+  skipped: number;
+  errors: number;
+};
+
+/**
+ * Finds all items for `userId` whose title is a generic platform placeholder and
+ * regenerates a descriptive title from stored caption / transcript / category.
+ * Updates the `title` column in-place; also logs with [INGEST-TITLE].
+ */
+export async function backfillVideoTitles(userId: string): Promise<BackfillResult> {
+  const counts: BackfillResult = { processed: 0, updated: 0, skipped: 0, errors: 0 };
+
+  const { data: items, error } = await supabaseAdmin
+    .from("items")
+    .select("id,title,source_platform,original_caption,transcript,ai_category,ai_subcategory,description,ai_summary")
+    .eq("user_id", userId)
+    .in("title", GENERIC_TITLE_PATTERNS);
+
+  if (error) {
+    console.warn(`[BACKFILL-TITLES] Query failed: ${error.message}`);
+    return counts;
+  }
+
+  console.log(`[BACKFILL-TITLES] Found ${items?.length ?? 0} item(s) with generic titles for user ${userId}`);
+
+  for (const item of items ?? []) {
+    counts.processed++;
+    const oldTitle = item.title as string;
+    const platform = (item.source_platform ?? "unknown") as string;
+
+    // Prefer Apify caption → transcript → description → ai_summary → category
+    const caption = (item as any).original_caption || (item as any).description || (item as any).ai_summary || null;
+    const transcript = (item as any).transcript || null;
+    const category = (item as any).ai_category || null;
+    const subcategory = (item as any).ai_subcategory || null;
+
+    if (!caption && !transcript && !category) {
+      console.log(`[BACKFILL-TITLES] item=${item.id} platform=${platform} — no metadata to derive title from, skipping`);
+      counts.skipped++;
+      continue;
+    }
+
+    try {
+      const smart = await generateSmartVideoTitle({ caption, transcript, category, subcategory, platform });
+      if (!smart) {
+        console.log(`[BACKFILL-TITLES] item=${item.id} platform=${platform} — title generation returned null, skipping`);
+        counts.skipped++;
+        continue;
+      }
+
+      const { error: updErr } = await supabaseAdmin
+        .from("items")
+        .update({ title: smart.title })
+        .eq("id", item.id)
+        .eq("user_id", userId);
+
+      if (updErr) {
+        console.warn(`[BACKFILL-TITLES] item=${item.id} update failed: ${updErr.message}`);
+        counts.errors++;
+        continue;
+      }
+
+      console.log(`[INGEST-TITLE] source=${platform} oldTitle=${JSON.stringify(oldTitle)} generatedTitle=${JSON.stringify(smart.title)} basis="${smart.basis}"`);
+      counts.updated++;
+    } catch (err) {
+      console.warn(`[BACKFILL-TITLES] item=${item.id} unexpected error: ${err}`);
+      counts.errors++;
+    }
+  }
+
+  console.log(`[BACKFILL-TITLES] Done: processed=${counts.processed} updated=${counts.updated} skipped=${counts.skipped} errors=${counts.errors}`);
+  return counts;
 }
 
 export async function getUserIdFromBearer(request: Request): Promise<string | null> {
