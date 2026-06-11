@@ -93,6 +93,7 @@ function ItemDetailPage() {
   const [ingredientsOpen, setIngredientsOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  const [reExtracting, setReExtracting] = useState(false);
 
   const handleDelete = async () => {
     if (!item) return;
@@ -110,6 +111,36 @@ function ItemDetailPage() {
     qc.invalidateQueries({ queryKey: ["collection-items"] });
     toast.success("Save deleted");
     navigate({ to: "/dashboard" });
+  };
+
+  const handleReExtract = async () => {
+    if (!item) return;
+    setReExtracting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+
+      const res = await fetch("/api/public/items/re-extract", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ item_id: item.id }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Re-extraction failed");
+
+      toast.success("Extraction complete — save updated with fresh AI results.");
+      qc.invalidateQueries({ queryKey: ["item-detail", id] });
+      qc.invalidateQueries({ queryKey: ["items"] });
+      qc.invalidateQueries({ queryKey: ["items-category"] });
+    } catch (err: any) {
+      toast.error(err.message || "Re-extraction failed. Try again.");
+    } finally {
+      setReExtracting(false);
+    }
   };
 
   const handleExtractRecipe = async () => {
@@ -642,6 +673,27 @@ function ItemDetailPage() {
           </span>
           <span className="flex-1 text-sm font-medium">Edit Save</span>
           <ChevronLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
+        </button>
+
+        <button
+          type="button"
+          onClick={handleReExtract}
+          disabled={reExtracting}
+          className="flex w-full items-center gap-3 border-t border-border/20 px-4 py-3.5 text-left transition hover:bg-accent/20 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-100">
+            <Sparkles className={`h-4 w-4 text-purple-500 ${reExtracting ? "animate-pulse" : ""}`} />
+          </span>
+          <div className="flex-1">
+            <span className="block text-sm font-medium">
+              {reExtracting ? "Processing…" : "Re-Extract with AI"}
+            </span>
+            {!reExtracting && (
+              <span className="block text-xs text-muted-foreground">
+                Re-fetch metadata, transcript &amp; re-run AI categorization
+              </span>
+            )}
+          </div>
         </button>
 
         <button

@@ -1744,3 +1744,236 @@ export async function ingestSharedUrlInstant(input: IngestInput): Promise<Ingest
     processing_status: "pending",
   };
 }
+
+// ─── Re-Extract: full pipeline re-run on an existing save ───────────────────
+// Unlike recategorizeItem (which only re-runs AI on stored content),
+// reExtractItem also re-fetches a fresh transcript and fresh URL metadata
+// before calling AI, giving the best chance of improved categorization.
+//
+// Preserved fields (never overwritten):
+//   user_override, user_category, user_folder, user_subfolder
+//   collection_id / item_collections (user's collection memberships)
+//   description (user notes — only AI-written description is updated)
+
+export type ReExtractResult = RecategorizeResult & { image_url?: string | null };
+
+export async function reExtractItem(input: { userId: string; itemId: string }): Promise<ReExtractResult> {
+  const { userId, itemId } = input;
+
+  const { data: item, error: fetchErr } = await supabaseAdmin
+    .from("items")
+    .select("id,url,title,source,source_platform,creator_name,original_caption,transcript,image_url,user_id,description,ai_summary,user_override,user_category,user_folder,user_subfolder")
+    .eq("id", itemId)
+    .eq("user_id", userId)
+    .single();
+
+  if (fetchErr || !item) throw new Error(fetchErr?.message || "Item not found");
+
+  const userOverride = (item as any).user_override === true;
+  const platform = (item.source_platform ?? "web") as SourcePlatform;
+
+  console.log(`[RE-EXTRACT] item=${itemId} url=${item.url?.slice(0, 80)} platform=${platform} user_override=${userOverride}`);
+
+  // ── Fresh URL metadata ─────────────────────────────────────────────────────
+  let urlMeta: UrlMetadata | null = null;
+  if (item.url) {
+    try {
+      urlMeta = await fetchMetadata(item.url);
+      console.log(`[RE-EXTRACT] Metadata: title=${JSON.stringify(urlMeta?.title?.slice(0, 60))} image=${!!urlMeta?.image} recipe_ingredients=${urlMeta?.recipe_ingredients?.length ?? 0}`);
+    } catch (err) {
+      console.warn(`[RE-EXTRACT] Metadata fetch failed: ${err}`);
+    }
+  }
+
+  // ── Fresh transcript attempt ───────────────────────────────────────────────
+  // Re-fetch from the platform; use the longer of fresh vs stored.
+  let freshTranscript: string | null = null;
+  if (item.url) {
+    try {
+      const tr = await fetchTranscript(item.url, platform);
+      freshTranscript = tr?.text ?? null;
+      if (freshTranscript) console.log(`[RE-EXTRACT] Fresh transcript: ${freshTranscript.length} chars`);
+    } catch (err) {
+      console.warn(`[RE-EXTRACT] Transcript fetch failed: ${err}`);
+    }
+  }
+  const storedLen = item.transcript?.length ?? 0;
+  const transcript = freshTranscript && freshTranscript.length > storedLen
+    ? freshTranscript
+    : (item.transcript ?? freshTranscript ?? null);
+  const caption = item.original_caption ?? urlMeta?.description ?? null;
+
+  // ── Existing collections hint ──────────────────────────────────────────────
+  const { data: cols } = await supabaseAdmin.from("collections").select("id,name").eq("user_id", userId);
+  const existingNames = (cols ?? []).map((c: any) => c.name);
+
+  // ── AI categorization ──────────────────────────────────────────────────────
+  console.log(`[RE-EXTRACT] Calling AI — caption=${caption?.length ?? 0}ch transcript=${transcript?.length ?? 0}ch`);
+  const ai = await aiCategorize({
+    url: item.url ?? "",
+    title: item.title ?? "",
+    description: urlMeta?.description ?? "",
+    source: item.source ?? "",
+    platform,
+    creator: item.creator_name ?? null,
+    caption: caption ?? null,
+    transcript,
+    notes: "",
+    existingCollections: existingNames,
+  });
+  console.log(`[RE-EXTRACT] AI: category=${ai?.category} title=${JSON.stringify(ai?.generated_title)} confidence=${ai?.confidence_score}`);
+
+  const cleanArr = (v: any, max = 8, maxLen = 200): string[] =>
+    Array.isArray(v)
+      ? v.map((t: any) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, max).map((s: string) => s.slice(0, maxLen))
+      : [];
+
+  const CATS = CATEGORIES as readonly string[];
+  const newCategory = ai?.category && CATS.includes(ai.category) ? ai.category : "Uncategorized";
+  const newSubcategory = ai?.subcategory ? String(ai.subcategory).slice(0, 200) : null;
+  const newType = ai?.content_type && (CONTENT_TYPES as readonly string[]).includes(ai.content_type)
+    ? ai.content_type
+    : contentTypeFromCategory(newCategory);
+
+  const tags = cleanArr(ai?.tags, 8, 60).map((t: string) => t.toLowerCase());
+  const keyTakeaways = cleanArr(ai?.key_takeaways, 6, 240);
+
+  let recipeIngredients = cleanArr(ai?.recipe_ingredients, 40, 200);
+  let recipeSteps = cleanArr(ai?.recipe_steps, 30, 600);
+  let recipeNutrition: Record<string, unknown> | null =
+    ai?.recipe_nutrition && typeof ai.recipe_nutrition === "object" && !Array.isArray(ai.recipe_nutrition)
+      ? (ai.recipe_nutrition as Record<string, unknown>) : null;
+
+  if (urlMeta?.recipe_ingredients?.length) {
+    recipeIngredients = urlMeta.recipe_ingredients.slice(0, 40).map((s) => s.slice(0, 200));
+    console.log(`[RE-EXTRACT] JSON-LD ingredients: ${recipeIngredients.length} (overriding AI)`);
+  }
+  if (urlMeta?.recipe_steps?.length) {
+    recipeSteps = urlMeta.recipe_steps.slice(0, 30).map((s) => s.slice(0, 600));
+    console.log(`[RE-EXTRACT] JSON-LD steps: ${recipeSteps.length} (overriding AI)`);
+  }
+  if (urlMeta?.recipe_nutrition) recipeNutrition = urlMeta.recipe_nutrition as Record<string, unknown>;
+
+  const productNames = cleanArr(ai?.product_names, 20, 200);
+  let productBrand: string | null = ai?.product_brand ? String(ai.product_brand).slice(0, 200) : (urlMeta?.product_brand ?? null);
+  let productPrice: string | null = ai?.product_price ? String(ai.product_price).slice(0, 100) : (urlMeta?.product_price ?? null);
+  let productRetailer: string | null = ai?.product_retailer ? String(ai.product_retailer).slice(0, 200) : (urlMeta?.product_retailer ?? null);
+  let productCategory: string | null = ai?.product_category ? String(ai.product_category).slice(0, 200) : (urlMeta?.product_category ?? null);
+  let productDescription: string | null = ai?.product_description ? String(ai.product_description).slice(0, 500) : (urlMeta?.product_description ?? null);
+  const confidence = typeof ai?.confidence_score === "number" ? Math.max(0, Math.min(1, ai.confidence_score)) : null;
+  const summary = ai?.summary ? String(ai.summary).slice(0, 240) : null;
+  const aiTitle = ai?.generated_title ? String(ai.generated_title).trim() : "";
+  const travelDetails = ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
+    ? ai.travel_details : null;
+
+  // ── Fresh thumbnail ────────────────────────────────────────────────────────
+  // Cache CDN images so they aren't blocked by hotlink protection in the browser.
+  let freshImageUrl: string | null = null;
+  const rawImage = urlMeta?.image && !INSTAGRAM_STATIC_RE.test(urlMeta.image) ? urlMeta.image : null;
+  if (rawImage) {
+    const isCdnHotlink = /cdninstagram\.com|tiktokcdn\.com|scontent\./i.test(rawImage);
+    freshImageUrl = isCdnHotlink
+      ? await cacheThumbnailToStorage(rawImage, platform, item.url ?? rawImage)
+      : rawImage;
+    console.log(`[RE-EXTRACT] Fresh image: ${freshImageUrl?.slice(0, 80)}`);
+  }
+
+  // ── Build update payload ───────────────────────────────────────────────────
+  const updatePayload: Record<string, any> = {
+    // Only update organization fields when the user hasn't manually overridden them
+    ...(!userOverride && {
+      type: newType,
+      category: newCategory,
+      subcategory: newSubcategory,
+      user_edited: false,
+      edited_at: null,
+    }),
+    // AI insight fields — always updated
+    tags,
+    ai_summary: summary,
+    ai_category: newCategory,
+    ai_subcategory: newSubcategory,
+    ai_tags: tags,
+    ai_key_takeaways: keyTakeaways,
+    recipe_ingredients: recipeIngredients,
+    recipe_steps: recipeSteps,
+    recipe_nutrition: recipeNutrition,
+    product_names: productNames,
+    product_brand: productBrand,
+    product_price: productPrice,
+    product_retailer: productRetailer,
+    product_category: productCategory,
+    product_description: productDescription,
+    travel_details: travelDetails,
+    confidence_score: confidence,
+    processing_status: "ai_processed",
+    updated_at: new Date().toISOString(),
+  };
+
+  // Update title if AI gives a meaningful one (always replace on re-extract)
+  if (aiTitle && isMeaningfulMetadataValue(aiTitle, item.url ?? "")) {
+    updatePayload.title = aiTitle.slice(0, 500);
+  }
+
+  // Update transcript only if fresh is richer than stored
+  if (freshTranscript && freshTranscript.length > storedLen) {
+    updatePayload.transcript = freshTranscript;
+  }
+
+  // Update image_url if fresh is available and current is missing or a raw CDN hotlink
+  if (freshImageUrl) {
+    const currentIsCdnHotlink = item.image_url
+      ? /cdninstagram\.com|tiktokcdn\.com|scontent\./i.test(item.image_url) && !item.image_url.includes("supabase.co")
+      : true;
+    if (!item.image_url || currentIsCdnHotlink) {
+      updatePayload.image_url = freshImageUrl;
+    }
+  }
+
+  // ── Write to DB ────────────────────────────────────────────────────────────
+  let { data: updated, error: updErr } = await supabaseAdmin
+    .from("items")
+    .update(updatePayload as any)
+    .eq("id", itemId)
+    .eq("user_id", userId)
+    .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,recipe_nutrition,product_names,product_brand,product_price,product_retailer,product_category,product_description,confidence_score,processing_status,image_url")
+    .single();
+
+  if (updErr || !updated) {
+    console.warn(`[RE-EXTRACT] Full update failed (${updErr?.message}) — retrying without enrichment columns`);
+    const { recipe_nutrition: _rn, travel_details: _td, ...corePayload } = updatePayload;
+    const fallback = await supabaseAdmin
+      .from("items")
+      .update(corePayload as any)
+      .eq("id", itemId)
+      .eq("user_id", userId)
+      .select("id,title,category,subcategory,tags,ai_summary,ai_category,ai_subcategory,ai_tags,ai_key_takeaways,recipe_ingredients,recipe_steps,product_names,confidence_score,processing_status,image_url")
+      .single();
+    if (fallback.error || !fallback.data) throw new Error(fallback.error?.message || updErr?.message || "Failed to update item");
+    updated = fallback.data as typeof updated;
+  }
+
+  console.log(`[RE-EXTRACT] Done: category=${updated.category} title=${JSON.stringify(updated.title)}`);
+
+  // ── Re-embed ───────────────────────────────────────────────────────────────
+  try {
+    const text = [
+      updated.title && `Title: ${updated.title}`,
+      updated.category && `Category: ${updated.category}`,
+      updated.subcategory && `Subcategory: ${updated.subcategory}`,
+      updated.tags?.length && `Tags: ${updated.tags.join(", ")}`,
+      keyTakeaways.length && `Takeaways: ${keyTakeaways.join(" | ")}`,
+      productNames.length && `Products: ${productNames.join(", ")}`,
+      recipeIngredients.length && `Ingredients: ${recipeIngredients.join(", ")}`,
+      updated.ai_summary && `Summary: ${updated.ai_summary}`,
+    ].filter(Boolean).join("\n");
+    const vec = await embed(text);
+    if (vec) {
+      await supabaseAdmin.from("items")
+        .update({ embedding: vec as any, embedding_updated_at: new Date().toISOString() })
+        .eq("id", itemId);
+    }
+  } catch (err) { console.warn("[RE-EXTRACT] Embed failed", err); }
+
+  return updated as ReExtractResult;
+}
