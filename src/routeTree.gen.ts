@@ -28,6 +28,7 @@ import { Route as ApiPublicUrlMetadataRouteImport } from './routes/api/public/ur
 import { Route as ApiMeShortcutRouteImport } from './routes/api/me.shortcut'
 import { Route as ApiMeSaveTokenRouteImport } from './routes/api/me.save-token'
 import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
+import { Route as AuthenticatedFolderIdRouteImport } from './routes/_authenticated/folder.$id'
 import { Route as AuthenticatedCollectionsIdRouteImport } from './routes/_authenticated/collections.$id'
 import { Route as AuthenticatedCategoryTypeRouteImport } from './routes/_authenticated/category.$type'
 import { Route as ApiPublicShareSaveRouteImport } from './routes/api/public/share.save'
@@ -131,6 +132,11 @@ const AuthenticatedItemIdRoute = AuthenticatedItemIdRouteImport.update({
   path: '/item/$id',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedFolderIdRoute = AuthenticatedFolderIdRouteImport.update({
+  id: '/folder/$id',
+  path: '/folder/$id',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedCollectionsIdRoute =
   AuthenticatedCollectionsIdRouteImport.update({
     id: '/$id',
@@ -189,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/share/$slug': typeof ShareSlugRoute
   '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
+  '/folder/$id': typeof AuthenticatedFolderIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
@@ -216,6 +223,7 @@ export interface FileRoutesByTo {
   '/share/$slug': typeof ShareSlugRoute
   '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
+  '/folder/$id': typeof AuthenticatedFolderIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
@@ -245,6 +253,7 @@ export interface FileRoutesById {
   '/share/$slug': typeof ShareSlugRoute
   '/_authenticated/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
+  '/_authenticated/folder/$id': typeof AuthenticatedFolderIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
@@ -274,6 +283,7 @@ export interface FileRouteTypes {
     | '/share/$slug'
     | '/category/$type'
     | '/collections/$id'
+    | '/folder/$id'
     | '/item/$id'
     | '/api/me/save-token'
     | '/api/me/shortcut'
@@ -301,6 +311,7 @@ export interface FileRouteTypes {
     | '/share/$slug'
     | '/category/$type'
     | '/collections/$id'
+    | '/folder/$id'
     | '/item/$id'
     | '/api/me/save-token'
     | '/api/me/shortcut'
@@ -329,6 +340,7 @@ export interface FileRouteTypes {
     | '/share/$slug'
     | '/_authenticated/category/$type'
     | '/_authenticated/collections/$id'
+    | '/_authenticated/folder/$id'
     | '/_authenticated/item/$id'
     | '/api/me/save-token'
     | '/api/me/shortcut'
@@ -492,6 +504,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedItemIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/folder/$id': {
+      id: '/_authenticated/folder/$id'
+      path: '/folder/$id'
+      fullPath: '/folder/$id'
+      preLoaderRoute: typeof AuthenticatedFolderIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/collections/$id': {
       id: '/_authenticated/collections/$id'
       path: '/$id'
@@ -569,6 +588,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedSearchRoute: typeof AuthenticatedSearchRoute
   AuthenticatedShareRoute: typeof AuthenticatedShareRoute
   AuthenticatedCategoryTypeRoute: typeof AuthenticatedCategoryTypeRoute
+  AuthenticatedFolderIdRoute: typeof AuthenticatedFolderIdRoute
   AuthenticatedItemIdRoute: typeof AuthenticatedItemIdRoute
 }
 
@@ -583,6 +603,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSearchRoute: AuthenticatedSearchRoute,
   AuthenticatedShareRoute: AuthenticatedShareRoute,
   AuthenticatedCategoryTypeRoute: AuthenticatedCategoryTypeRoute,
+  AuthenticatedFolderIdRoute: AuthenticatedFolderIdRoute,
   AuthenticatedItemIdRoute: AuthenticatedItemIdRoute,
 }
 

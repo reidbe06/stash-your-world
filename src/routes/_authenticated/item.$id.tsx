@@ -5,6 +5,7 @@ import {
   ChevronLeft, ExternalLink, FolderPlus, Pencil, Sparkles,
   Bell, CheckCircle2, Folder, Trash2, UtensilsCrossed, ChefHat,
   ChevronDown, ChevronUp, RefreshCw, ShoppingBag, Tag, Package,
+  FolderSymlink,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -13,6 +14,7 @@ import { ItemImage } from "@/components/ItemImage";
 import { EditItemModal } from "@/components/EditItemModal";
 import { CollectionQuickAdd } from "@/components/CollectionQuickAdd";
 import { ReminderPicker } from "@/components/ReminderPicker";
+import { MoveOrganizeModal } from "@/components/MoveOrganizeModal";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -63,6 +65,12 @@ type FullItem = Item & {
   product_image_url?: string | null;
   affiliate_url?: string | null;
   detected_products?: DetectedProduct[] | null;
+  user_override?: boolean | null;
+  user_category?: string | null;
+  user_folder?: string | null;
+  user_subfolder?: string | null;
+  original_ai_category?: string | null;
+  original_ai_subcategory?: string | null;
 };
 
 function formatDate(iso: string) {
@@ -84,6 +92,7 @@ function ItemDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
   const [ingredientsOpen, setIngredientsOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [extracting, setExtracting] = useState(false);
@@ -620,6 +629,27 @@ function ItemDetailPage() {
 
         <button
           type="button"
+          onClick={() => setMoveOpen(true)}
+          className="flex w-full items-center gap-3 border-t border-border/20 px-4 py-3.5 text-left transition hover:bg-accent/20"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100">
+            <FolderSymlink className="h-4 w-4 text-violet-600" />
+          </span>
+          <div className="flex-1">
+            <span className="block text-sm font-medium">Move / Organize</span>
+            {item.user_folder ? (
+              <span className="block text-xs text-muted-foreground">
+                {[item.user_category ?? item.type, item.user_folder, item.user_subfolder]
+                  .filter(Boolean)
+                  .join(" › ")}
+              </span>
+            ) : null}
+          </div>
+          <ChevronLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
+        </button>
+
+        <button
+          type="button"
           onClick={() => setEditOpen(true)}
           className="flex w-full items-center gap-3 border-t border-border/20 px-4 py-3.5 text-left transition hover:bg-accent/20"
         >
@@ -661,6 +691,12 @@ function ItemDetailPage() {
       </div>
 
       {/* Modals */}
+      <MoveOrganizeModal
+        item={item}
+        open={moveOpen}
+        onClose={() => setMoveOpen(false)}
+        onMoved={() => qc.invalidateQueries({ queryKey: ["item-detail", id] })}
+      />
       <EditItemModal
         item={item}
         open={editOpen}

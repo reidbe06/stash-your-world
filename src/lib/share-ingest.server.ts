@@ -1325,12 +1325,16 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
   // Fetch the existing item (server-side, admin client)
   const { data: item, error: fetchErr } = await supabaseAdmin
     .from("items")
-    .select("id,url,title,source,source_platform,creator_name,original_caption,transcript,image_url,collection_id,user_id,description,ai_summary")
+    .select("id,url,title,source,source_platform,creator_name,original_caption,transcript,image_url,collection_id,user_id,description,ai_summary,user_override")
     .eq("id", itemId)
     .eq("user_id", userId)
     .single();
 
   if (fetchErr || !item) throw new Error(fetchErr?.message || "Item not found");
+
+  // Respect user organization — don't let AI overwrite user's manual category choice.
+  // We still allow recipe/product content extraction, but skip type/category updates.
+  const userOverride = (item as any).user_override === true;
 
   const platform = (item.source_platform ?? "web") as SourcePlatform;
 
@@ -1452,19 +1456,23 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     : contentTypeFromCategory(category);
 
   // Build update payload.
-  // user_edited is reset to false because the user explicitly clicked "Organize with AI",
-  // which counts as opting back into AI categorization.
+  // When user_override=true the user has manually organized this save.
+  // We update AI insight fields (summary, recipe, product data) but do NOT
+  // overwrite their chosen category — that must stay permanent.
   const updatePayload: Record<string, any> = {
-    type: recategorizeContentType,
-    category,
-    subcategory,
+    // Only update type/category/subcategory if user has not manually organized
+    ...(!userOverride && {
+      type: recategorizeContentType,
+      category,
+      subcategory,
+      user_edited: false,
+      edited_at: null,
+    }),
     tags,
     ai_summary: summary,
     ai_category: category,
     ai_subcategory: subcategory,
     ai_tags: tags,
-    user_edited: false,
-    edited_at: null,
     ai_key_takeaways: keyTakeaways,
     recipe_ingredients: recipeIngredients,
     recipe_steps: recipeSteps,
