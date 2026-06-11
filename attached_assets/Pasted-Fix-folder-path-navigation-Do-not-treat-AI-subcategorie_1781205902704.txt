@@ -1,0 +1,63 @@
+Fix folder path navigation. Do not treat AI subcategories as search filters.
+
+Current bug:
+AI subcategory cards like Recipes > Dinner are not clickable as real folders and have no path. They either route to Search or do nothing.
+
+Expected behavior:
+AI-generated subcategories should behave like real folders in a folder tree, similar to Microsoft/Google Drive path navigation.
+
+Example:
+Home > Recipes > Dinner
+
+When AI creates a subcategory like Dinner, it should create or resolve an actual folder record/path for that user:
+- category: Recipes
+- folder name: Dinner
+- parent_folder_id: null
+- source: ai_generated
+
+Clicking Dinner should navigate to:
+Recipes / Dinner
+
+Dinner folder page should include:
+- breadcrumb path: Recipes > Dinner
+- only Dinner saves
+- ability to add a folder inside Dinner
+- ability to move saves into or out of Dinner
+- ability to create subfolders under Dinner
+
+Example:
+Recipes > Dinner > High Protein
+Recipes > Dinner > Chicken
+Recipes > Dinner > Crockpot
+
+Important:
+This is not just visual breadcrumb text.
+This must be actual navigable path logic backed by folder IDs or slugs.
+
+Data requirements:
+- AI subcategories and user-created folders should use the same folder/path system.
+- Do not maintain separate AI collections vs folders.
+- Each folder should have:
+  - id
+  - user_id
+  - category
+  - name
+  - parent_folder_id
+  - source: ai_generated or user_created
+  - slug/path
+  - created_at
+
+Save display logic:
+- Saves assigned by AI to Recipes > Dinner should link to the Dinner folder.
+- Saves moved by user should update their active folder_id.
+- A save should not duplicate in old folder after move.
+
+Acceptance test:
+1. AI creates Recipes > Dinner.
+2. Dinner appears as a clickable folder card.
+3. Clicking Dinner opens Recipes > Dinner.
+4. Page shows breadcrumb Recipes > Dinner.
+5. User can add subfolder inside Dinner.
+6. New subfolder appears at Recipes > Dinner > [New Folder].
+7. Saves inside Dinner remain visible there.
+8. Moving a save out of Dinner removes it from Dinner.

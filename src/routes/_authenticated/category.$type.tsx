@@ -169,6 +169,7 @@ type FolderRecord = {
   category: string;
   name: string;
   parent_id: string | null;
+  source: string; // 'user_created' | 'ai_generated'
 };
 
 function CategorySubcategoryPage() {
@@ -294,28 +295,63 @@ function CategorySubcategoryPage() {
     );
   }, [items, search]);
 
-  // Unified collection items: user folders first, then AI subcategories
+  // Unified: resolved folder records (AI + user) merged with unresolved AI subcategories.
+  // Stats for AI-generated folders: combine AI-matched items + user-moved items.
   const allCollections = useMemo(() => {
+    const folderNameSet = new Set(folders.map((f) => f.name));
+    const aiStats = Object.fromEntries(
+      subcategories.map((s) => [s.name, { count: s.count, images: s.images }]),
+    );
+
     const folderItems = folders.map((f) => {
-      const stats = folderStats[f.id] ?? { count: 0, images: [] };
+      const userStats = folderStats[f.id] ?? { count: 0, images: [] };
+      const ai = aiStats[f.name] ?? { count: 0, images: [] };
+      const isAI = f.source === "ai_generated";
       return {
         key: `folder-${f.id}`,
         name: f.name,
-        count: stats.count,
-        images: stats.images,
-        onClick: () => navigate({ to: "/folder/$id", params: { id: f.id } }),
+        // AI folders: count non-overridden AI items + user-moved items
+        count: isAI ? ai.count + userStats.count : userStats.count,
+        images: isAI
+          ? ai.images.length ? ai.images : userStats.images
+          : userStats.images,
+        folderId: f.id,
       };
     });
-    const subItems = subcategories.map((s) => ({
-      key: `sub-${s.name}`,
-      name: s.name,
-      count: s.count,
-      images: s.images,
-      onClick: () =>
-        navigate({ to: "/category/$type/$sub", params: { type, sub: s.name } }),
-    }));
-    return [...folderItems, ...subItems];
+
+    // Unresolved AI subcategories — no folder record yet, created lazily on click
+    const unresolvedSubs = subcategories
+      .filter((s) => !folderNameSet.has(s.name))
+      .map((s) => ({
+        key: `sub-${s.name}`,
+        name: s.name,
+        count: s.count,
+        images: s.images,
+        folderId: null as string | null,
+      }));
+
+    return [...folderItems, ...unresolvedSubs];
   }, [folders, folderStats, subcategories]);
+
+  // Navigate to folder — resolve/create AI folder record lazily on first click
+  const handleCollectionClick = async (item: {
+    name: string;
+    folderId: string | null;
+  }) => {
+    if (item.folderId) {
+      navigate({ to: "/folder/$id", params: { id: item.folderId } });
+      return;
+    }
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("folders")
+      .insert({ user_id: user.id, category: type, name: item.name, source: "ai_generated" })
+      .select("id")
+      .single();
+    if (error) { toast.error("Could not open collection"); return; }
+    qc.invalidateQueries({ queryKey: ["folders", type] });
+    navigate({ to: "/folder/$id", params: { id: data.id } });
+  };
 
   const handleCreateFolder = async () => {
     const name = newFolderName.trim();
@@ -324,7 +360,7 @@ function CategorySubcategoryPage() {
     try {
       const { error } = await supabase
         .from("folders")
-        .insert({ category: type, name, user_id: user.id })
+        .insert({ category: type, name, user_id: user.id, source: "user_created" })
         .select()
         .single();
       if (error) throw error;
@@ -434,7 +470,7 @@ function CategorySubcategoryPage() {
                   bgFrom={meta.bgFrom}
                   bgTo={meta.bgTo}
                   emoji={meta.emoji}
-                  onClick={c.onClick}
+                  onClick={() => handleCollectionClick(c)}
                 />
               ))}
             </div>

@@ -30,6 +30,7 @@ type FolderRecord = {
   category: string;
   name: string;
   parent_id: string | null;
+  source: string; // 'user_created' | 'ai_generated'
   created_at: string;
 };
 
@@ -96,11 +97,37 @@ function FolderPage() {
   const { data: items = [], isLoading: itemsLoading } = useQuery({
     queryKey: [
       "folder-items", id,
-      folder?.name, folder?.category, folder?.parent_id, parentFolder?.name,
+      folder?.name, folder?.category, folder?.parent_id, folder?.source, parentFolder?.name,
     ],
     enabled: !!folder && (folder.parent_id ? !!parentFolder : true),
     queryFn: async () => {
       if (!folder) return [];
+
+      // AI-generated top-level folders: merge native AI items + user-moved items
+      if (folder.source === "ai_generated" && !folder.parent_id) {
+        const [aiRes, movedRes] = await Promise.all([
+          supabase
+            .from("items")
+            .select("*")
+            .eq("type", folder.category)
+            .or(`subcategory.eq.${folder.name},ai_subcategory.eq.${folder.name}`)
+            .not("user_override", "eq", true)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("items")
+            .select("*")
+            .eq("user_category", folder.category)
+            .eq("user_folder", folder.name)
+            .is("user_subfolder", null)
+            .order("created_at", { ascending: false }),
+        ]);
+        const seen = new Set<string>();
+        return [...(aiRes.data ?? []), ...(movedRes.data ?? [])]
+          .filter((it) => { if (seen.has(it.id)) return false; seen.add(it.id); return true; })
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) as Item[];
+      }
+
+      // User-created folders (and subfolders of AI folders)
       let q = supabase
         .from("items")
         .select("*")
