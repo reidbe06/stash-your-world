@@ -20,6 +20,23 @@ const CATEGORY_LABELS: Record<string, string> = {
   Other: "Other",
 };
 
+// Maps type key → the category display-label stored in item.category column.
+// Keeps EditItemModal and any other old-code path working without separate changes.
+const TYPE_TO_CATEGORY_LABEL: Record<string, string> = {
+  Recipe: "Recipes",
+  Fashion: "Fashion",
+  Product: "Products",
+  Home: "Home",
+  Travel: "Travel",
+  Tutorial: "Education",
+  Fitness: "Fitness",
+  Beauty: "Beauty",
+  Parenting: "Parenting",
+  Business: "Business Ideas",
+  Entertainment: "Entertainment",
+  Other: "Other",
+};
+
 const CATEGORY_KEYS = [
   "Recipe", "Fashion", "Product", "Home", "Travel",
   "Tutorial", "Fitness", "Beauty", "Parenting", "Business",
@@ -182,10 +199,17 @@ export function MoveOrganizeModal({ item, open, onClose, onMoved }: Props) {
       const selectedSubfolder = subfolders.find((f) => f.id === selectedSubfolderId);
 
       const updatePayload: Record<string, unknown> = {
+        // user_* fields — canonical source of truth after a manual move
         user_category: selectedCategory,
         user_folder: selectedFolder?.name ?? null,
         user_subfolder: selectedSubfolder?.name ?? null,
         user_override: true,
+        // Also update type/category/subcategory so every existing display path
+        // (ItemCard badge, EditItemModal initialiser, detail page) sees the right
+        // value immediately, without needing to check user_override everywhere.
+        type: selectedCategory,
+        category: TYPE_TO_CATEGORY_LABEL[selectedCategory] ?? selectedCategory,
+        subcategory: selectedFolder?.name ?? null,
         updated_at: new Date().toISOString(),
       };
 

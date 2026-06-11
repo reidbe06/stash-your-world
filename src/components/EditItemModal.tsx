@@ -7,6 +7,24 @@ import { useAuth } from "@/lib/auth";
 import { CATEGORIES, SUBCATEGORY_TAXONOMY } from "@/lib/taxonomy";
 import type { Item } from "./ItemCard";
 
+// Reverse map: type key → category display label used by this modal.
+// Needed to initialise the form correctly when a save was moved via
+// MoveOrganizeModal (which stores the type key in user_category).
+const TYPE_TO_CATEGORY_LABEL: Record<string, string> = {
+  Recipe: "Recipes",
+  Fashion: "Fashion",
+  Product: "Products",
+  Home: "Home",
+  Travel: "Travel",
+  Tutorial: "Education",
+  Fitness: "Fitness",
+  Beauty: "Beauty",
+  Parenting: "Parenting",
+  Business: "Business Ideas",
+  Entertainment: "Entertainment",
+  Other: "Other",
+};
+
 const CATEGORY_TO_TYPE: Record<string, string> = {
   Recipes: "Recipe",
   Fashion: "Fashion",
@@ -66,10 +84,19 @@ export function EditItemModal({ item, open, onClose }: Props) {
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
 
+  // When the user has manually moved a save, show the effective location —
+  // not the original AI-assigned category that may still sit in item.category.
+  const effectiveCategory = item.user_override && item.user_category
+    ? (TYPE_TO_CATEGORY_LABEL[item.user_category] ?? item.user_category)
+    : (item.category ?? item.ai_category ?? "");
+  const effectiveSubcategory = item.user_override
+    ? (item.user_folder ?? "")
+    : (item.subcategory ?? "");
+
   const [fields, setFields] = useState<EditFields>({
     title: item.title ?? "",
-    category: item.category ?? item.ai_category ?? "",
-    subcategory: item.subcategory ?? "",
+    category: effectiveCategory,
+    subcategory: effectiveSubcategory,
     tags: item.tags?.join(", ") ?? "",
     description: item.description ?? "",
     url: item.url ?? "",
@@ -106,10 +133,16 @@ export function EditItemModal({ item, open, onClose }: Props) {
 
   useEffect(() => {
     if (open) {
+      const effCat = item.user_override && item.user_category
+        ? (TYPE_TO_CATEGORY_LABEL[item.user_category] ?? item.user_category)
+        : (item.category ?? item.ai_category ?? "");
+      const effSub = item.user_override
+        ? (item.user_folder ?? "")
+        : (item.subcategory ?? "");
       setFields({
         title: item.title ?? "",
-        category: item.category ?? item.ai_category ?? "",
-        subcategory: item.subcategory ?? "",
+        category: effCat,
+        subcategory: effSub,
         tags: item.tags?.join(", ") ?? "",
         description: item.description ?? "",
         url: item.url ?? "",
@@ -158,8 +191,8 @@ export function EditItemModal({ item, open, onClose }: Props) {
   const taxonomyKey = CATEGORY_TO_TAXONOMY_KEY[fields.category] ?? "";
   const suggestedSubs: string[] = taxonomyKey ? (SUBCATEGORY_TAXONOMY[taxonomyKey] ?? []) : [];
 
-  const categoryChanged = fields.category !== (item.category ?? item.ai_category ?? "");
-  const subcategoryChanged = fields.subcategory !== (item.subcategory ?? "");
+  const categoryChanged = fields.category !== effectiveCategory;
+  const subcategoryChanged = fields.subcategory !== effectiveSubcategory;
   const userEditing = categoryChanged || subcategoryChanged;
 
   const parseTags = (raw: string): string[] =>

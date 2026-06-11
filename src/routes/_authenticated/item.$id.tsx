@@ -251,7 +251,7 @@ function ItemDetailPage() {
     ? item.user_category
     : item.type;
   const subcategoryLabel = item.user_override
-    ? (item.user_folder ?? item.subcategory ?? item.ai_subcategory ?? null)
+    ? (item.user_folder ?? null)
     : (item.subcategory ?? item.ai_subcategory ?? null);
   const typeLabel = subcategoryLabel
     ? `${effectiveCategory} › ${subcategoryLabel}`

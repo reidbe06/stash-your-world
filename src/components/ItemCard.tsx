@@ -40,6 +40,12 @@ export interface Item {
   confidence_score?: number | null;
   user_edited?: boolean | null;
   edited_at?: string | null;
+  user_override?: boolean | null;
+  user_category?: string | null;
+  user_folder?: string | null;
+  user_subfolder?: string | null;
+  original_ai_category?: string | null;
+  original_ai_subcategory?: string | null;
 }
 
 function timeAgo(iso: string): string {
@@ -302,8 +308,16 @@ export function ItemCard({ item, readOnly }: { item: Item; readOnly?: boolean })
   const qc = useQueryClient();
   const navigate = useNavigate();
 
-  const subcategoryLabel = (item as any).subcategory ?? (item as any).ai_subcategory ?? null;
-  const typeLabel = subcategoryLabel ? `${item.type} › ${subcategoryLabel}` : item.type;
+  // If the user manually moved this save, show user_category/user_folder.
+  // Do NOT fall through to ai_subcategory when there is an override — it would
+  // show the old AI label (e.g. "Tutorial › Other") instead of the new one.
+  const effectiveType = item.user_override && item.user_category
+    ? item.user_category
+    : item.type;
+  const subcategoryLabel = item.user_override
+    ? (item.user_folder ?? null)
+    : ((item as any).subcategory ?? (item as any).ai_subcategory ?? null);
+  const typeLabel = subcategoryLabel ? `${effectiveType} › ${subcategoryLabel}` : effectiveType;
   const needsContext = item.processing_status === "needs_user_context";
 
   let host: string | null = item.source;
