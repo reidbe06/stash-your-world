@@ -333,24 +333,18 @@ function CategorySubcategoryPage() {
     return [...folderItems, ...unresolvedSubs];
   }, [folders, folderStats, subcategories]);
 
-  // Navigate to folder — resolve/create AI folder record lazily on first click
-  const handleCollectionClick = async (item: {
+  // Navigate to a collection tile:
+  // - user folder with a real DB record → /folder/:id
+  // - AI subcategory (no folder record yet) → /category/:type/:sub
+  const handleCollectionClick = (item: {
     name: string;
     folderId: string | null;
   }) => {
     if (item.folderId) {
       navigate({ to: "/folder/$id", params: { id: item.folderId } });
-      return;
+    } else {
+      navigate({ to: "/category/$type/$sub", params: { type, sub: item.name } });
     }
-    if (!user) return;
-    const { data, error } = await supabase
-      .from("folders")
-      .insert({ user_id: user.id, category: type, name: item.name, source: "ai_generated" })
-      .select("id")
-      .single();
-    if (error) { toast.error("Could not open collection"); return; }
-    qc.invalidateQueries({ queryKey: ["folders", type] });
-    navigate({ to: "/folder/$id", params: { id: data.id } });
   };
 
   const handleCreateFolder = async () => {
