@@ -8,8 +8,8 @@ import { CATEGORIES, SUBCATEGORY_TAXONOMY } from "@/lib/taxonomy";
 import type { Item } from "./ItemCard";
 
 // Reverse map: type key → category display label used by this modal.
-// Needed to initialise the form correctly when a save was moved via
-// MoveOrganizeModal (which stores the type key in user_category).
+// When user_override=true, user_category holds a type key (e.g. "Tutorial");
+// this map converts it to the display label the form expects (e.g. "Education").
 const TYPE_TO_CATEGORY_LABEL: Record<string, string> = {
   Recipe: "Recipes",
   Fashion: "Fashion",

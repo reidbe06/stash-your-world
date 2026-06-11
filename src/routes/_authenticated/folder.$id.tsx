@@ -388,7 +388,7 @@ function FolderPage() {
               No saves in this {folder.parent_id ? "subfolder" : "folder"} yet.
             </p>
             <p className="text-xs text-[#b8b0c0]">
-              Open any save and tap "Move / Organize" to put it here.
+              Open any save and use Edit Save to assign it here.
             </p>
           </div>
         ) : (

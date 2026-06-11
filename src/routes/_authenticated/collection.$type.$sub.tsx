@@ -6,8 +6,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Item } from "@/components/ItemCard";
 import { ItemCard } from "@/components/ItemCard";
-import { MoveOrganizeModal } from "@/components/MoveOrganizeModal";
-
 export const Route = createFileRoute("/_authenticated/collection/$type/$sub")({
   head: () => ({ meta: [{ title: "Collection — STASHd" }] }),
   component: CollectionPage,
@@ -34,7 +32,6 @@ function CollectionPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [moveItem, setMoveItem] = useState<Item | null>(null);
 
   const meta = CATEGORY_META[type] ?? { label: type, emoji: "📌" };
 
@@ -156,25 +153,12 @@ function CollectionPage() {
               <ItemCard
                 key={item.id}
                 item={item}
-                onMove={() => setMoveItem(item)}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* Move / Organize sheet */}
-      {moveItem && (
-        <MoveOrganizeModal
-          item={moveItem}
-          open={!!moveItem}
-          onClose={() => setMoveItem(null)}
-          onMoved={() => {
-            setMoveItem(null);
-            qc.invalidateQueries({ queryKey: ["collection-items", user?.id, type, sub] });
-          }}
-        />
-      )}
     </div>
   );
 }
