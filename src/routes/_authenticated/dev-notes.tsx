@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useServerFn } from "@tanstack/react-start";
+import { runBackfillTitles } from "@/lib/backfill-titles.functions";
 
 export const Route = createFileRoute("/_authenticated/dev-notes")({
   head: () => ({
@@ -182,22 +183,15 @@ function BackfillTitlesPanel() {
   const [status, setStatus] = useState<"idle" | "running" | "done" | "error">("idle");
   const [result, setResult] = useState<{ processed: number; updated: number; skipped: number; errors: number } | null>(null);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const backfill = useServerFn(runBackfillTitles);
 
   async function runBackfill() {
     setStatus("running");
     setResult(null);
     setErrMsg(null);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error("Not authenticated");
-      const res = await fetch("/api/public/items/backfill-titles", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
-      setResult({ processed: json.processed, updated: json.updated, skipped: json.skipped, errors: json.errors });
+      const res = await backfill();
+      setResult(res);
       setStatus("done");
     } catch (e: any) {
       setErrMsg(e?.message || "Backfill failed");
