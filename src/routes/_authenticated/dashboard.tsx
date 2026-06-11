@@ -1,11 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
 import type { Item } from "@/components/ItemCard";
+import { CreateCategoryModal, type UserCategory } from "@/components/CreateCategoryModal";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "My Stash — STASHd" }] }),
@@ -233,11 +234,49 @@ function CategoryTile({
   );
 }
 
+// ── Create Category tile ───────────────────────────────────────────────────────
+function CreateCategoryTile({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex flex-col overflow-hidden rounded-[20px] bg-white text-left transition-transform active:scale-[0.97]"
+      style={{
+        boxShadow: "0 8px 24px rgba(0,0,0,0.06), 0 20px 40px rgba(0,0,0,0.08)",
+        border: "1.5px dashed rgba(253,88,151,0.25)",
+      }}
+    >
+      {/* Icon area */}
+      <div
+        className="aspect-[16/9] w-full flex items-center justify-center"
+        style={{ background: "linear-gradient(160deg, #FFF5FA, #FFF9FC)" }}
+      >
+        <span
+          className="flex h-12 w-12 items-center justify-center rounded-full"
+          style={{ background: "rgba(253,88,151,0.10)" }}
+        >
+          <Plus className="h-6 w-6" style={{ color: "#FD5897" }} />
+        </span>
+      </div>
+      {/* Label footer */}
+      <div className="px-3.5 pb-3.5 pt-3">
+        <p className="text-[14px] font-bold leading-tight" style={{ color: "#FD5897" }}>
+          Create Category
+        </p>
+        <p className="mt-[3px] text-[12px] font-medium text-[#b0a5b8]">
+          Organise your saves
+        </p>
+      </div>
+    </button>
+  );
+}
+
 // ── Main dashboard ─────────────────────────────────────────────────────────────
 function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data: profile } = useProfile();
+  const [createCatOpen, setCreateCatOpen] = useState(false);
 
   const { data: items, isLoading } = useQuery({
     queryKey: ["items", user?.id],
@@ -249,6 +288,20 @@ function Dashboard() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Item[];
+    },
+  });
+
+  const { data: userCategories = [] } = useQuery<UserCategory[]>({
+    queryKey: ["user-categories", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_categories")
+        .select("*")
+        .order("created_at", { ascending: true });
+      // Silently return [] if the table doesn't exist yet
+      if (error) return [];
+      return data as UserCategory[];
     },
   });
 
@@ -326,6 +379,10 @@ function Dashboard() {
     }
   }
 
+  function handleUserCategoryTap(cat: UserCategory) {
+    navigate({ to: "/search", search: { q: cat.name } as never });
+  }
+
   const firstName = getFirstName(profile, user?.email);
 
   return (
@@ -384,6 +441,19 @@ function Dashboard() {
               onClick={() => handleCategoryTap(cat)}
             />
           ))}
+          {userCategories.map((cat) => (
+            <CategoryTile
+              key={cat.id}
+              label={cat.name}
+              count={0}
+              images={[]}
+              bgFrom={cat.bg_from}
+              bgTo={cat.bg_to}
+              emoji={cat.emoji}
+              onClick={() => handleUserCategoryTap(cat)}
+            />
+          ))}
+          <CreateCategoryTile onClick={() => setCreateCatOpen(true)} />
         </div>
       )}
 
@@ -398,6 +468,12 @@ function Dashboard() {
           </p>
         </div>
       )}
+
+      <CreateCategoryModal
+        open={createCatOpen}
+        onClose={() => setCreateCatOpen(false)}
+        existingCount={userCategories.length}
+      />
     </div>
   );
 }
