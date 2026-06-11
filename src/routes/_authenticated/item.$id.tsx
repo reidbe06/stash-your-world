@@ -246,8 +246,16 @@ function ItemDetailPage() {
     .map((ic) => (ic as { collections: { id: string; name: string } | null }).collections?.name)
     .filter(Boolean) as string[];
 
-  const subcategoryLabel = item.subcategory ?? item.ai_subcategory ?? null;
-  const typeLabel = subcategoryLabel ? `${item.type} › ${subcategoryLabel}` : item.type;
+  // Effective category/sub: honour user's manual placement when present
+  const effectiveCategory = item.user_override && item.user_category
+    ? item.user_category
+    : item.type;
+  const subcategoryLabel = item.user_override
+    ? (item.user_folder ?? item.subcategory ?? item.ai_subcategory ?? null)
+    : (item.subcategory ?? item.ai_subcategory ?? null);
+  const typeLabel = subcategoryLabel
+    ? `${effectiveCategory} › ${subcategoryLabel}`
+    : effectiveCategory;
 
   return (
     <div className="space-y-5 pb-10">

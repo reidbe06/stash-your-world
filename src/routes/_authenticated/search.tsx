@@ -178,13 +178,20 @@ function SearchPage() {
   }, [items]);
 
   // Dynamic subcategory chips for selected type.
-  // Checks both `subcategory` and `ai_subcategory` so items are found
-  // regardless of which field was populated during ingest.
+  // Uses effective category (user_category if overridden, else type) so moved
+  // saves are counted under their new home, not their old AI category.
   const availableSubcats = useMemo(() => {
     if (category === "all") return [];
     const counts = new Map<string, number>();
-    items?.filter((it) => it.type === category).forEach((it) => {
-      const sub = it.subcategory ?? it.ai_subcategory ?? null;
+    items?.forEach((it) => {
+      const eff = (it as any).user_override && (it as any).user_category
+        ? (it as any).user_category
+        : it.type;
+      if (eff !== category) return;
+      // Effective sub: user_folder for moved items, AI sub for native items
+      const sub = (it as any).user_override
+        ? ((it as any).user_folder ?? it.subcategory ?? it.ai_subcategory ?? null)
+        : (it.subcategory ?? it.ai_subcategory ?? null);
       if (sub) counts.set(sub, (counts.get(sub) ?? 0) + 1);
     });
     return Array.from(counts.entries())
@@ -198,15 +205,23 @@ function SearchPage() {
     if (!items) return [] as (ItemWithCollection & { _sim?: number })[];
     const needle = q.trim().toLowerCase();
 
-    // Category / collection / tag gates — never changes between paths
+    // Effective category/subcategory for a save:
+    // If user moved it (user_override=true), honour user_category/user_folder;
+    // otherwise fall back to the AI-assigned type/subcategory.
+    const effectiveCat = (it: ItemWithCollection) =>
+      (it as any).user_override && (it as any).user_category
+        ? (it as any).user_category
+        : it.type;
+
+    const effectiveSub = (it: ItemWithCollection) =>
+      (it as any).user_override
+        ? ((it as any).user_folder ?? it.subcategory ?? it.ai_subcategory ?? null)
+        : (it.subcategory ?? it.ai_subcategory ?? null);
+
+    // Category / collection / tag gates
     const passesFilters = (it: ItemWithCollection) => {
-      if (category !== "all" && it.type !== category) return false;
-      if (subcategory) {
-        // If the user has relocated this item, its ai_subcategory is stale — exclude it
-        if ((it as any).user_override) return false;
-        const itemSub = it.subcategory ?? it.ai_subcategory ?? null;
-        if (itemSub !== subcategory) return false;
-      }
+      if (category !== "all" && effectiveCat(it) !== category) return false;
+      if (subcategory && effectiveSub(it) !== subcategory) return false;
       if (collectionFilter !== "all") {
         if (collectionFilter === "none" && it.collection_id) return false;
         if (collectionFilter !== "none" && it.collection_id !== collectionFilter) return false;

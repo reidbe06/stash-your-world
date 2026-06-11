@@ -214,12 +214,16 @@ export function MoveOrganizeModal({ item, open, onClose, onMoved }: Props) {
         throw new Error("Save did not persist — please try again.");
       }
 
-      // Invalidate every query that might show this item
+      // Invalidate every query that might show this item.
+      // ["items"] prefix covers search page ("items", userId, "with-collection").
+      // ["items-category"] covers category.$type page.
+      // ["collection-items"] covers collection.$type.$sub page.
+      // ["folder-items"] covers folder.$id page.
       qc.invalidateQueries({ queryKey: ["item-detail", item.id] });
+      qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["items-category"] });
       qc.invalidateQueries({ queryKey: ["folder-items"] });
       qc.invalidateQueries({ queryKey: ["collection-items"] });
-      qc.invalidateQueries({ queryKey: ["items-search"] });
 
       const destLabel = [
         CATEGORY_LABELS[selectedCategory] ?? selectedCategory,
