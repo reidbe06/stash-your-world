@@ -1,11 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import type { Item } from "@/components/ItemCard";
 import { ItemCard } from "@/components/ItemCard";
+import { MoveOrganizeModal } from "@/components/MoveOrganizeModal";
 
 export const Route = createFileRoute("/_authenticated/collection/$type/$sub")({
   head: () => ({ meta: [{ title: "Collection — STASHd" }] }),
@@ -31,7 +32,9 @@ function CollectionPage() {
   const { type, sub } = Route.useParams();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [moveItem, setMoveItem] = useState<Item | null>(null);
 
   const meta = CATEGORY_META[type] ?? { label: type, emoji: "📌" };
 
@@ -39,15 +42,42 @@ function CollectionPage() {
     queryKey: ["collection-items", user?.id, type, sub],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("items")
-        .select("*")
-        .eq("type", type)
-        .or(`subcategory.eq.${sub},ai_subcategory.eq.${sub}`)
-        .not("user_override", "eq", true)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data as Item[];
+      // Two fetches merged:
+      // 1. Native AI items: matched by type + subcategory/ai_subcategory, NOT user-overridden
+      // 2. User-moved items: user explicitly placed here (user_category + user_folder), user_override = true
+      const [nativeRes, movedRes] = await Promise.all([
+        supabase
+          .from("items")
+          .select("*")
+          .eq("type", type)
+          .or(`subcategory.eq.${sub},ai_subcategory.eq.${sub}`)
+          .not("user_override", "eq", true)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("items")
+          .select("*")
+          .eq("user_category", type)
+          .eq("user_folder", sub)
+          .eq("user_override", true)
+          .order("created_at", { ascending: false }),
+      ]);
+
+      if (nativeRes.error) throw nativeRes.error;
+      if (movedRes.error) throw movedRes.error;
+
+      // Merge + deduplicate (a save shouldn't appear twice)
+      const seen = new Set<string>();
+      const all: Item[] = [];
+      for (const it of [...(nativeRes.data ?? []), ...(movedRes.data ?? [])]) {
+        if (!seen.has(it.id)) {
+          seen.add(it.id);
+          all.push(it as Item);
+        }
+      }
+      return all.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
     },
   });
 
@@ -123,11 +153,28 @@ function CollectionPage() {
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {filteredItems.map((item) => (
-              <ItemCard key={item.id} item={item} />
+              <ItemCard
+                key={item.id}
+                item={item}
+                onMove={() => setMoveItem(item)}
+              />
             ))}
           </div>
         )}
       </div>
+
+      {/* Move / Organize sheet */}
+      {moveItem && (
+        <MoveOrganizeModal
+          item={moveItem}
+          open={!!moveItem}
+          onClose={() => setMoveItem(null)}
+          onMoved={() => {
+            setMoveItem(null);
+            qc.invalidateQueries({ queryKey: ["collection-items", user?.id, type, sub] });
+          }}
+        />
+      )}
     </div>
   );
 }

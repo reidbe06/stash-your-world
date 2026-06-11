@@ -195,17 +195,31 @@ export function MoveOrganizeModal({ item, open, onClose, onMoved }: Props) {
           item.subcategory ?? item.ai_subcategory ?? null;
       }
 
-      const { error } = await supabase
+      // Use .select().single() so we get the updated row back and can verify it persisted
+      const { data: updated, error } = await supabase
         .from("items")
         .update(updatePayload)
-        .eq("id", item.id);
+        .eq("id", item.id)
+        .select("id, user_category, user_folder, user_subfolder, user_override")
+        .single();
 
       if (error) throw error;
 
+      // Verify the DB record actually reflects what we asked for
+      if (
+        !updated ||
+        updated.user_override !== true ||
+        updated.user_category !== selectedCategory
+      ) {
+        throw new Error("Save did not persist — please try again.");
+      }
+
+      // Invalidate every query that might show this item
       qc.invalidateQueries({ queryKey: ["item-detail", item.id] });
-      qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["items-category"] });
       qc.invalidateQueries({ queryKey: ["folder-items"] });
+      qc.invalidateQueries({ queryKey: ["collection-items"] });
+      qc.invalidateQueries({ queryKey: ["items-search"] });
 
       const destLabel = [
         CATEGORY_LABELS[selectedCategory] ?? selectedCategory,
