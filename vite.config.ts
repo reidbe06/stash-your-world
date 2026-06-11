@@ -48,6 +48,7 @@ export default defineConfig(({ mode }) => {
       port: 5000,
       allowedHosts: true,
       watch: {
+        ignored: ["**/.local/**", "**/attached_assets/**", "**/node_modules/**"],
         awaitWriteFinish: {
           stabilityThreshold: 1000,
           pollInterval: 100,

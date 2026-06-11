@@ -45,7 +45,7 @@
 
 :root {
   --radius: 1rem;
-  --background: oklch(0.930 0.014 82);
+  --background: oklch(0.945 0.020 68);
   --foreground: oklch(0.18 0.02 340);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.18 0.02 340);
@@ -104,6 +104,8 @@
   * { border-color: var(--color-border); }
   body {
     background-color: var(--color-background);
+    background-image: linear-gradient(160deg, #F5EEE8 0%, #FFF3F8 50%, #F5EEE8 100%);
+    background-attachment: fixed;
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;

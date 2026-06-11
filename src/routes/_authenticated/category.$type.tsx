@@ -34,11 +34,21 @@ const CATEGORY_META: CategoryMeta[] = [
   { key: "Parenting", label: "Parenting",    description: "All your parenting saves, organized by AI",    emoji: "👶", bgFrom: "#FFF0F0", bgTo: "#FFF7F7" },
 ];
 
-// Apple Wallet–style tile elevation — three-layer shadow lifts cards off the page
+// Apple Wallet–style tile elevation — soft multi-layer shadow lifts cards off the page
 const TILE_STYLE: React.CSSProperties = {
-  boxShadow: "0 2px 8px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.10), 0 24px 48px rgba(0,0,0,0.08)",
-  border: "1px solid rgba(0,0,0,0.07)",
+  boxShadow: "0 8px 24px rgba(0,0,0,0.06), 0 20px 40px rgba(0,0,0,0.08)",
+  border: "1px solid rgba(0,0,0,0.06)",
 };
+
+// Platforms whose thumbnails are rich full-frame lifestyle photos (video covers)
+const VIDEO_PLATFORMS = new Set(["tiktok", "instagram_reel", "youtube", "youtube_short"]);
+
+// Hero-slot score: video-platform items first, raw product cutouts last
+function heroScore(it: { type: string; source_platform?: string }): number {
+  if (VIDEO_PLATFORMS.has((it as any).source_platform ?? "")) return 2;
+  if (it.type === "Product") return 0;
+  return 1;
+}
 
 // ── Collage image — plain img so flex/height inheritance is never broken ──────
 function CImg({
@@ -218,19 +228,28 @@ function CategorySubcategoryPage() {
     },
   });
 
-  // Subcategory map: name → { count, images }
+  // Subcategory map: name → { count, images }.
+  // Collects up to 6 candidates per subcategory then picks the best 3 by hero
+  // score so video/lifestyle thumbnails lead and product cutouts support.
   const subcategories = useMemo(() => {
-    const map: Record<string, { count: number; images: string[] }> = {};
+    const map: Record<string, { count: number; candidates: Item[] }> = {};
     for (const it of items) {
       const sub = (it as any).subcategory ?? (it as any).ai_subcategory ?? null;
       if (!sub) continue;
-      if (!map[sub]) map[sub] = { count: 0, images: [] };
+      if (!map[sub]) map[sub] = { count: 0, candidates: [] };
       map[sub].count += 1;
-      if (it.image_url && map[sub].images.length < 3) map[sub].images.push(it.image_url);
+      if (it.image_url && map[sub].candidates.length < 6) map[sub].candidates.push(it);
     }
     return Object.entries(map)
       .sort((a, b) => b[1].count - a[1].count)
-      .map(([name, data]) => ({ name, ...data }));
+      .map(([name, { count, candidates }]) => ({
+        name,
+        count,
+        images: candidates
+          .sort((a, b) => heroScore(b) - heroScore(a))
+          .slice(0, 3)
+          .map((it) => it.image_url as string),
+      }));
   }, [items]);
 
   const filteredItems = useMemo(() => {

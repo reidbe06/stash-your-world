@@ -35,11 +35,21 @@ const CATEGORIES: CategoryDef[] = [
   { key: "Parenting", label: "Parenting", emoji: "👶", bgFrom: "#FFF0F0", bgTo: "#FFF7F7", match: (it) => it.type === "Parenting"},
 ];
 
-// Apple Wallet–style card elevation — three-layer shadow lifts cards off the page
+// Apple Wallet–style card elevation — soft multi-layer shadow lifts cards off the page
 const TILE_STYLE: React.CSSProperties = {
-  boxShadow: "0 2px 8px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.10), 0 24px 48px rgba(0,0,0,0.08)",
-  border: "1px solid rgba(0,0,0,0.07)",
+  boxShadow: "0 8px 24px rgba(0,0,0,0.06), 0 20px 40px rgba(0,0,0,0.08)",
+  border: "1px solid rgba(0,0,0,0.06)",
 };
+
+// Platforms whose thumbnails are rich full-frame lifestyle photos (video covers)
+const VIDEO_PLATFORMS = new Set(["tiktok", "instagram_reel", "youtube", "youtube_short"]);
+
+// Hero-slot score: video-platform items first, raw product cutouts last
+function heroScore(it: { type: string; source_platform?: string }): number {
+  if (VIDEO_PLATFORMS.has((it as any).source_platform ?? "")) return 2;
+  if (it.type === "Product") return 0;
+  return 1;
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 function getGreeting(): string {
@@ -247,15 +257,17 @@ function Dashboard() {
     },
   });
 
-  // Per-category stats: count + first 3 images for hero collage
+  // Per-category stats: count + best 3 images for hero collage.
+  // Sort so video-platform thumbnails (rich lifestyle frames) take the hero slot;
+  // plain product-cutout items are demoted to supporting slots.
   const categoryData = useMemo(() => {
     const all = items ?? [];
     return CATEGORIES.map((cat) => {
       const matched = all.filter(cat.match);
-      const imgs = matched
+      const withImages = matched
         .filter((it) => it.image_url)
-        .slice(0, 3)
-        .map((it) => it.image_url as string);
+        .sort((a, b) => heroScore(b) - heroScore(a));
+      const imgs = withImages.slice(0, 3).map((it) => it.image_url as string);
       const hasSubs = new Set(
         matched.map((it) => (it as any).subcategory ?? (it as any).ai_subcategory).filter(Boolean)
       ).size > 0;
@@ -265,29 +277,44 @@ function Dashboard() {
 
   const totalCount = items?.length ?? 0;
 
-  // All Saves cover: pick one image from each category in priority order so the
-  // collage shows visual variety (recipe + fashion + product…) rather than
-  // repeating the same thumbnails as the top category tile.
+  // All Saves cover: one image per category, lifestyle categories first, avoiding
+  // duplicates with the individual category tile heroes for visual variety.
   const allImages = useMemo(() => {
-    const all = (items ?? []).filter((it) => it.image_url);
-    if (all.length === 0) return [];
+    const allWithImg = (items ?? []).filter((it) => it.image_url);
+    if (allWithImg.length === 0) return [];
+
+    // URLs already used as the hero (first slot) of a category tile — skip these
+    // in All Saves so users see different images across the dashboard
+    const categoryHeroUrls = new Set(
+      categoryData.filter((c) => c.images.length > 0).map((c) => c.images[0])
+    );
+
+    // Sort: video-platform items first; product-type last
+    const sorted = [...allWithImg].sort((a, b) => heroScore(b) - heroScore(a));
+
+    // Categories with lifestyle imagery go first so All Saves looks curated
     const PRIORITY_KEYS = [
-      "Recipe", "Fashion", "Product", "Travel",
-      "Home", "Beauty", "Fitness", "Tutorial", "Business", "Parenting",
+      "Home", "Travel", "Fashion", "Recipe", "Beauty",
+      "Fitness", "Tutorial", "Business", "Parenting", "Product",
     ];
     const picked: string[] = [];
     const usedUrls = new Set<string>();
+
     for (const key of PRIORITY_KEYS) {
       if (picked.length >= 3) break;
-      const img = all.find((it) => it.type === key && !usedUrls.has(it.image_url!))?.image_url;
+      // Prefer an image not already headlining a category tile
+      const img =
+        sorted.find((it) => it.type === key && !usedUrls.has(it.image_url!) && !categoryHeroUrls.has(it.image_url!))?.image_url
+        ?? sorted.find((it) => it.type === key && !usedUrls.has(it.image_url!))?.image_url;
       if (img) { picked.push(img); usedUrls.add(img); }
     }
-    for (const it of all) {
+    // Pad with best remaining if fewer than 3 found
+    for (const it of sorted) {
       if (picked.length >= 3) break;
       if (!usedUrls.has(it.image_url!)) { picked.push(it.image_url!); usedUrls.add(it.image_url!); }
     }
     return picked;
-  }, [items]);
+  }, [items, categoryData]);
 
   // Populated categories first, then empty (by count desc)
   const sortedCategories = useMemo(
