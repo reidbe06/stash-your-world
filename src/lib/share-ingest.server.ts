@@ -432,6 +432,7 @@ async function aiCategorize(input: {
   hashtags?: string[];
   notes?: string; contextType?: string;
   existingCollections: string[];
+  userCategories?: string[];
 }) {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
@@ -451,11 +452,21 @@ async function aiCategorize(input: {
   const collectionsHint = input.existingCollections.length
     ? `User's existing collections (prefer one if it fits): ${input.existingCollections.join(", ")}`
     : "User has no existing collections — suggest a short name.";
+
+  // Build the combined allowed-category list (system + user-created).
+  // User-created categories take priority when the content clearly fits.
+  const userCats = input.userCategories ?? [];
+  const allCategories = [...CATEGORIES, ...userCats];
+  const userCatsSection = userCats.length
+    ? `\nUSER-CREATED CATEGORIES (select one of these when the content clearly fits — they take priority over system categories):\n${userCats.map(c => `  • ${c}`).join("\n")}\nExamples: if user has "Disney" and content is about Disney parks → Disney. If user has "Christmas" and content is a Christmas gift idea → Christmas.\nDo NOT invent a category name that isn't in the list above.`
+    : "";
+
   const body = {
     model: "gpt-4o-mini",
     messages: [
       { role: "system", content: `You categorize saved web/video items for STASHd.
-Categories must be one of: ${CATEGORIES.join(", ")}.
+Choose the BEST category from this list — system categories are defaults, user-created categories take priority when content clearly matches:
+System categories: ${CATEGORIES.join(", ")}.${userCatsSection}
 content_type is the PURPOSE of the content (what it's ABOUT), not the media format.
   - A recipe video → content_type "Recipe", NOT "Video"
   - A fashion TikTok → content_type "Fashion"
@@ -517,7 +528,7 @@ ${collectionsHint}` },
         parameters: {
           type: "object",
           properties: {
-            category: { type: "string", enum: [...CATEGORIES] },
+            category: { type: "string", enum: allCategories },
             content_type: { type: "string", enum: [...CONTENT_TYPES], description: "Content PURPOSE — what is this about? NOT the media format." },
             media_format: { type: "string", enum: ["Video", "Article", "Webpage", "Social Post", "Product Page", "Image"], description: "Technical delivery format." },
             generated_title: { type: "string" },
@@ -887,6 +898,14 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     .from("collections").select("id,name").eq("user_id", input.userId);
   const existingNames = (cols ?? []).map((c) => c.name);
 
+  // User-created categories — fetched so AI can select them when content fits
+  const { data: userCatRows } = await supabaseAdmin
+    .from("user_categories").select("name").eq("user_id", input.userId);
+  const userCategoryNames: string[] = (userCatRows ?? []).map((r: any) => r.name);
+  if (userCategoryNames.length) {
+    console.log(`[INGEST] User categories available for AI: ${userCategoryNames.join(", ")}`);
+  }
+
   // "Needs user context" = video platform with no caption/transcript/note/hint.
   // IMPORTANT: when opaqueVideo=true we must NOT call OpenAI — it will hallucinate
   // generic output ("Instagram post", "Uncategorized") from an empty prompt.
@@ -968,6 +987,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
       notes: userNote,
       contextType,
       existingCollections: existingNames,
+      userCategories: userCategoryNames,
     };
     const aiPromptText = [
       `URL: ${input.url}`,
@@ -986,7 +1006,11 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     console.log(`[INGEST] OpenAI summary: ${JSON.stringify(ai?.summary)}`);
     console.log(`[INGEST] OpenAI tags: ${JSON.stringify(ai?.tags)}`);
 
-    category = ai?.category && (CATEGORIES as readonly string[]).includes(ai.category) ? ai.category : "Uncategorized";
+    const allValidCats = [...(CATEGORIES as readonly string[]), ...userCategoryNames];
+    category = ai?.category && allValidCats.includes(ai.category) ? ai.category : "Uncategorized";
+    if (ai?.category && userCategoryNames.includes(category)) {
+      console.log(`[INGEST] AI selected user category: "${category}"`);
+    }
     contentType = ai?.content_type && (CONTENT_TYPES as readonly string[]).includes(ai.content_type)
       ? ai.content_type
       : contentTypeFromCategory(category);
@@ -1363,6 +1387,13 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     .from("collections").select("id,name").eq("user_id", userId);
   const existingNames = (cols ?? []).map((c) => c.name);
 
+  const { data: userCatRowsRe } = await supabaseAdmin
+    .from("user_categories").select("name").eq("user_id", userId);
+  const userCategoryNamesRe: string[] = (userCatRowsRe ?? []).map((r: any) => r.name);
+  if (userCategoryNamesRe.length) {
+    console.log(`[RECATEGORIZE] User categories available for AI: ${userCategoryNamesRe.join(", ")}`);
+  }
+
   const cleanArr = (v: any, max = 8, maxLen = 200): string[] =>
     Array.isArray(v)
       ? v.map((t: any) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, max)
@@ -1382,12 +1413,16 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     transcript: item.transcript ?? null,
     notes: contextNote,
     existingCollections: existingNames,
+    userCategories: userCategoryNamesRe,
   });
 
   console.log(`[RECATEGORIZE] OpenAI response: category=${ai?.category} title=${JSON.stringify(ai?.generated_title)} confidence=${ai?.confidence_score}`);
 
-  const CATS = CATEGORIES as readonly string[];
+  const CATS = [...(CATEGORIES as readonly string[]), ...userCategoryNamesRe];
   const category = ai?.category && CATS.includes(ai.category) ? ai.category : "Uncategorized";
+  if (ai?.category && userCategoryNamesRe.includes(category)) {
+    console.log(`[RECATEGORIZE] AI selected user category: "${category}"`);
+  }
   const tags = cleanArr(ai?.tags, 8, 60).map((t: string) => t.toLowerCase());
   const keyTakeaways = cleanArr(ai?.key_takeaways, 6, 240);
   let recipeIngredients = cleanArr(ai?.recipe_ingredients, 40, 200);
@@ -1807,6 +1842,13 @@ export async function reExtractItem(input: { userId: string; itemId: string }): 
   const { data: cols } = await supabaseAdmin.from("collections").select("id,name").eq("user_id", userId);
   const existingNames = (cols ?? []).map((c: any) => c.name);
 
+  const { data: userCatRowsEx } = await supabaseAdmin
+    .from("user_categories").select("name").eq("user_id", userId);
+  const userCategoryNamesEx: string[] = (userCatRowsEx ?? []).map((r: any) => r.name);
+  if (userCategoryNamesEx.length) {
+    console.log(`[RE-EXTRACT] User categories available for AI: ${userCategoryNamesEx.join(", ")}`);
+  }
+
   // ── AI categorization ──────────────────────────────────────────────────────
   console.log(`[RE-EXTRACT] Calling AI — caption=${caption?.length ?? 0}ch transcript=${transcript?.length ?? 0}ch`);
   const ai = await aiCategorize({
@@ -1820,6 +1862,7 @@ export async function reExtractItem(input: { userId: string; itemId: string }): 
     transcript,
     notes: "",
     existingCollections: existingNames,
+    userCategories: userCategoryNamesEx,
   });
   console.log(`[RE-EXTRACT] AI: category=${ai?.category} title=${JSON.stringify(ai?.generated_title)} confidence=${ai?.confidence_score}`);
 
@@ -1828,8 +1871,11 @@ export async function reExtractItem(input: { userId: string; itemId: string }): 
       ? v.map((t: any) => String(t).replace(/^#/, "").trim()).filter(Boolean).slice(0, max).map((s: string) => s.slice(0, maxLen))
       : [];
 
-  const CATS = CATEGORIES as readonly string[];
-  const newCategory = ai?.category && CATS.includes(ai.category) ? ai.category : "Uncategorized";
+  const CATS_EX = [...(CATEGORIES as readonly string[]), ...userCategoryNamesEx];
+  const newCategory = ai?.category && CATS_EX.includes(ai.category) ? ai.category : "Uncategorized";
+  if (ai?.category && userCategoryNamesEx.includes(newCategory)) {
+    console.log(`[RE-EXTRACT] AI selected user category: "${newCategory}"`);
+  }
   const newSubcategory = ai?.subcategory ? String(ai.subcategory).slice(0, 200) : null;
   const newType = ai?.content_type && (CONTENT_TYPES as readonly string[]).includes(ai.content_type)
     ? ai.content_type
