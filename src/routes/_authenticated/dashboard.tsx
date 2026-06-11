@@ -144,7 +144,7 @@ function CollageCover({
     );
   }
 
-  // ── 2 images — hero left (65%) + one stacked right ──
+  // ── 2 images — hero left (65%) + one full-height right (35%) ──
   if (imgs.length === 2) {
     return (
       <div className="flex h-full w-full gap-[2px]">
@@ -152,14 +152,9 @@ function CollageCover({
         <div className="h-full overflow-hidden" style={{ width: "65%" }}>
           <CImg src={imgs[0]} bgFrom={bgFrom} bgTo={bgTo} />
         </div>
-        {/* Stacked column — 35% wide */}
-        <div className="flex h-full flex-1 flex-col gap-[2px]">
-          <div className="flex-1 overflow-hidden">
-            <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} />
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <GradientSlot bgFrom={bgFrom} bgTo={bgTo} emoji={emoji} />
-          </div>
+        {/* Second image — 35% wide, full height, no blank slot */}
+        <div className="h-full flex-1 overflow-hidden">
+          <CImg src={imgs[1]} bgFrom={bgFrom} bgTo={bgTo} />
         </div>
       </div>
     );
