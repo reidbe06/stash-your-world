@@ -312,7 +312,7 @@ function CategorySubcategoryPage() {
       count: s.count,
       images: s.images,
       onClick: () =>
-        navigate({ to: "/search", search: { type, sub: s.name } as never }),
+        navigate({ to: "/category/$type/$sub", params: { type, sub: s.name } }),
     }));
     return [...folderItems, ...subItems];
   }, [folders, folderStats, subcategories]);
