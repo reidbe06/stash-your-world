@@ -34,10 +34,10 @@ const CATEGORY_META: CategoryMeta[] = [
   { key: "Parenting", label: "Parenting",    description: "All your parenting saves, organized by AI",    emoji: "👶", bgFrom: "#FFF0F0", bgTo: "#FFF7F7" },
 ];
 
-// Apple Wallet–style tile elevation
+// Apple Wallet–style tile elevation — three-layer shadow lifts cards off the page
 const TILE_STYLE: React.CSSProperties = {
-  boxShadow: "0 4px 12px rgba(0,0,0,0.04), 0 12px 32px rgba(0,0,0,0.06)",
-  border: "1px solid rgba(250,247,242,0.9)",
+  boxShadow: "0 2px 8px rgba(0,0,0,0.07), 0 8px 24px rgba(0,0,0,0.10), 0 24px 48px rgba(0,0,0,0.08)",
+  border: "1px solid rgba(0,0,0,0.07)",
 };
 
 // ── Collage image — plain img so flex/height inheritance is never broken ──────
