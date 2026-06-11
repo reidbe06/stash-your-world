@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, FolderPlus, Check, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -54,6 +55,7 @@ type Props = {
 
 export function MoveOrganizeModal({ item, open, onClose, onMoved }: Props) {
   const qc = useQueryClient();
+  const { user } = useAuth();
 
   const effectiveCategory = item.user_category ?? item.type ?? "";
   const effectiveFolder = item.user_folder ?? null;
@@ -133,7 +135,7 @@ export function MoveOrganizeModal({ item, open, onClose, onMoved }: Props) {
     try {
       const { data, error } = await supabase
         .from("folders")
-        .insert({ category: selectedCategory, name })
+        .insert({ category: selectedCategory, name, user_id: user?.id })
         .select()
         .single();
       if (error) throw error;
@@ -156,7 +158,7 @@ export function MoveOrganizeModal({ item, open, onClose, onMoved }: Props) {
     try {
       const { data, error } = await supabase
         .from("folders")
-        .insert({ category: selectedCategory, name, parent_id: selectedFolderId })
+        .insert({ category: selectedCategory, name, parent_id: selectedFolderId, user_id: user?.id })
         .select()
         .single();
       if (error) throw error;

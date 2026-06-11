@@ -163,34 +163,6 @@ function SubcategoryTile({
   );
 }
 
-function FolderTile({
-  name, count, images, bgFrom, bgTo, emoji, onClick,
-}: {
-  name: string; count: number; images: string[];
-  bgFrom: string; bgTo: string; emoji: string; onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex flex-col overflow-hidden rounded-[20px] bg-white text-left transition-transform active:scale-[0.97]"
-      style={TILE_STYLE}
-    >
-      <div className="aspect-[16/9] w-full overflow-hidden">
-        <CollageCover images={images} bgFrom={bgFrom} bgTo={bgTo} emoji={emoji} />
-      </div>
-      <div className="flex items-center gap-1.5 px-3.5 pb-3.5 pt-3">
-        <Folder className="h-3.5 w-3.5 shrink-0 text-[#FD5897]" />
-        <div className="min-w-0">
-          <p className="truncate text-[13px] font-bold leading-snug text-[#1a1a1a]">{name}</p>
-          <p className="mt-[3px] text-[11px] font-medium text-[#b0a5b8]">
-            {count} save{count !== 1 ? "s" : ""}
-          </p>
-        </div>
-      </div>
-    </button>
-  );
-}
 
 type FolderRecord = {
   id: string;
@@ -321,22 +293,44 @@ function CategorySubcategoryPage() {
     );
   }, [items, search]);
 
+  // Unified collection items: user folders first, then AI subcategories
+  const allCollections = useMemo(() => {
+    const folderItems = folders.map((f) => {
+      const stats = folderStats[f.id] ?? { count: 0, images: [] };
+      return {
+        key: `folder-${f.id}`,
+        name: f.name,
+        count: stats.count,
+        images: stats.images,
+        onClick: () => navigate({ to: "/folder/$id", params: { id: f.id } }),
+      };
+    });
+    const subItems = subcategories.map((s) => ({
+      key: `sub-${s.name}`,
+      name: s.name,
+      count: s.count,
+      images: s.images,
+      onClick: () =>
+        navigate({ to: "/search", search: { type, sub: s.name } as never }),
+    }));
+    return [...folderItems, ...subItems];
+  }, [folders, folderStats, subcategories]);
+
   const handleCreateFolder = async () => {
     const name = newFolderName.trim();
-    if (!name) return;
+    if (!name || !user) return;
     setCreatingFolder(true);
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("folders")
-        .insert({ category: type, name })
+        .insert({ category: type, name, user_id: user.id })
         .select()
         .single();
       if (error) throw error;
       await refetchFolders();
       setNewFolderName("");
       setShowNewFolder(false);
-      toast.success(`Folder "${name}" created`);
-      navigate({ to: "/folder/$id", params: { id: data.id } });
+      toast.success(`"${name}" added to Collections`);
     } catch (err: any) {
       toast.error(err.message || "Could not create folder");
     } finally {
@@ -378,18 +372,18 @@ function CategorySubcategoryPage() {
         />
       </div>
 
-      {/* My Folders */}
-      {!search && (
+      {/* Unified Collections — user folders + AI subcategories in one grid */}
+      {(allCollections.length > 0 || showNewFolder) && !search && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#c8bfd2]">
-              My Folders
+              {meta.label} Collections
             </p>
             {!showNewFolder && (
               <button
                 type="button"
                 onClick={() => setShowNewFolder(true)}
-                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold text-[#FD5897] transition hover:bg-[#FD5897]/8"
+                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold text-[#FD5897] transition hover:bg-[#FD5897]/5"
                 style={{ border: "1px solid rgba(253,88,151,0.2)" }}
               >
                 <FolderPlus className="h-3.5 w-3.5" />
@@ -398,7 +392,7 @@ function CategorySubcategoryPage() {
             )}
           </div>
 
-          {/* New folder input */}
+          {/* Inline new-folder input */}
           {showNewFolder && (
             <div className="flex items-center gap-2">
               <input
@@ -428,59 +422,23 @@ function CategorySubcategoryPage() {
             </div>
           )}
 
-          {folders.length > 0 ? (
+          {allCollections.length > 0 && (
             <div className="grid grid-cols-2 gap-4">
-              {folders.map((f) => {
-                const stats = folderStats[f.id] ?? { count: 0, images: [] };
-                return (
-                  <FolderTile
-                    key={f.id}
-                    name={f.name}
-                    count={stats.count}
-                    images={stats.images}
-                    bgFrom={meta.bgFrom}
-                    bgTo={meta.bgTo}
-                    emoji={meta.emoji}
-                    onClick={() =>
-                      navigate({ to: "/folder/$id", params: { id: f.id } })
-                    }
-                  />
-                );
-              })}
+              {allCollections.map((c) => (
+                <SubcategoryTile
+                  key={c.key}
+                  name={c.name}
+                  count={c.count}
+                  images={c.images}
+                  bgFrom={meta.bgFrom}
+                  bgTo={meta.bgTo}
+                  emoji={meta.emoji}
+                  onClick={c.onClick}
+                />
+              ))}
             </div>
-          ) : !showNewFolder ? (
-            <p className="text-[13px] text-[#b0a8b8] text-center py-2">
-              No folders yet — create one to organize your saves.
-            </p>
-          ) : null}
-        </div>
-      )}
+          )}
 
-      {/* AI Collections */}
-      {subcategories.length > 0 && !search && (
-        <div className="space-y-4">
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[#c8bfd2]">
-            AI Collections
-          </p>
-          <div className="grid grid-cols-2 gap-4">
-            {subcategories.map(({ name, count, images }) => (
-              <SubcategoryTile
-                key={name}
-                name={name}
-                count={count}
-                images={images}
-                bgFrom={meta.bgFrom}
-                bgTo={meta.bgTo}
-                emoji={meta.emoji}
-                onClick={() =>
-                  navigate({
-                    to: "/search",
-                    search: { type, sub: name } as never,
-                  })
-                }
-              />
-            ))}
-          </div>
           <button
             type="button"
             onClick={() =>
