@@ -361,19 +361,29 @@ function ItemDetailPage() {
       </div>
 
       {/* ── AI Summary ── */}
-      {item.ai_summary && (
-        <div className="rounded-2xl border border-border/40 bg-white p-4 shadow-sm space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100">
-              <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-            </span>
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-              AI Summary
-            </p>
-          </div>
-          <p className="text-sm leading-relaxed text-foreground">{item.ai_summary}</p>
+      <div className="rounded-2xl border border-border/40 bg-white p-4 shadow-sm space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100">
+            <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+          </span>
+          <p className="flex-1 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            AI Summary
+          </p>
+          <button
+            type="button"
+            onClick={handleReExtract}
+            disabled={reExtracting}
+            className="flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium text-violet-600 hover:bg-violet-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Sparkles className={`h-3 w-3 ${reExtracting ? "animate-pulse" : ""}`} />
+            {reExtracting ? "Processing…" : "Re-Extract"}
+          </button>
         </div>
-      )}
+        {item.ai_summary
+          ? <p className="text-sm leading-relaxed text-foreground">{item.ai_summary}</p>
+          : <p className="text-xs text-muted-foreground/60 italic">No AI summary yet — tap Re-Extract to generate one.</p>
+        }
+      </div>
 
       {/* ── Detected Products (social video saves) ── */}
       {hasDetectedProducts && (
@@ -673,27 +683,6 @@ function ItemDetailPage() {
           </span>
           <span className="flex-1 text-sm font-medium">Edit Save</span>
           <ChevronLeft className="h-4 w-4 rotate-180 text-muted-foreground" />
-        </button>
-
-        <button
-          type="button"
-          onClick={handleReExtract}
-          disabled={reExtracting}
-          className="flex w-full items-center gap-3 border-t border-border/20 px-4 py-3.5 text-left transition hover:bg-accent/20 disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-purple-100">
-            <Sparkles className={`h-4 w-4 text-purple-500 ${reExtracting ? "animate-pulse" : ""}`} />
-          </span>
-          <div className="flex-1">
-            <span className="block text-sm font-medium">
-              {reExtracting ? "Processing…" : "Re-Extract with AI"}
-            </span>
-            {!reExtracting && (
-              <span className="block text-xs text-muted-foreground">
-                Re-fetch metadata, transcript &amp; re-run AI categorization
-              </span>
-            )}
-          </div>
         </button>
 
         <button
