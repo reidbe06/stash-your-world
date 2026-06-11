@@ -202,6 +202,8 @@ function SearchPage() {
     const passesFilters = (it: ItemWithCollection) => {
       if (category !== "all" && it.type !== category) return false;
       if (subcategory) {
+        // If the user has relocated this item, its ai_subcategory is stale — exclude it
+        if ((it as any).user_override) return false;
         const itemSub = it.subcategory ?? it.ai_subcategory ?? null;
         if (itemSub !== subcategory) return false;
       }

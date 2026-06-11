@@ -254,10 +254,11 @@ function CategorySubcategoryPage() {
     return map;
   }, [folders, items]);
 
-  // AI subcategory groups (items without a user folder)
+  // AI subcategory groups — exclude items the user has explicitly relocated
   const subcategories = useMemo(() => {
     const map: Record<string, { count: number; candidates: Item[] }> = {};
     for (const it of items) {
+      if ((it as any).user_override) continue; // user relocated — don't show in AI bucket
       const sub =
         (it as any).subcategory ?? (it as any).ai_subcategory ?? null;
       if (!sub) continue;
