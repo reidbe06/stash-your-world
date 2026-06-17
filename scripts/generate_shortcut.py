@@ -13,7 +13,8 @@ Two modes:
        → writes binary plist to stdout (token is pre-embedded, zero install prompts)
 
 The shortcut:
-  - Extracts a URL from any share sheet input (URL, text blobs, Instagram captions)
+  - Coerces share-sheet input to text (handles URL items, text, captions)
+  - Extracts the first https URL via regex
   - POSTs directly to /api/public/share/save with X-Save-Token + instant=true
   - Shows a native iOS notification "Saved ✓" — no Safari, no sign-in prompt
 """
@@ -34,19 +35,21 @@ args = parser.parse_args()
 if args.app_url:
     APP_URL = args.app_url.rstrip("/")
 else:
-    dev_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
-    APP_URL = f"https://{dev_domain}" if dev_domain else "https://stashd.replit.app"
+    # Default to production URL — never use the ephemeral dev domain for
+    # static assets, as it changes on every workspace restart.
+    APP_URL = os.environ.get("PUBLIC_URL", "https://stashd.replit.app")
 
 SAVE_ENDPOINT = f"{APP_URL}/api/public/share/save"
 PERSONAL = args.token is not None
 TOKEN_VALUE = args.token or ""
 
 # ── UUIDs ─────────────────────────────────────────────────────────────────────
-MATCH_UUID      = str(uuid.uuid4()).upper()
-GET_ITEM_UUID   = str(uuid.uuid4()).upper()
+COERCE_UUID    = str(uuid.uuid4()).upper()   # new: coerce ExtensionInput → text
+MATCH_UUID     = str(uuid.uuid4()).upper()
+GET_ITEM_UUID  = str(uuid.uuid4()).upper()
 TOKEN_TEXT_UUID = str(uuid.uuid4()).upper()
-HTTP_UUID       = str(uuid.uuid4()).upper()
-NOTIF_UUID      = str(uuid.uuid4()).upper()
+HTTP_UUID      = str(uuid.uuid4()).upper()
+NOTIF_UUID     = str(uuid.uuid4()).upper()
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 # JSON body: \uFFFC = Shortcuts Object Replacement Character (variable placeholder)
@@ -54,9 +57,11 @@ JSON_BODY = '{"url":"\uFFFC","instant":true,"share_source":"ios_shortcut"}'
 URL_OFFSET = JSON_BODY.index('\uFFFC')
 
 def text_token(string):
+    """Plain static text — no variable substitution."""
     return {"Value": {"string": string}, "WFSerializationType": "WFTextTokenString"}
 
 def action_ref(output_name, output_uuid):
+    """Reference to the output of a previous action (used as inline variable)."""
     return {
         "Value": {
             "Aggrandizements": [],
@@ -68,6 +73,7 @@ def action_ref(output_name, output_uuid):
     }
 
 def token_string_with_var(template, offset, output_name, output_uuid):
+    """Text token string with one variable interpolated at `offset`."""
     return {
         "Value": {
             "attachmentsByRange": {
@@ -85,20 +91,39 @@ def token_string_with_var(template, offset, output_name, output_uuid):
 
 # ── Shortcut actions ──────────────────────────────────────────────────────────
 actions = [
-    # 0 — Extract URLs from share sheet (handles text blobs and clean URLs)
+    # 0 — Coerce share-sheet input to a plain text string.
+    #     Instagram/TikTok/Safari may pass URL items, text blobs, or rich text.
+    #     Using a "Text" action with ExtensionInput normalises everything to text
+    #     before the regex runs, which is the most compatible approach.
+    {
+        "WFWorkflowActionIdentifier": "is.workflow.actions.text",
+        "WFWorkflowActionParameters": {
+            "UUID": COERCE_UUID,
+            "WFTextActionText": {
+                "Value": {
+                    "attachmentsByRange": {
+                        "{0, 1}": {
+                            "Aggrandizements": [],
+                            "Type": "ExtensionInput",
+                        }
+                    },
+                    "string": "\uFFFC",
+                },
+                "WFSerializationType": "WFTextTokenString",
+            },
+        },
+    },
+    # 1 — Extract URLs from the coerced text string.
     {
         "WFWorkflowActionIdentifier": "is.workflow.actions.matchtext",
         "WFWorkflowActionParameters": {
             "UUID": MATCH_UUID,
-            "WFMatchTextPattern": "https?://[^\\s<>\"'\\u0000-\\u001f]+",
+            "WFMatchTextPattern": "https?://[^\\s<>\"']+",
             "WFMatchTextCaseSensitive": False,
-            "WFInput": {
-                "Value": {"Aggrandizements": [], "Type": "ExtensionInput"},
-                "WFSerializationType": "WFTextTokenAttachment",
-            },
+            "WFInput": action_ref("Text", COERCE_UUID),
         },
     },
-    # 1 — Get first matched URL
+    # 2 — Get first matched URL.
     {
         "WFWorkflowActionIdentifier": "is.workflow.actions.getitemfromlist",
         "WFWorkflowActionParameters": {
@@ -107,7 +132,7 @@ actions = [
             "WFInput": action_ref("Match Text", MATCH_UUID),
         },
     },
-    # 2 — Save token (either pre-embedded or filled by import question)
+    # 3 — Save token (either pre-embedded or filled by import question).
     {
         "WFWorkflowActionIdentifier": "is.workflow.actions.text",
         "WFWorkflowActionParameters": {
@@ -118,13 +143,15 @@ actions = [
             },
         },
     },
-    # 3 — POST to /api/public/share/save
+    # 4 — POST to /api/public/share/save.
+    #     WFURL must be a WFTextTokenString dict — a plain string is NOT accepted
+    #     by iOS 15+ and causes "The shortcut URL provided was invalid."
     {
         "WFWorkflowActionIdentifier": "is.workflow.actions.downloadurl",
         "WFWorkflowActionParameters": {
             "UUID": HTTP_UUID,
             "WFHTTPMethod": "POST",
-            "WFURL": SAVE_ENDPOINT,
+            "WFURL": text_token(SAVE_ENDPOINT),
             "WFHTTPHeaders": {
                 "Value": {
                     "WFDictionaryFieldValueItems": [
@@ -146,13 +173,13 @@ actions = [
             "WFHTTPBody": token_string_with_var(JSON_BODY, URL_OFFSET, "Get Item from List", GET_ITEM_UUID),
         },
     },
-    # 4 — Native notification
+    # 5 — Native notification.
     {
         "WFWorkflowActionIdentifier": "is.workflow.actions.notification",
         "WFWorkflowActionParameters": {
             "UUID": NOTIF_UUID,
-            "WFNotificationActionTitle": "STASHd",
-            "WFNotificationActionBody": "Saved ✓  AI is organizing it…",
+            "WFNotificationActionTitle": text_token("STASHd"),
+            "WFNotificationActionBody": text_token("Saved ✓  AI is organizing it…"),
             "WFNotificationActionPlaySound": False,
         },
     },
@@ -161,18 +188,18 @@ actions = [
 # ── Full shortcut dict ────────────────────────────────────────────────────────
 shortcut = {
     "WFWorkflowActions": actions,
-    "WFWorkflowClientVersion": "1105",
+    "WFWorkflowClientVersion": "1604",
     "WFWorkflowHasOutputFallback": False,
     "WFWorkflowHasShortcutInputVariables": True,
     "WFWorkflowIcon": {
         "WFWorkflowIconGlyphNumber": 59511,
         "WFWorkflowIconStartColor": -1524983041,  # pink
     },
-    # Import question only needed for the generic (non-personalised) shortcut
+    # Import question only needed for the generic (non-personalised) shortcut.
     **({"WFWorkflowImportQuestions": []} if PERSONAL else {
         "WFWorkflowImportQuestions": [
             {
-                "ActionIndex": 2,
+                "ActionIndex": 3,
                 "DefaultValue": "",
                 "ParameterKey": "WFTextActionText",
                 "Prompt": "Open STASHd → Profile → iOS Shortcut, then copy and paste your save token here.",
