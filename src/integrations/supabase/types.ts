@@ -86,6 +86,11 @@ export type Database = {
           product_description: string | null
           product_image_url: string | null
           affiliate_url: string | null
+          product_name: string | null
+          product_url: string | null
+          is_shoppable: boolean
+          affiliate_click_count: number
+          last_affiliate_click_at: string | null
           detected_products: Json | null
           title: string
           transcript: string | null
@@ -132,6 +137,11 @@ export type Database = {
           product_description?: string | null
           product_image_url?: string | null
           affiliate_url?: string | null
+          product_name?: string | null
+          product_url?: string | null
+          is_shoppable?: boolean
+          affiliate_click_count?: number
+          last_affiliate_click_at?: string | null
           detected_products?: Json | null
           title: string
           transcript?: string | null
@@ -178,6 +188,11 @@ export type Database = {
           product_description?: string | null
           product_image_url?: string | null
           affiliate_url?: string | null
+          product_name?: string | null
+          product_url?: string | null
+          is_shoppable?: boolean
+          affiliate_click_count?: number
+          last_affiliate_click_at?: string | null
           detected_products?: Json | null
           title?: string
           transcript?: string | null

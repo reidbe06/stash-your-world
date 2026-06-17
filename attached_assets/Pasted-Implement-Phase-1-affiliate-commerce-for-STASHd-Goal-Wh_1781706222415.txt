@@ -1,0 +1,81 @@
+Implement Phase 1 affiliate commerce for STASHd.
+
+Goal:
+When a saved item is product-related, STASHd should extract and display shoppable product information and a clear Buy Now button on the Save Detail page. Do NOT build a creator marketplace yet.
+
+Requirements:
+
+1. Database
+Add fields to saves if they do not already exist:
+- product_brand
+- product_name
+- product_price
+- product_retailer
+- product_category
+- product_description
+- product_url
+- affiliate_url
+- is_shoppable boolean
+- affiliate_click_count
+- last_affiliate_click_at
+
+2. AI extraction
+Update the existing AI categorization/extraction logic so when a save appears to contain a product, it extracts:
+- brand
+- product name
+- retailer
+- price if explicitly available
+- product category
+- product description
+- direct product URL if available
+
+Important:
+- Do not hallucinate brand, price, or retailer.
+- If unsure, leave the field blank.
+- Product-related clothing should still categorize as Fashion unless the content is clearly a general product review.
+
+3. Save Detail UI
+On the Save Detail page, if is_shoppable is true, show a “Products in this save” section near the top, directly under the title/summary.
+
+Display:
+- Product name
+- Brand
+- Retailer
+- Price
+- Description
+- Buy Now button
+
+The Buy Now button should use affiliate_url if available, otherwise product_url, otherwise original_url.
+
+4. Click tracking
+Create an endpoint:
+POST /api/saves/:id/affiliate-click
+
+When user clicks Buy Now:
+- increment affiliate_click_count
+- update last_affiliate_click_at
+- redirect user to affiliate_url/product_url/original_url
+
+5. Admin/future-ready
+For now, affiliate_url can be manually added through the database or edit form. Do not require full affiliate network integration yet.
+
+6. Edit Save
+Update Edit Save so user can edit:
+- product name
+- brand
+- retailer
+- price
+- product URL
+- affiliate URL
+- is_shoppable
+
+7. Testing
+Test with:
+- fashion reel
+- Amazon product link
+- skincare product
+- recipe save
+- travel save
+
+Product saves should show Buy Now.
+Non-product saves should not show Buy Now unless is_shoppable is true.

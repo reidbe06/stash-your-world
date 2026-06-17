@@ -37,6 +37,13 @@ export interface Item {
   recipe_steps?: string[];
   recipe_nutrition?: { calories_per_serving?: number | null; protein_g?: number | null; carbs_g?: number | null; fat_g?: number | null } | null;
   product_names?: string[];
+  product_name?: string | null;
+  product_brand?: string | null;
+  product_price?: string | null;
+  product_retailer?: string | null;
+  product_url?: string | null;
+  affiliate_url?: string | null;
+  is_shoppable?: boolean | null;
   confidence_score?: number | null;
   user_edited?: boolean | null;
   edited_at?: string | null;

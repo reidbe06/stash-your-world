@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Check, Loader2, Plus, FolderOpen } from "lucide-react";
+import { X, Check, Loader2, Plus, FolderOpen, ShoppingBag, ChevronDown, ChevronUp } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -72,6 +72,13 @@ interface EditFields {
   tags: string;
   description: string;
   url: string;
+  product_name: string;
+  product_brand: string;
+  product_retailer: string;
+  product_price: string;
+  product_url: string;
+  affiliate_url: string;
+  is_shoppable: boolean;
 }
 
 interface Props {
@@ -84,6 +91,7 @@ export function EditItemModal({ item, open, onClose }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
+  const [productOpen, setProductOpen] = useState(false);
 
   // When the user has manually moved a save, show the effective location —
   // not the original AI-assigned category that may still sit in item.category.
@@ -101,6 +109,13 @@ export function EditItemModal({ item, open, onClose }: Props) {
     tags: item.tags?.join(", ") ?? "",
     description: item.description ?? "",
     url: item.url ?? "",
+    product_name: item.product_name ?? "",
+    product_brand: item.product_brand ?? "",
+    product_retailer: item.product_retailer ?? "",
+    product_price: item.product_price ?? "",
+    product_url: item.product_url ?? "",
+    affiliate_url: item.affiliate_url ?? "",
+    is_shoppable: item.is_shoppable ?? false,
   });
 
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<Set<string> | null>(null);
@@ -159,6 +174,13 @@ export function EditItemModal({ item, open, onClose }: Props) {
         tags: item.tags?.join(", ") ?? "",
         description: item.description ?? "",
         url: item.url ?? "",
+        product_name: item.product_name ?? "",
+        product_brand: item.product_brand ?? "",
+        product_retailer: item.product_retailer ?? "",
+        product_price: item.product_price ?? "",
+        product_url: item.product_url ?? "",
+        affiliate_url: item.affiliate_url ?? "",
+        is_shoppable: item.is_shoppable ?? false,
       });
       setNewColName("");
       setSelectedCollectionIds(null);
@@ -238,6 +260,13 @@ export function EditItemModal({ item, open, onClose }: Props) {
       tags: parsedTags,
       description: fields.description.trim() || null,
       url: fields.url.trim() || null,
+      product_name: fields.product_name.trim() || null,
+      product_brand: fields.product_brand.trim() || null,
+      product_retailer: fields.product_retailer.trim() || null,
+      product_price: fields.product_price.trim() || null,
+      product_url: fields.product_url.trim() || null,
+      affiliate_url: fields.affiliate_url.trim() || null,
+      is_shoppable: fields.is_shoppable,
       updated_at: now,
     };
 
@@ -448,6 +477,134 @@ export function EditItemModal({ item, open, onClose }: Props) {
               placeholder="https://…"
               className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
             />
+          </div>
+
+          {/* ── Product Details ── */}
+          <div className="rounded-xl border border-border overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setProductOpen((v) => !v)}
+              className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-accent/40"
+            >
+              <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <ShoppingBag className="h-3.5 w-3.5" />
+                Product Details
+                {fields.is_shoppable && (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary normal-case tracking-normal">
+                    Shoppable
+                  </span>
+                )}
+              </span>
+              {productOpen
+                ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                : <ChevronDown className="h-4 w-4 text-muted-foreground" />
+              }
+            </button>
+
+            {productOpen && (
+              <div className="flex flex-col gap-4 border-t border-border px-4 py-4">
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Product Name
+                  </label>
+                  <input
+                    type="text"
+                    value={fields.product_name}
+                    onChange={(e) => setFields((f) => ({ ...f, product_name: e.target.value }))}
+                    placeholder="e.g. Laneige Lip Mask"
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Brand
+                    </label>
+                    <input
+                      type="text"
+                      value={fields.product_brand}
+                      onChange={(e) => setFields((f) => ({ ...f, product_brand: e.target.value }))}
+                      placeholder="e.g. Laneige"
+                      className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Retailer
+                    </label>
+                    <input
+                      type="text"
+                      value={fields.product_retailer}
+                      onChange={(e) => setFields((f) => ({ ...f, product_retailer: e.target.value }))}
+                      placeholder="e.g. Amazon"
+                      className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Price
+                  </label>
+                  <input
+                    type="text"
+                    value={fields.product_price}
+                    onChange={(e) => setFields((f) => ({ ...f, product_price: e.target.value }))}
+                    placeholder="e.g. $24.99"
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Product URL
+                  </label>
+                  <input
+                    type="url"
+                    value={fields.product_url}
+                    onChange={(e) => setFields((f) => ({ ...f, product_url: e.target.value }))}
+                    placeholder="https://…"
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Affiliate URL
+                  </label>
+                  <input
+                    type="url"
+                    value={fields.affiliate_url}
+                    onChange={(e) => setFields((f) => ({ ...f, affiliate_url: e.target.value }))}
+                    placeholder="https://…"
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-border bg-accent/20 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium">Mark as Shoppable</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Shows Buy Now button on this save</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFields((f) => ({ ...f, is_shoppable: !f.is_shoppable }))}
+                    className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                      fields.is_shoppable ? "bg-primary" : "bg-muted"
+                    }`}
+                    role="switch"
+                    aria-checked={fields.is_shoppable}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${
+                        fields.is_shoppable ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

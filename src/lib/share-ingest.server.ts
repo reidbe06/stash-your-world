@@ -502,6 +502,7 @@ CRITICAL ANTI-HALLUCINATION RULES:
 - product_price: ONLY populate when a specific price is explicitly mentioned. Include currency symbol. Otherwise null.
 - product_retailer: The retailer/seller name (Amazon, Target, Etsy, etc.), derivable from URL or description. Otherwise null.
 - product_category: Specific product sub-category (Skincare, Blender, etc.) grounded in provided text. Otherwise null.
+- product_name: The single primary product name being featured, reviewed, or promoted. null if not a product save. Do not repeat generic terms — only a real named product.
 - product_description: One factual sentence about what the product is/does, grounded strictly in provided text. Otherwise null.
 - detected_products: [] unless this is Products/Fashion content with explicitly named products in caption/transcript/hashtags. Each product_name must appear verbatim in the provided text. Never invent or infer from context alone.
 - travel_details: ONLY populate if content is travel-related. Object with optional destination, location, activities[]. Otherwise null.
@@ -551,6 +552,7 @@ ${collectionsHint}` },
               },
             },
             product_names: { type: "array", items: { type: "string" } },
+            product_name: { type: ["string", "null"], description: "Single primary product name being featured or reviewed. null if not a product save." },
             product_brand: { type: ["string", "null"], description: "Primary brand name for the product. null if not a product or brand not mentioned." },
             product_price: { type: ["string", "null"], description: "Price with currency symbol e.g. '$29.99'. null if price not mentioned." },
             product_retailer: { type: ["string", "null"], description: "Retailer or seller name (e.g. 'Amazon', 'Target', 'Nordstrom'). null if not identifiable." },
@@ -587,7 +589,7 @@ ${collectionsHint}` },
             "category", "content_type", "media_format", "generated_title", "subcategory", "tags",
             "summary", "notes", "suggested_collection",
             "key_takeaways", "recipe_ingredients", "recipe_steps",
-            "product_names", "product_brand", "product_price",
+            "product_names", "product_name", "product_brand", "product_price",
             "product_retailer", "product_category", "product_description",
             "detected_products",
             "confidence_score", "recipe_nutrition",
@@ -929,6 +931,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   let recipeSteps: string[];
   let recipeNutrition: any;
   let productNames: string[];
+  let productName: string | null = null;
   let productBrand: string | null;
   let productPrice: string | null;
   let productRetailer: string | null;
@@ -1050,6 +1053,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
     productRetailer = ai?.product_retailer ? String(ai.product_retailer).slice(0, 200) : null;
     productCategory = ai?.product_category ? String(ai.product_category).slice(0, 200) : null;
     productDescription = ai?.product_description ? String(ai.product_description).slice(0, 500) : null;
+    productName = ai?.product_name ? String(ai.product_name).slice(0, 300) : null;
     productImageUrl = null; // set from JSON-LD only
     // JSON-LD Product fields override AI
     if (meta?.product_brand) { productBrand = meta.product_brand; console.log(`[INGEST] JSON-LD product_brand: ${productBrand}`); }
@@ -1076,6 +1080,9 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
       }));
     detectedProducts = [...aiDetectedProducts, ...urlExtracted];
     if (detectedProducts.length) console.log(`[INGEST] detected_products: ${detectedProducts.length} items`);
+    // Fallback product_name from detected list or product_names array
+    if (!productName && detectedProducts.length > 0) productName = detectedProducts[0].product_name ?? null;
+    if (!productName && productNames.length > 0) productName = productNames[0];
 
     travelDetails =
       ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
@@ -1167,6 +1174,7 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   if (recipeSteps.length)     enrichmentPayload.recipe_steps      = recipeSteps;
   if (recipeNutrition != null) enrichmentPayload.recipe_nutrition  = recipeNutrition;
   if (productNames.length)    enrichmentPayload.product_names     = productNames;
+  if (productName != null)        enrichmentPayload.product_name        = productName;
   if (productBrand != null)       enrichmentPayload.product_brand       = productBrand;
   if (productPrice != null)       enrichmentPayload.product_price       = productPrice;
   if (productRetailer != null)    enrichmentPayload.product_retailer    = productRetailer;
@@ -1176,6 +1184,8 @@ export async function ingestSharedUrl(input: IngestInput): Promise<IngestResult>
   if (detectedProducts.length)    enrichmentPayload.detected_products   = detectedProducts;
   if (travelDetails != null)  enrichmentPayload.travel_details    = travelDetails;
   if (confidence != null)     enrichmentPayload.confidence_score  = confidence;
+  // Auto-derive is_shoppable when meaningful product data is present
+  enrichmentPayload.is_shoppable = !!(productBrand || productPrice || productRetailer || productName || (detectedProducts && detectedProducts.length > 0));
 
   const captionValue = caption ?? (
     (platform === "instagram_reel" || platform === "instagram" || platform === "tiktok") && transcript
@@ -1448,6 +1458,7 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     recipeNutritionRe = urlMeta.recipe_nutrition as Record<string, unknown>;
   }
   const productNames = cleanArr(ai?.product_names, 20, 200);
+  let productNameRe: string | null = ai?.product_name ? String(ai.product_name).slice(0, 300) : null;
   let productBrandRe: string | null = ai?.product_brand ? String(ai.product_brand).slice(0, 200) : null;
   let productPriceRe: string | null = ai?.product_price ? String(ai.product_price).slice(0, 100) : null;
   let productRetailerRe: string | null = ai?.product_retailer ? String(ai.product_retailer).slice(0, 200) : null;
@@ -1480,6 +1491,9 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     : [];
   const detectedProductsRe = [...aiDetectedProductsRe, ...reUrlExtracted];
   if (detectedProductsRe.length) console.log(`[RECATEGORIZE] detected_products: ${detectedProductsRe.length} items`);
+  if (!productNameRe && detectedProductsRe.length > 0) productNameRe = detectedProductsRe[0].product_name ?? null;
+  if (!productNameRe && productNames.length > 0) productNameRe = productNames[0];
+  const isShoppableRe = !!(productBrandRe || productPriceRe || productRetailerRe || productNameRe || detectedProductsRe.length);
 
   const travelDetails =
     ai?.travel_details && typeof ai.travel_details === "object" && !Array.isArray(ai.travel_details)
@@ -1519,11 +1533,13 @@ export async function recategorizeItem(input: RecategorizeInput): Promise<Recate
     recipe_steps: recipeSteps,
     recipe_nutrition: recipeNutritionRe,
     product_names: productNames,
+    product_name: productNameRe,
     product_brand: productBrandRe,
     product_price: productPriceRe,
     product_retailer: productRetailerRe,
     product_category: productCategoryRe,
     product_description: productDescriptionRe,
+    is_shoppable: isShoppableRe,
     ...(productImageUrlRe ? { product_image_url: productImageUrlRe } : {}),
     ...(detectedProductsRe.length ? { detected_products: detectedProductsRe } : {}),
     travel_details: travelDetails,
@@ -1909,6 +1925,7 @@ export async function reExtractItem(input: { userId: string; itemId: string }): 
   if (urlMeta?.recipe_nutrition) recipeNutrition = urlMeta.recipe_nutrition as Record<string, unknown>;
 
   const productNames = cleanArr(ai?.product_names, 20, 200);
+  let productName: string | null = ai?.product_name ? String(ai.product_name).slice(0, 300) : null;
   let productBrand: string | null = ai?.product_brand ? String(ai.product_brand).slice(0, 200) : (urlMeta?.product_brand ?? null);
   let productPrice: string | null = ai?.product_price ? String(ai.product_price).slice(0, 100) : (urlMeta?.product_price ?? null);
   let productRetailer: string | null = ai?.product_retailer ? String(ai.product_retailer).slice(0, 200) : (urlMeta?.product_retailer ?? null);
@@ -1953,11 +1970,13 @@ export async function reExtractItem(input: { userId: string; itemId: string }): 
     recipe_steps: recipeSteps,
     recipe_nutrition: recipeNutrition,
     product_names: productNames,
+    product_name: productName,
     product_brand: productBrand,
     product_price: productPrice,
     product_retailer: productRetailer,
     product_category: productCategory,
     product_description: productDescription,
+    is_shoppable: !!(productBrand || productPrice || productRetailer || productName),
     travel_details: travelDetails,
     confidence_score: confidence,
     processing_status: "ai_processed",

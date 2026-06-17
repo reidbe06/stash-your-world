@@ -55,13 +55,18 @@ type FullItem = Item & {
   media_format?: string | null;
   travel_details?: Record<string, unknown> | null;
   recipe_nutrition?: RecipeNutrition | null;
+  product_name?: string | null;
   product_brand?: string | null;
   product_price?: string | null;
   product_retailer?: string | null;
   product_category?: string | null;
   product_description?: string | null;
   product_image_url?: string | null;
+  product_url?: string | null;
   affiliate_url?: string | null;
+  is_shoppable?: boolean | null;
+  affiliate_click_count?: number | null;
+  last_affiliate_click_at?: string | null;
   detected_products?: DetectedProduct[] | null;
   user_override?: boolean | null;
   user_category?: string | null;
@@ -94,6 +99,7 @@ function ItemDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [reExtracting, setReExtracting] = useState(false);
+  const [buyingNow, setBuyingNow] = useState(false);
 
   const handleDelete = async () => {
     if (!item) return;
@@ -141,6 +147,28 @@ function ItemDetailPage() {
     } finally {
       setReExtracting(false);
     }
+  };
+
+  const handleBuyNow = async () => {
+    if (!item) return;
+    const targetUrl = item.affiliate_url || item.product_url || item.url;
+    if (!targetUrl) return;
+    setBuyingNow(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        fetch("/api/public/items/affiliate-click", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ item_id: item.id }),
+        }).catch(() => {});
+      }
+    } catch {}
+    window.open(targetUrl, "_blank", "noreferrer");
+    setBuyingNow(false);
   };
 
   const handleExtractRecipe = async () => {
@@ -243,11 +271,13 @@ function ItemDetailPage() {
     item.product_brand ||
     item.product_price ||
     item.product_retailer ||
+    item.product_name ||
     item.product_description ||
     item.product_image_url ||
-    item.affiliate_url
+    item.affiliate_url ||
+    item.product_url
   );
-  const showProductUI = isProduct || isFashion || hasProductData;
+  const showProductUI = isProduct || isFashion || hasProductData || item.is_shoppable === true;
   const hasIngredients = Array.isArray(item.recipe_ingredients) && item.recipe_ingredients.length > 0;
   const hasSteps = Array.isArray(item.recipe_steps) && item.recipe_steps.length > 0;
   const hasRecipeContent = hasIngredients || hasSteps;
@@ -318,7 +348,9 @@ function ItemDetailPage() {
           </p>
         )}
         <h1 className="text-xl font-extrabold leading-snug tracking-tight">
-          {item.title}
+          {item.product_name && item.product_name !== item.title
+            ? item.product_name
+            : item.title}
         </h1>
         {showProductUI && item.product_price && (
           <p className="text-2xl font-bold text-primary">{item.product_price}</p>
@@ -328,16 +360,16 @@ function ItemDetailPage() {
             {item.product_description}
           </p>
         )}
-        {showProductUI && (item.affiliate_url || item.url) && (
-          <a
-            href={item.affiliate_url || item.url!}
-            target="_blank"
-            rel="noreferrer"
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm hover:opacity-90 active:scale-[0.98] transition mt-1"
+        {showProductUI && (item.affiliate_url || item.product_url || item.url) && (
+          <button
+            type="button"
+            onClick={handleBuyNow}
+            disabled={buyingNow}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-primary py-3.5 text-base font-semibold text-primary-foreground shadow-sm hover:opacity-90 active:scale-[0.98] transition mt-1 disabled:opacity-70"
           >
             <ShoppingBag className="h-5 w-5" />
-            Buy Now
-          </a>
+            {buyingNow ? "Opening…" : "Buy Now"}
+          </button>
         )}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground pt-0.5">
           {host && <span className="font-medium">{host}</span>}

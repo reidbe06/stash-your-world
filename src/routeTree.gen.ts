@@ -35,6 +35,7 @@ import { Route as ApiPublicShareSaveRouteImport } from './routes/api/public/shar
 import { Route as ApiPublicItemsRecategorizeRouteImport } from './routes/api/public/items.recategorize'
 import { Route as ApiPublicItemsReExtractRouteImport } from './routes/api/public/items.re-extract'
 import { Route as ApiPublicItemsBackfillTitlesRouteImport } from './routes/api/public/items.backfill-titles'
+import { Route as ApiPublicItemsAffiliateClickRouteImport } from './routes/api/public/items.affiliate-click'
 import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/extension.save'
 import { Route as ApiPublicExtensionCollectionsRouteImport } from './routes/api/public/extension.collections'
 import { Route as AuthenticatedCollectionTypeSubRouteImport } from './routes/_authenticated/collection.$type.$sub'
@@ -173,6 +174,12 @@ const ApiPublicItemsBackfillTitlesRoute =
     path: '/api/public/items/backfill-titles',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicItemsAffiliateClickRoute =
+  ApiPublicItemsAffiliateClickRouteImport.update({
+    id: '/api/public/items/affiliate-click',
+    path: '/api/public/items/affiliate-click',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicExtensionSaveRoute = ApiPublicExtensionSaveRouteImport.update({
   id: '/api/public/extension/save',
   path: '/api/public/extension/save',
@@ -216,6 +223,7 @@ export interface FileRoutesByFullPath {
   '/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/items/affiliate-click': typeof ApiPublicItemsAffiliateClickRoute
   '/api/public/items/backfill-titles': typeof ApiPublicItemsBackfillTitlesRoute
   '/api/public/items/re-extract': typeof ApiPublicItemsReExtractRoute
   '/api/public/items/recategorize': typeof ApiPublicItemsRecategorizeRoute
@@ -246,6 +254,7 @@ export interface FileRoutesByTo {
   '/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/items/affiliate-click': typeof ApiPublicItemsAffiliateClickRoute
   '/api/public/items/backfill-titles': typeof ApiPublicItemsBackfillTitlesRoute
   '/api/public/items/re-extract': typeof ApiPublicItemsReExtractRoute
   '/api/public/items/recategorize': typeof ApiPublicItemsRecategorizeRoute
@@ -278,6 +287,7 @@ export interface FileRoutesById {
   '/_authenticated/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
   '/api/public/extension/save': typeof ApiPublicExtensionSaveRoute
+  '/api/public/items/affiliate-click': typeof ApiPublicItemsAffiliateClickRoute
   '/api/public/items/backfill-titles': typeof ApiPublicItemsBackfillTitlesRoute
   '/api/public/items/re-extract': typeof ApiPublicItemsReExtractRoute
   '/api/public/items/recategorize': typeof ApiPublicItemsRecategorizeRoute
@@ -310,6 +320,7 @@ export interface FileRouteTypes {
     | '/collection/$type/$sub'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/items/affiliate-click'
     | '/api/public/items/backfill-titles'
     | '/api/public/items/re-extract'
     | '/api/public/items/recategorize'
@@ -340,6 +351,7 @@ export interface FileRouteTypes {
     | '/collection/$type/$sub'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/items/affiliate-click'
     | '/api/public/items/backfill-titles'
     | '/api/public/items/re-extract'
     | '/api/public/items/recategorize'
@@ -371,6 +383,7 @@ export interface FileRouteTypes {
     | '/_authenticated/collection/$type/$sub'
     | '/api/public/extension/collections'
     | '/api/public/extension/save'
+    | '/api/public/items/affiliate-click'
     | '/api/public/items/backfill-titles'
     | '/api/public/items/re-extract'
     | '/api/public/items/recategorize'
@@ -389,6 +402,7 @@ export interface RootRouteChildren {
   ApiPublicUrlMetadataRoute: typeof ApiPublicUrlMetadataRoute
   ApiPublicExtensionCollectionsRoute: typeof ApiPublicExtensionCollectionsRoute
   ApiPublicExtensionSaveRoute: typeof ApiPublicExtensionSaveRoute
+  ApiPublicItemsAffiliateClickRoute: typeof ApiPublicItemsAffiliateClickRoute
   ApiPublicItemsBackfillTitlesRoute: typeof ApiPublicItemsBackfillTitlesRoute
   ApiPublicItemsReExtractRoute: typeof ApiPublicItemsReExtractRoute
   ApiPublicItemsRecategorizeRoute: typeof ApiPublicItemsRecategorizeRoute
@@ -579,6 +593,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicItemsBackfillTitlesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/items/affiliate-click': {
+      id: '/api/public/items/affiliate-click'
+      path: '/api/public/items/affiliate-click'
+      fullPath: '/api/public/items/affiliate-click'
+      preLoaderRoute: typeof ApiPublicItemsAffiliateClickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/extension/save': {
       id: '/api/public/extension/save'
       path: '/api/public/extension/save'
@@ -665,6 +686,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicUrlMetadataRoute: ApiPublicUrlMetadataRoute,
   ApiPublicExtensionCollectionsRoute: ApiPublicExtensionCollectionsRoute,
   ApiPublicExtensionSaveRoute: ApiPublicExtensionSaveRoute,
+  ApiPublicItemsAffiliateClickRoute: ApiPublicItemsAffiliateClickRoute,
   ApiPublicItemsBackfillTitlesRoute: ApiPublicItemsBackfillTitlesRoute,
   ApiPublicItemsReExtractRoute: ApiPublicItemsReExtractRoute,
   ApiPublicItemsRecategorizeRoute: ApiPublicItemsRecategorizeRoute,
