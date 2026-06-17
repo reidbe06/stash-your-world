@@ -88,7 +88,7 @@ export const Route = createFileRoute("/api/me/shortcut-upload")({
           data: { publicUrl },
         } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(storagePath);
 
-        const shortcutsDeepLink = `shortcuts://import-shortcut?url=${encodeURIComponent(publicUrl)}`;
+        const shortcutsDeepLink = `shortcuts://import-shortcut/?url=${encodeURIComponent(publicUrl)}&name=Save%20to%20STASHd`;
 
         console.log(`[shortcut-upload] ok userId=${userId} url=${publicUrl}`);
 
