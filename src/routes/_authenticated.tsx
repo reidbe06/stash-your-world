@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { UserAvatar } from "@/components/UserAvatar";
 import { useProfile } from "@/hooks/useProfile";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import { FeedbackButton } from "@/components/FeedbackButton";
 
 export const Route = createFileRoute("/_authenticated")({ component: AuthedLayout });
@@ -21,6 +22,7 @@ const navItems = [
 function AuthedLayout() {
   const { user, loading } = useAuth();
   const { data: profile } = useProfile();
+  const { isAdmin } = useIsAdmin();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -59,15 +61,17 @@ function AuthedLayout() {
                 </Link>
               );
             })}
-            <Link
-              to="/analytics"
-              className={cn(
-                "rounded-full px-4 py-2 text-sm font-medium transition",
-                pathname.startsWith("/analytics") ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Analytics
-            </Link>
+            {isAdmin && (
+              <Link
+                to="/analytics"
+                className={cn(
+                  "rounded-full px-4 py-2 text-sm font-medium transition",
+                  pathname.startsWith("/analytics") ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                Analytics
+              </Link>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <FeedbackButton />

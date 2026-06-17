@@ -5,6 +5,7 @@ import { Search, Plus, BarChart2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useProfile } from "@/hooks/useProfile";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import type { Item } from "@/components/ItemCard";
 import { CreateCategoryModal, type UserCategory } from "@/components/CreateCategoryModal";
 
@@ -276,6 +277,7 @@ function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { data: profile } = useProfile();
+  const { isAdmin } = useIsAdmin();
   const [createCatOpen, setCreateCatOpen] = useState(false);
 
   const { data: items, isLoading } = useQuery({
@@ -475,23 +477,25 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Commerce Analytics banner — mobile entry point (desktop uses nav) */}
-      <Link
-        to="/analytics"
-        className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm transition hover:opacity-90 md:hidden"
-        style={{ border: "1px solid rgba(253,88,151,0.15)" }}
-      >
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
-            <BarChart2 className="h-4.5 w-4.5 text-primary" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold leading-snug">Commerce Analytics</p>
-            <p className="text-[11px] text-muted-foreground">Clicks · shoppable saves · top brands</p>
+      {/* Commerce Analytics banner — admin only, mobile entry point (desktop uses nav) */}
+      {isAdmin && (
+        <Link
+          to="/analytics"
+          className="flex items-center justify-between rounded-2xl bg-white px-4 py-3.5 shadow-sm transition hover:opacity-90 md:hidden"
+          style={{ border: "1px solid rgba(253,88,151,0.15)" }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/10">
+              <BarChart2 className="h-4.5 w-4.5 text-primary" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold leading-snug">Commerce Analytics</p>
+              <p className="text-[11px] text-muted-foreground">Clicks · shoppable saves · top brands</p>
+            </div>
           </div>
-        </div>
-        <svg className="h-4 w-4 text-muted-foreground/50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-      </Link>
+          <svg className="h-4 w-4 text-muted-foreground/50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+        </Link>
+      )}
 
       {/* Zero-state nudge */}
       {!isLoading && totalCount === 0 && (

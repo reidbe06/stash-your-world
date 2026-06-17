@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, Tooltip,
@@ -9,6 +10,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({ meta: [{ title: "Commerce Analytics — STASHd" }] }),
@@ -57,6 +59,24 @@ function KpiCard({
 // ── main component ─────────────────────────────────────────────────────────────
 function AnalyticsPage() {
   const { user } = useAuth();
+  const { isAdmin, isLoading: adminLoading } = useIsAdmin();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!adminLoading && !isAdmin) {
+      navigate({ to: "/dashboard" });
+    }
+  }, [isAdmin, adminLoading, navigate]);
+
+  if (adminLoading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="h-8 w-8 animate-pulse rounded-full bg-primary/30" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) return null;
 
   const { data: items = [], isLoading } = useQuery<AnalyticsItem[]>({
     queryKey: ["analytics-items", user?.id],
