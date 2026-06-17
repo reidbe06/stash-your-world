@@ -9,14 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ShortcutDebugRouteImport } from './routes/shortcut-debug'
 import { Route as ShortcutRouteImport } from './routes/shortcut'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShareSlugRouteImport } from './routes/share.$slug'
-import { Route as ApiShortcutRouteImport } from './routes/api/shortcut'
 import { Route as AuthenticatedShareRouteImport } from './routes/_authenticated/share'
 import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
 import { Route as AuthenticatedSaveRouteImport } from './routes/_authenticated/save'
@@ -28,8 +26,6 @@ import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as ApiPublicUrlMetadataRouteImport } from './routes/api/public/url-metadata'
-import { Route as ApiMeShortcutUploadRouteImport } from './routes/api/me.shortcut-upload'
-import { Route as ApiMeShortcutRouteImport } from './routes/api/me.shortcut'
 import { Route as ApiMeSaveTokenRouteImport } from './routes/api/me.save-token'
 import { Route as ApiAdminAnalyticsRouteImport } from './routes/api/admin/analytics'
 import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
@@ -45,11 +41,6 @@ import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/
 import { Route as ApiPublicExtensionCollectionsRouteImport } from './routes/api/public/extension.collections'
 import { Route as AuthenticatedCollectionTypeSubRouteImport } from './routes/_authenticated/collection.$type.$sub'
 
-const ShortcutDebugRoute = ShortcutDebugRouteImport.update({
-  id: '/shortcut-debug',
-  path: '/shortcut-debug',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ShortcutRoute = ShortcutRouteImport.update({
   id: '/shortcut',
   path: '/shortcut',
@@ -77,11 +68,6 @@ const IndexRoute = IndexRouteImport.update({
 const ShareSlugRoute = ShareSlugRouteImport.update({
   id: '/share/$slug',
   path: '/share/$slug',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiShortcutRoute = ApiShortcutRouteImport.update({
-  id: '/api/shortcut',
-  path: '/api/shortcut',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedShareRoute = AuthenticatedShareRouteImport.update({
@@ -138,16 +124,6 @@ const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
 const ApiPublicUrlMetadataRoute = ApiPublicUrlMetadataRouteImport.update({
   id: '/api/public/url-metadata',
   path: '/api/public/url-metadata',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiMeShortcutUploadRoute = ApiMeShortcutUploadRouteImport.update({
-  id: '/api/me/shortcut-upload',
-  path: '/api/me/shortcut-upload',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiMeShortcutRoute = ApiMeShortcutRouteImport.update({
-  id: '/api/me/shortcut',
-  path: '/api/me/shortcut',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMeSaveTokenRoute = ApiMeSaveTokenRouteImport.update({
@@ -233,7 +209,6 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
-  '/shortcut-debug': typeof ShortcutDebugRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
@@ -244,7 +219,6 @@ export interface FileRoutesByFullPath {
   '/save': typeof AuthenticatedSaveRoute
   '/search': typeof AuthenticatedSearchRoute
   '/share': typeof AuthenticatedShareRoute
-  '/api/shortcut': typeof ApiShortcutRoute
   '/share/$slug': typeof ShareSlugRoute
   '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
@@ -252,8 +226,6 @@ export interface FileRoutesByFullPath {
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/api/admin/analytics': typeof ApiAdminAnalyticsRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
-  '/api/me/shortcut': typeof ApiMeShortcutRoute
-  '/api/me/shortcut-upload': typeof ApiMeShortcutUploadRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -269,7 +241,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
-  '/shortcut-debug': typeof ShortcutDebugRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
@@ -280,7 +251,6 @@ export interface FileRoutesByTo {
   '/save': typeof AuthenticatedSaveRoute
   '/search': typeof AuthenticatedSearchRoute
   '/share': typeof AuthenticatedShareRoute
-  '/api/shortcut': typeof ApiShortcutRoute
   '/share/$slug': typeof ShareSlugRoute
   '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
@@ -288,8 +258,6 @@ export interface FileRoutesByTo {
   '/item/$id': typeof AuthenticatedItemIdRoute
   '/api/admin/analytics': typeof ApiAdminAnalyticsRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
-  '/api/me/shortcut': typeof ApiMeShortcutRoute
-  '/api/me/shortcut-upload': typeof ApiMeShortcutUploadRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -307,7 +275,6 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
-  '/shortcut-debug': typeof ShortcutDebugRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/ask': typeof AuthenticatedAskRoute
   '/_authenticated/collections': typeof AuthenticatedCollectionsRouteWithChildren
@@ -318,7 +285,6 @@ export interface FileRoutesById {
   '/_authenticated/save': typeof AuthenticatedSaveRoute
   '/_authenticated/search': typeof AuthenticatedSearchRoute
   '/_authenticated/share': typeof AuthenticatedShareRoute
-  '/api/shortcut': typeof ApiShortcutRoute
   '/share/$slug': typeof ShareSlugRoute
   '/_authenticated/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
@@ -326,8 +292,6 @@ export interface FileRoutesById {
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
   '/api/admin/analytics': typeof ApiAdminAnalyticsRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
-  '/api/me/shortcut': typeof ApiMeShortcutRoute
-  '/api/me/shortcut-upload': typeof ApiMeShortcutUploadRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/_authenticated/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -345,7 +309,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
-    | '/shortcut-debug'
     | '/analytics'
     | '/ask'
     | '/collections'
@@ -356,7 +319,6 @@ export interface FileRouteTypes {
     | '/save'
     | '/search'
     | '/share'
-    | '/api/shortcut'
     | '/share/$slug'
     | '/category/$type'
     | '/collections/$id'
@@ -364,8 +326,6 @@ export interface FileRouteTypes {
     | '/item/$id'
     | '/api/admin/analytics'
     | '/api/me/save-token'
-    | '/api/me/shortcut'
-    | '/api/me/shortcut-upload'
     | '/api/public/url-metadata'
     | '/collection/$type/$sub'
     | '/api/public/extension/collections'
@@ -381,7 +341,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
-    | '/shortcut-debug'
     | '/analytics'
     | '/ask'
     | '/collections'
@@ -392,7 +351,6 @@ export interface FileRouteTypes {
     | '/save'
     | '/search'
     | '/share'
-    | '/api/shortcut'
     | '/share/$slug'
     | '/category/$type'
     | '/collections/$id'
@@ -400,8 +358,6 @@ export interface FileRouteTypes {
     | '/item/$id'
     | '/api/admin/analytics'
     | '/api/me/save-token'
-    | '/api/me/shortcut'
-    | '/api/me/shortcut-upload'
     | '/api/public/url-metadata'
     | '/collection/$type/$sub'
     | '/api/public/extension/collections'
@@ -418,7 +374,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
-    | '/shortcut-debug'
     | '/_authenticated/analytics'
     | '/_authenticated/ask'
     | '/_authenticated/collections'
@@ -429,7 +384,6 @@ export interface FileRouteTypes {
     | '/_authenticated/save'
     | '/_authenticated/search'
     | '/_authenticated/share'
-    | '/api/shortcut'
     | '/share/$slug'
     | '/_authenticated/category/$type'
     | '/_authenticated/collections/$id'
@@ -437,8 +391,6 @@ export interface FileRouteTypes {
     | '/_authenticated/item/$id'
     | '/api/admin/analytics'
     | '/api/me/save-token'
-    | '/api/me/shortcut'
-    | '/api/me/shortcut-upload'
     | '/api/public/url-metadata'
     | '/_authenticated/collection/$type/$sub'
     | '/api/public/extension/collections'
@@ -456,13 +408,9 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   SetupRoute: typeof SetupRoute
   ShortcutRoute: typeof ShortcutRoute
-  ShortcutDebugRoute: typeof ShortcutDebugRoute
-  ApiShortcutRoute: typeof ApiShortcutRoute
   ShareSlugRoute: typeof ShareSlugRoute
   ApiAdminAnalyticsRoute: typeof ApiAdminAnalyticsRoute
   ApiMeSaveTokenRoute: typeof ApiMeSaveTokenRoute
-  ApiMeShortcutRoute: typeof ApiMeShortcutRoute
-  ApiMeShortcutUploadRoute: typeof ApiMeShortcutUploadRoute
   ApiPublicUrlMetadataRoute: typeof ApiPublicUrlMetadataRoute
   ApiPublicExtensionCollectionsRoute: typeof ApiPublicExtensionCollectionsRoute
   ApiPublicExtensionSaveRoute: typeof ApiPublicExtensionSaveRoute
@@ -475,13 +423,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/shortcut-debug': {
-      id: '/shortcut-debug'
-      path: '/shortcut-debug'
-      fullPath: '/shortcut-debug'
-      preLoaderRoute: typeof ShortcutDebugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/shortcut': {
       id: '/shortcut'
       path: '/shortcut'
@@ -522,13 +463,6 @@ declare module '@tanstack/react-router' {
       path: '/share/$slug'
       fullPath: '/share/$slug'
       preLoaderRoute: typeof ShareSlugRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/shortcut': {
-      id: '/api/shortcut'
-      path: '/api/shortcut'
-      fullPath: '/api/shortcut'
-      preLoaderRoute: typeof ApiShortcutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/share': {
@@ -606,20 +540,6 @@ declare module '@tanstack/react-router' {
       path: '/api/public/url-metadata'
       fullPath: '/api/public/url-metadata'
       preLoaderRoute: typeof ApiPublicUrlMetadataRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/me/shortcut-upload': {
-      id: '/api/me/shortcut-upload'
-      path: '/api/me/shortcut-upload'
-      fullPath: '/api/me/shortcut-upload'
-      preLoaderRoute: typeof ApiMeShortcutUploadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/me/shortcut': {
-      id: '/api/me/shortcut'
-      path: '/api/me/shortcut'
-      fullPath: '/api/me/shortcut'
-      preLoaderRoute: typeof ApiMeShortcutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/me/save-token': {
@@ -781,13 +701,9 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   SetupRoute: SetupRoute,
   ShortcutRoute: ShortcutRoute,
-  ShortcutDebugRoute: ShortcutDebugRoute,
-  ApiShortcutRoute: ApiShortcutRoute,
   ShareSlugRoute: ShareSlugRoute,
   ApiAdminAnalyticsRoute: ApiAdminAnalyticsRoute,
   ApiMeSaveTokenRoute: ApiMeSaveTokenRoute,
-  ApiMeShortcutRoute: ApiMeShortcutRoute,
-  ApiMeShortcutUploadRoute: ApiMeShortcutUploadRoute,
   ApiPublicUrlMetadataRoute: ApiPublicUrlMetadataRoute,
   ApiPublicExtensionCollectionsRoute: ApiPublicExtensionCollectionsRoute,
   ApiPublicExtensionSaveRoute: ApiPublicExtensionSaveRoute,

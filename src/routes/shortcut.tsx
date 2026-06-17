@@ -1,8 +1,7 @@
-// Public Shortcut download/install landing page — no auth required.
-// On iPhone: tapping "Add to Shortcuts" opens the shortcuts:// URL scheme
-// which launches the Shortcuts app directly with the import dialog.
+// Public Shortcut landing page — no auth required.
+// Links to the Apple-signed iCloud shortcut URL; never serves a raw plist file.
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Logo } from "@/components/Logo";
 import {
   Download,
@@ -39,16 +38,20 @@ function useIsIOS() {
   return isIOS;
 }
 
+// Set to the published iCloud URL once the shortcut is created in the
+// iOS Shortcuts app and shared via "Copy iCloud Link".
+const ICLOUD_SHORTCUT_URL: string | null = null;
+
 const steps = [
   {
     n: "1",
-    heading: "Download the Shortcut",
-    body: "Tap the button below. iOS opens the Shortcuts app and shows you exactly what the shortcut does before you add it.",
+    heading: "Copy your save token",
+    body: "Open STASHd → Profile → iOS Shortcut → tap \"Copy My Token\". It goes to your clipboard.",
   },
   {
     n: "2",
-    heading: "Paste your save token",
-    body: "When prompted, open STASHd → Profile → iOS Shortcut section and copy your personal save token. Paste it once — Shortcuts remembers it forever.",
+    heading: "Add the Shortcut",
+    body: "Tap Add to Shortcuts below. When it asks \"Paste your STASHd token\", paste from clipboard. That's it — Shortcuts remembers it forever.",
   },
   {
     n: "3",
@@ -66,24 +69,23 @@ const works = [
   { icon: "🛍️", label: "Shopping" },
 ];
 
-function DownloadButton({ isIOS, label }: { isIOS: boolean; label: string }) {
+function DownloadButton({ label }: { label: string }) {
   const [triggered, setTriggered] = useState(false);
-  const [shortcutsLink, setShortcutsLink] = useState<string | null>(null);
 
-  const handleClick = useCallback(() => {
-    if (isIOS) {
-      // shortcuts:// scheme is the only reliable way to trigger import on iOS.
-      // Direct <a download> is silently ignored by iOS Safari.
-      const fileUrl = `${window.location.origin}/STASHd.shortcut`;
-      const sLink = `shortcuts://import-shortcut?url=${encodeURIComponent(fileUrl)}`;
-      setShortcutsLink(sLink);
-      setTriggered(true);
-      window.location.href = sLink;
-    } else {
-      // Desktop: direct download
-      window.location.href = "/STASHd.shortcut";
-    }
-  }, [isIOS]);
+  function handleClick() {
+    if (!ICLOUD_SHORTCUT_URL) return;
+    setTriggered(true);
+    const deepLink = `shortcuts://import-shortcut?url=${encodeURIComponent(ICLOUD_SHORTCUT_URL)}`;
+    window.location.href = deepLink;
+  }
+
+  if (!ICLOUD_SHORTCUT_URL) {
+    return (
+      <div className="mt-7 flex w-full items-center justify-center gap-2.5 rounded-full border border-dashed py-4 text-base font-bold text-muted-foreground cursor-not-allowed opacity-60">
+        <Download className="h-5 w-5 shrink-0" /> Coming soon
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -91,17 +93,15 @@ function DownloadButton({ isIOS, label }: { isIOS: boolean; label: string }) {
         onClick={handleClick}
         className="mt-7 flex w-full items-center justify-center gap-2.5 rounded-full bg-brand-gradient py-4 text-base font-bold text-primary-foreground shadow-brand transition active:scale-95"
       >
-        {isIOS ? <ExternalLink className="h-5 w-5 shrink-0" /> : <Download className="h-5 w-5 shrink-0" />}
+        <ExternalLink className="h-5 w-5 shrink-0" />
         {label}
       </button>
 
-      {/* Fallback for iOS if Shortcuts didn't open */}
-      {isIOS && triggered && shortcutsLink && (
+      {triggered && ICLOUD_SHORTCUT_URL && (
         <div className="rounded-xl border border-dashed border-amber-400/60 bg-amber-50 px-4 py-3 text-xs text-amber-800 text-left space-y-1.5">
           <p className="font-semibold">Shortcuts didn't open automatically?</p>
-          <p>Tap below — it will open the Shortcuts app directly:</p>
           <a
-            href={shortcutsLink}
+            href={`shortcuts://import-shortcut?url=${encodeURIComponent(ICLOUD_SHORTCUT_URL)}`}
             className="inline-flex items-center gap-1 font-semibold underline underline-offset-2"
           >
             <ExternalLink className="h-3 w-3 shrink-0" />
@@ -110,18 +110,11 @@ function DownloadButton({ isIOS, label }: { isIOS: boolean; label: string }) {
         </div>
       )}
 
-      {!isIOS && (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Open this page on your iPhone for the best experience.
-        </p>
-      )}
     </div>
   );
 }
 
 function ShortcutPage() {
-  const isIOS = useIsIOS();
-
   return (
     <div className="min-h-screen bg-background">
       {/* Nav */}
@@ -157,7 +150,7 @@ function ShortcutPage() {
         </p>
 
         {/* Download CTA */}
-        <DownloadButton isIOS={isIOS} label={isIOS ? "Add to Shortcuts" : "Download Shortcut"} />
+        <DownloadButton label="Add to Shortcuts" />
 
         {/* Works with */}
         <div className="mt-10">
@@ -234,7 +227,7 @@ function ShortcutPage() {
         </div>
 
         {/* Second CTA */}
-        <DownloadButton isIOS={isIOS} label={isIOS ? "Add to Shortcuts" : "Download Shortcut"} />
+        <DownloadButton label="Add to Shortcuts" />
 
         <p className="mt-4 text-xs text-muted-foreground">
           Need an account?{" "}
