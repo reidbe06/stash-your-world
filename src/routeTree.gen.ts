@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ShortcutDebugRouteImport } from './routes/shortcut-debug'
 import { Route as ShortcutRouteImport } from './routes/shortcut'
 import { Route as SetupRouteImport } from './routes/setup'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -44,6 +45,11 @@ import { Route as ApiPublicExtensionSaveRouteImport } from './routes/api/public/
 import { Route as ApiPublicExtensionCollectionsRouteImport } from './routes/api/public/extension.collections'
 import { Route as AuthenticatedCollectionTypeSubRouteImport } from './routes/_authenticated/collection.$type.$sub'
 
+const ShortcutDebugRoute = ShortcutDebugRouteImport.update({
+  id: '/shortcut-debug',
+  path: '/shortcut-debug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShortcutRoute = ShortcutRouteImport.update({
   id: '/shortcut',
   path: '/shortcut',
@@ -227,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
+  '/shortcut-debug': typeof ShortcutDebugRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
@@ -262,6 +269,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
+  '/shortcut-debug': typeof ShortcutDebugRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
@@ -299,6 +307,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
+  '/shortcut-debug': typeof ShortcutDebugRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/ask': typeof AuthenticatedAskRoute
   '/_authenticated/collections': typeof AuthenticatedCollectionsRouteWithChildren
@@ -336,6 +345,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
+    | '/shortcut-debug'
     | '/analytics'
     | '/ask'
     | '/collections'
@@ -371,6 +381,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
+    | '/shortcut-debug'
     | '/analytics'
     | '/ask'
     | '/collections'
@@ -407,6 +418,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
+    | '/shortcut-debug'
     | '/_authenticated/analytics'
     | '/_authenticated/ask'
     | '/_authenticated/collections'
@@ -444,6 +456,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   SetupRoute: typeof SetupRoute
   ShortcutRoute: typeof ShortcutRoute
+  ShortcutDebugRoute: typeof ShortcutDebugRoute
   ApiShortcutRoute: typeof ApiShortcutRoute
   ShareSlugRoute: typeof ShareSlugRoute
   ApiAdminAnalyticsRoute: typeof ApiAdminAnalyticsRoute
@@ -462,6 +475,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/shortcut-debug': {
+      id: '/shortcut-debug'
+      path: '/shortcut-debug'
+      fullPath: '/shortcut-debug'
+      preLoaderRoute: typeof ShortcutDebugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shortcut': {
       id: '/shortcut'
       path: '/shortcut'
@@ -761,6 +781,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   SetupRoute: SetupRoute,
   ShortcutRoute: ShortcutRoute,
+  ShortcutDebugRoute: ShortcutDebugRoute,
   ApiShortcutRoute: ApiShortcutRoute,
   ShareSlugRoute: ShareSlugRoute,
   ApiAdminAnalyticsRoute: ApiAdminAnalyticsRoute,
