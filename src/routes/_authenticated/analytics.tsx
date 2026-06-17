@@ -1,12 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, Tooltip,
 } from "recharts";
 import {
   ShoppingBag, MousePointerClick, TrendingUp, AlertCircle,
-  ExternalLink, Package, Tag, Percent, ChevronRight,
+  ExternalLink, Package, Tag, Percent, ChevronRight, Users, UserCheck, UserPlus, Bookmark,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -18,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/analytics")({
   component: AnalyticsPage,
 });
 
-// ── types ──────────────────────────────────────────────────────────────────────
+// ── types ─────────────────────────────────────────────────────────────────────
 type AnalyticsItem = {
   id: string;
   title: string;
@@ -30,6 +29,18 @@ type AnalyticsItem = {
   product_url: string | null;
   is_shoppable: boolean;
   affiliate_click_count: number;
+  user_id: string;
+  created_at: string;
+  last_affiliate_click_at: string | null;
+};
+
+type PlatformStats = {
+  totalUsers: number;
+  newUsersThisWeek: number;
+  activeUsersToday: number;
+  activeUsersThisWeek: number;
+  totalSaves: number;
+  savesThisWeek: number;
 };
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -57,7 +68,7 @@ function KpiCard({
   );
 }
 
-// ── main component ─────────────────────────────────────────────────────────────
+// ── main component ────────────────────────────────────────────────────────────
 function AnalyticsPage() {
   const { user } = useAuth();
   const { isAdmin, isLoading: adminLoading } = useIsAdmin();
@@ -100,9 +111,14 @@ function AnalyticsPage() {
   }
   // ── END TEMPORARY DEBUG ──
 
-  const { data: items = [], isLoading } = useQuery<AnalyticsItem[]>({
+  return <AnalyticsDashboard user={user} />;
+}
+
+// ── dashboard (only mounts when isAdmin = true) ───────────────────────────────
+function AnalyticsDashboard({ user }: { user: { id: string } | null }) {
+  const { data: analyticsData, isLoading } = useQuery<{ items: AnalyticsItem[]; stats: PlatformStats }>({
     queryKey: ["analytics-items-all"],
-    enabled: !!user && isAdmin,
+    enabled: !!user,
     staleTime: 60_000,
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -112,23 +128,41 @@ function AnalyticsPage() {
       });
       if (!res.ok) throw new Error(`Analytics fetch failed: ${res.status}`);
       const json = await res.json();
-      return (json.items ?? []).map((r: any) => ({
-        ...r,
-        is_shoppable: !!r.is_shoppable,
-        affiliate_click_count: r.affiliate_click_count ?? 0,
-      }));
+      return {
+        items: (json.items ?? []).map((r: any) => ({
+          ...r,
+          is_shoppable: !!r.is_shoppable,
+          affiliate_click_count: r.affiliate_click_count ?? 0,
+        })),
+        stats: json.stats ?? {
+          totalUsers: 0,
+          newUsersThisWeek: 0,
+          activeUsersToday: 0,
+          activeUsersThisWeek: 0,
+          totalSaves: 0,
+          savesThisWeek: 0,
+        },
+      };
     },
   });
 
-  // ── derived metrics ─────────────────────────────────────────────────────────
-  const shoppable       = items.filter((i) => i.is_shoppable);
-  const totalClicks     = items.reduce((s, i) => s + i.affiliate_click_count, 0);
-  const totalSaves      = items.length;
-  const withLinks       = shoppable.filter((i) => i.affiliate_url || i.product_url);
-  const missingLinks    = shoppable.filter((i) => !i.affiliate_url && !i.product_url);
-  const ctr             = shoppable.length ? (totalClicks / shoppable.length) : 0;
+  const items = analyticsData?.items ?? [];
+  const pStats: PlatformStats = analyticsData?.stats ?? {
+    totalUsers: 0,
+    newUsersThisWeek: 0,
+    activeUsersToday: 0,
+    activeUsersThisWeek: 0,
+    totalSaves: 0,
+    savesThisWeek: 0,
+  };
 
-  // clicks by category
+  // ── derived commerce metrics ──────────────────────────────────────────────
+  const shoppable    = items.filter((i) => i.is_shoppable);
+  const totalClicks  = items.reduce((s, i) => s + i.affiliate_click_count, 0);
+  const withLinks    = shoppable.filter((i) => i.affiliate_url || i.product_url);
+  const missingLinks = shoppable.filter((i) => !i.affiliate_url && !i.product_url);
+  const ctr          = shoppable.length ? totalClicks / shoppable.length : 0;
+
   const byCategory = Object.entries(
     items.reduce<Record<string, { saves: number; clicks: number; shoppable: number }>>((acc, item) => {
       const cat = item.category || item.type || "Uncategorized";
@@ -144,13 +178,11 @@ function AnalyticsPage() {
     .slice(0, 10)
     .map(([category, v]) => ({ category, ...v }));
 
-  // top clicked saves
   const topSaves = [...items]
     .filter((i) => i.affiliate_click_count > 0)
     .sort((a, b) => b.affiliate_click_count - a.affiliate_click_count)
     .slice(0, 10);
 
-  // top brands
   const brandMap = items.reduce<Record<string, number>>((acc, i) => {
     if (i.product_brand && i.affiliate_click_count > 0) {
       acc[i.product_brand] = (acc[i.product_brand] ?? 0) + i.affiliate_click_count;
@@ -173,44 +205,37 @@ function AnalyticsPage() {
 
   return (
     <div className="space-y-8 pb-10">
+
       {/* ── Header ── */}
       <div>
         <h1 className="text-2xl font-extrabold tracking-tight">Commerce Analytics</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Performance across your {totalSaves.toLocaleString()} saved item{totalSaves !== 1 ? "s" : ""}
+          Platform-wide performance across {pStats.totalSaves.toLocaleString()} saved item{pStats.totalSaves !== 1 ? "s" : ""}
         </p>
       </div>
 
-      {/* ── KPI cards ── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <KpiCard
-          label="Shoppable Saves"
-          value={shoppable.length}
-          sub={`${pct(shoppable.length, totalSaves)} of all saves`}
-          icon={ShoppingBag}
-          color="#FD5897"
-        />
-        <KpiCard
-          label="Total Clicks"
-          value={totalClicks}
-          sub="Buy Now taps"
-          icon={MousePointerClick}
-          color="#a855f7"
-        />
-        <KpiCard
-          label="Avg CTR"
-          value={ctr.toFixed(2)}
-          sub="clicks per shoppable save"
-          icon={Percent}
-          color="#3b82f6"
-        />
-        <KpiCard
-          label="Has Links"
-          value={withLinks.length}
-          sub={`${missingLinks.length} still missing`}
-          icon={TrendingUp}
-          color="#10b981"
-        />
+      {/* ── Founder Overview ── */}
+      <div>
+        <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">Founder Overview</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <KpiCard label="Total Users" value={pStats.totalUsers.toLocaleString()} sub="all-time signups" icon={Users} color="#6366f1" />
+          <KpiCard label="Active Today" value={pStats.activeUsersToday.toLocaleString()} sub="saved or clicked today" icon={UserCheck} color="#FD5897" />
+          <KpiCard label="Active This Week" value={pStats.activeUsersThisWeek.toLocaleString()} sub="saved or clicked (7d)" icon={TrendingUp} color="#a855f7" />
+          <KpiCard label="New Users (7d)" value={pStats.newUsersThisWeek.toLocaleString()} sub="joined this week" icon={UserPlus} color="#10b981" />
+          <KpiCard label="Total Saves" value={pStats.totalSaves.toLocaleString()} sub="across all users" icon={Bookmark} color="#3b82f6" />
+          <KpiCard label="Saves This Week" value={pStats.savesThisWeek.toLocaleString()} sub="new saves (7d)" icon={ShoppingBag} color="#f59e0b" />
+        </div>
+      </div>
+
+      {/* ── Commerce Performance ── */}
+      <div>
+        <h2 className="mb-3 text-xs font-bold uppercase tracking-widest text-muted-foreground">Commerce Performance</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <KpiCard label="Shoppable Saves" value={shoppable.length} sub={`${pct(shoppable.length, pStats.totalSaves)} of all saves`} icon={ShoppingBag} color="#FD5897" />
+          <KpiCard label="Total Clicks" value={totalClicks} sub="Buy Now taps" icon={MousePointerClick} color="#a855f7" />
+          <KpiCard label="Avg CTR" value={ctr.toFixed(2)} sub="clicks per shoppable save" icon={Percent} color="#3b82f6" />
+          <KpiCard label="Has Links" value={withLinks.length} sub={`${missingLinks.length} still missing`} icon={TrendingUp} color="#10b981" />
+        </div>
       </div>
 
       {/* ── Clicks by category chart ── */}
@@ -218,21 +243,10 @@ function AnalyticsPage() {
         <div className="rounded-2xl border border-border/40 bg-white p-5 shadow-sm">
           <h2 className="mb-4 text-sm font-bold">Clicks by Category</h2>
           <ResponsiveContainer width="100%" height={Math.max(180, byCategory.length * 40)}>
-            <BarChart
-              data={byCategory}
-              layout="vertical"
-              margin={{ top: 0, right: 24, left: 0, bottom: 0 }}
-            >
+            <BarChart data={byCategory} layout="vertical" margin={{ top: 0, right: 24, left: 0, bottom: 0 }}>
               <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#f0f0f0" />
               <XAxis type="number" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis
-                type="category"
-                dataKey="category"
-                tick={{ fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                width={90}
-              />
+              <YAxis type="category" dataKey="category" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={90} />
               <Tooltip
                 cursor={{ fill: "#f5f5f5" }}
                 contentStyle={{ borderRadius: 12, fontSize: 12, border: "1px solid #e5e7eb" }}
@@ -288,9 +302,7 @@ function AnalyticsPage() {
                     {i + 1}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="truncate text-sm font-medium leading-snug">
-                      {item.product_name || item.title}
-                    </p>
+                    <p className="truncate text-sm font-medium leading-snug">{item.product_name || item.title}</p>
                     <p className="text-[11px] text-muted-foreground mt-0.5">
                       {[item.product_brand, item.category || item.type].filter(Boolean).join(" · ")}
                     </p>
@@ -310,8 +322,6 @@ function AnalyticsPage() {
 
       {/* ── Top brands + CTR by category (side-by-side on desktop) ── */}
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-
-        {/* Top clicked brands */}
         {topBrands.length > 0 && (
           <div className="rounded-2xl border border-border/40 bg-white shadow-sm overflow-hidden">
             <div className="flex items-center gap-2 border-b border-border/40 px-5 py-3.5">
@@ -330,10 +340,7 @@ function AnalyticsPage() {
                       <span className="ml-2 shrink-0 text-xs font-bold text-primary">{clicks}</span>
                     </div>
                     <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-brand-gradient"
-                        style={{ width: `${(clicks / maxBrandClicks) * 100}%` }}
-                      />
+                      <div className="h-full rounded-full bg-brand-gradient" style={{ width: `${(clicks / maxBrandClicks) * 100}%` }} />
                     </div>
                   </div>
                 </li>
@@ -342,7 +349,6 @@ function AnalyticsPage() {
           </div>
         )}
 
-        {/* CTR by category table */}
         {byCategory.length > 0 && (
           <div className="rounded-2xl border border-border/40 bg-white shadow-sm overflow-hidden">
             <div className="flex items-center gap-2 border-b border-border/40 px-5 py-3.5">
@@ -407,8 +413,7 @@ function AnalyticsPage() {
                   <div className="flex-1 min-w-0">
                     <p className="truncate text-sm font-medium">{item.product_name || item.title}</p>
                     <p className="text-[11px] text-muted-foreground">
-                      {item.category || item.type}
-                      {item.product_brand ? ` · ${item.product_brand}` : ""}
+                      {item.category || item.type}{item.product_brand ? ` · ${item.product_brand}` : ""}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -441,6 +446,7 @@ function AnalyticsPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
