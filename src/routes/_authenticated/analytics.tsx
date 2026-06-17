@@ -10,7 +10,6 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
-import { useProfile } from "@/hooks/useProfile";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   head: () => ({ meta: [{ title: "Commerce Analytics — STASHd" }] }),
@@ -72,11 +71,9 @@ function KpiCard({
 function AnalyticsPage() {
   const { user } = useAuth();
   const { isAdmin, isLoading: adminLoading } = useIsAdmin();
-  const { data: profile, isLoading: profileLoading } = useProfile();
   const navigate = useNavigate();
 
-  // ── TEMPORARY DEBUG — remove after confirming admin access works ──
-  if (adminLoading || profileLoading) {
+  if (adminLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
         <div className="h-8 w-8 animate-pulse rounded-full bg-primary/30" />
@@ -85,31 +82,9 @@ function AnalyticsPage() {
   }
 
   if (!isAdmin) {
-    return (
-      <div className="mx-auto max-w-lg p-8 font-mono text-sm">
-        <div className="rounded-2xl border-2 border-red-400 bg-red-50 p-6 space-y-3">
-          <p className="text-base font-bold text-red-700">🔍 Admin Debug — Redirect Intercepted</p>
-          <div className="space-y-2 text-red-900">
-            <div className="flex gap-2"><span className="font-semibold w-36 shrink-0">User email:</span><span className="break-all">{user?.email ?? "—"}</span></div>
-            <div className="flex gap-2"><span className="font-semibold w-36 shrink-0">User ID:</span><span className="break-all">{user?.id ?? "—"}</span></div>
-            <div className="flex gap-2"><span className="font-semibold w-36 shrink-0">Profile found:</span><span>{profile ? "YES" : "NO — profile row missing"}</span></div>
-            <div className="flex gap-2"><span className="font-semibold w-36 shrink-0">is_admin value:</span><span>{profile ? String((profile as any).is_admin) : "n/a"}</span></div>
-            <div className="flex gap-2"><span className="font-semibold w-36 shrink-0">isAdmin (hook):</span><span>{String(isAdmin)}</span></div>
-            <div className="flex gap-2"><span className="font-semibold w-36 shrink-0">Redirect reason:</span><span>
-              {!user ? "No authenticated user" :
-               !profile ? "No profile row found for this user_id" :
-               (profile as any).is_admin === null ? "is_admin column is NULL (default not applied?)" :
-               (profile as any).is_admin === false ? "is_admin is explicitly false" :
-               (profile as any).is_admin === undefined ? "is_admin column missing from profile row" :
-               `Unexpected value: ${JSON.stringify((profile as any).is_admin)}`}
-            </span></div>
-            <div className="flex gap-2"><span className="font-semibold w-36 shrink-0">Raw profile:</span><span className="break-all">{JSON.stringify(profile)}</span></div>
-          </div>
-        </div>
-      </div>
-    );
+    navigate({ to: "/dashboard" });
+    return null;
   }
-  // ── END TEMPORARY DEBUG ──
 
   return <AnalyticsDashboard user={user} />;
 }

@@ -25,7 +25,6 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
 import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
-import { Route as AuthenticatedAdminDebugRouteImport } from './routes/_authenticated/admin-debug'
 import { Route as ApiPublicUrlMetadataRouteImport } from './routes/api/public/url-metadata'
 import { Route as ApiMeShortcutRouteImport } from './routes/api/me.shortcut'
 import { Route as ApiMeSaveTokenRouteImport } from './routes/api/me.save-token'
@@ -123,11 +122,6 @@ const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedAdminDebugRoute = AuthenticatedAdminDebugRouteImport.update({
-  id: '/admin-debug',
-  path: '/admin-debug',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const ApiPublicUrlMetadataRoute = ApiPublicUrlMetadataRouteImport.update({
   id: '/api/public/url-metadata',
   path: '/api/public/url-metadata',
@@ -221,7 +215,6 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
-  '/admin-debug': typeof AuthenticatedAdminDebugRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
@@ -255,7 +248,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
-  '/admin-debug': typeof AuthenticatedAdminDebugRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
@@ -291,7 +283,6 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
-  '/_authenticated/admin-debug': typeof AuthenticatedAdminDebugRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/ask': typeof AuthenticatedAskRoute
   '/_authenticated/collections': typeof AuthenticatedCollectionsRouteWithChildren
@@ -327,7 +318,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
-    | '/admin-debug'
     | '/analytics'
     | '/ask'
     | '/collections'
@@ -361,7 +351,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
-    | '/admin-debug'
     | '/analytics'
     | '/ask'
     | '/collections'
@@ -396,7 +385,6 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
-    | '/_authenticated/admin-debug'
     | '/_authenticated/analytics'
     | '/_authenticated/ask'
     | '/_authenticated/collections'
@@ -560,13 +548,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/admin-debug': {
-      id: '/_authenticated/admin-debug'
-      path: '/admin-debug'
-      fullPath: '/admin-debug'
-      preLoaderRoute: typeof AuthenticatedAdminDebugRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/api/public/url-metadata': {
       id: '/api/public/url-metadata'
       path: '/api/public/url-metadata'
@@ -697,7 +678,6 @@ const AuthenticatedCollectionsRouteWithChildren =
   )
 
 interface AuthenticatedRouteChildren {
-  AuthenticatedAdminDebugRoute: typeof AuthenticatedAdminDebugRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedAskRoute: typeof AuthenticatedAskRoute
   AuthenticatedCollectionsRoute: typeof AuthenticatedCollectionsRouteWithChildren
@@ -715,7 +695,6 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
-  AuthenticatedAdminDebugRoute: AuthenticatedAdminDebugRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedAskRoute: AuthenticatedAskRoute,
   AuthenticatedCollectionsRoute: AuthenticatedCollectionsRouteWithChildren,
