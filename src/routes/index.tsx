@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Bookmark, Search, Share2, ArrowRight, Sparkles, Brain, Zap, Users, ShoppingBag, ShoppingCart, MapPin, Home } from "lucide-react";
 import { Logo } from "@/components/Logo";
+import { HeroAnimation } from "@/components/HeroAnimation";
 import { useAuth } from "@/lib/auth";
 import { joinWaitlist } from "@/lib/waitlist.functions";
 
@@ -173,32 +174,9 @@ function Landing() {
             </div>
           </div>
 
-          {/* Phone mock */}
-          <div className="relative">
-            <div className="absolute -inset-10 bg-brand-gradient opacity-25 blur-3xl" />
-            <div className="relative mx-auto w-full max-w-sm rounded-[2.5rem] border-[10px] border-foreground/90 bg-card p-4 shadow-brand">
-              <div className="flex items-center justify-between pb-3">
-                <Logo size="sm" />
-                <div className="h-2 w-2 rounded-full bg-primary" />
-              </div>
-              <div className="space-y-2">
-                {[
-                  { label: "All Saves", n: 1248 },
-                  { label: "Recipes", n: 243 },
-                  { label: "Fashion", n: 132 },
-                  { label: "Home & Decor", n: 98 },
-                  { label: "Travel", n: 87 },
-                ].map((c) => (
-                  <div key={c.label} className="flex items-center justify-between rounded-2xl bg-muted/60 px-4 py-3">
-                    <span className="text-sm font-semibold">{c.label}</span>
-                    <span className="text-xs font-medium text-muted-foreground">{c.n}</span>
-                  </div>
-                ))}
-              </div>
-              <button className="mt-4 w-full rounded-full bg-brand-gradient py-3 text-sm font-semibold text-primary-foreground shadow-brand">
-                + Save an Item
-              </button>
-            </div>
+          {/* Animated hero visual */}
+          <div className="flex items-center justify-center">
+            <HeroAnimation />
           </div>
         </div>
       </section>
