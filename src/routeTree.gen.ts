@@ -28,6 +28,7 @@ import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authentica
 import { Route as ApiPublicUrlMetadataRouteImport } from './routes/api/public/url-metadata'
 import { Route as ApiMeShortcutRouteImport } from './routes/api/me.shortcut'
 import { Route as ApiMeSaveTokenRouteImport } from './routes/api/me.save-token'
+import { Route as ApiAdminAnalyticsRouteImport } from './routes/api/admin/analytics'
 import { Route as AuthenticatedItemIdRouteImport } from './routes/_authenticated/item.$id'
 import { Route as AuthenticatedFolderIdRouteImport } from './routes/_authenticated/folder.$id'
 import { Route as AuthenticatedCollectionsIdRouteImport } from './routes/_authenticated/collections.$id'
@@ -136,6 +137,11 @@ const ApiMeSaveTokenRoute = ApiMeSaveTokenRouteImport.update({
   path: '/api/me/save-token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminAnalyticsRoute = ApiAdminAnalyticsRouteImport.update({
+  id: '/api/admin/analytics',
+  path: '/api/admin/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedItemIdRoute = AuthenticatedItemIdRouteImport.update({
   id: '/item/$id',
   path: '/item/$id',
@@ -224,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/folder/$id': typeof AuthenticatedFolderIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
+  '/api/admin/analytics': typeof ApiAdminAnalyticsRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
@@ -256,6 +263,7 @@ export interface FileRoutesByTo {
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/folder/$id': typeof AuthenticatedFolderIdRoute
   '/item/$id': typeof AuthenticatedItemIdRoute
+  '/api/admin/analytics': typeof ApiAdminAnalyticsRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
@@ -290,6 +298,7 @@ export interface FileRoutesById {
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
   '/_authenticated/folder/$id': typeof AuthenticatedFolderIdRoute
   '/_authenticated/item/$id': typeof AuthenticatedItemIdRoute
+  '/api/admin/analytics': typeof ApiAdminAnalyticsRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
@@ -324,6 +333,7 @@ export interface FileRouteTypes {
     | '/collections/$id'
     | '/folder/$id'
     | '/item/$id'
+    | '/api/admin/analytics'
     | '/api/me/save-token'
     | '/api/me/shortcut'
     | '/api/public/url-metadata'
@@ -356,6 +366,7 @@ export interface FileRouteTypes {
     | '/collections/$id'
     | '/folder/$id'
     | '/item/$id'
+    | '/api/admin/analytics'
     | '/api/me/save-token'
     | '/api/me/shortcut'
     | '/api/public/url-metadata'
@@ -389,6 +400,7 @@ export interface FileRouteTypes {
     | '/_authenticated/collections/$id'
     | '/_authenticated/folder/$id'
     | '/_authenticated/item/$id'
+    | '/api/admin/analytics'
     | '/api/me/save-token'
     | '/api/me/shortcut'
     | '/api/public/url-metadata'
@@ -409,6 +421,7 @@ export interface RootRouteChildren {
   SetupRoute: typeof SetupRoute
   ShortcutRoute: typeof ShortcutRoute
   ShareSlugRoute: typeof ShareSlugRoute
+  ApiAdminAnalyticsRoute: typeof ApiAdminAnalyticsRoute
   ApiMeSaveTokenRoute: typeof ApiMeSaveTokenRoute
   ApiMeShortcutRoute: typeof ApiMeShortcutRoute
   ApiPublicUrlMetadataRoute: typeof ApiPublicUrlMetadataRoute
@@ -554,6 +567,13 @@ declare module '@tanstack/react-router' {
       path: '/api/me/save-token'
       fullPath: '/api/me/save-token'
       preLoaderRoute: typeof ApiMeSaveTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/analytics': {
+      id: '/api/admin/analytics'
+      path: '/api/admin/analytics'
+      fullPath: '/api/admin/analytics'
+      preLoaderRoute: typeof ApiAdminAnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/item/$id': {
@@ -702,6 +722,7 @@ const rootRouteChildren: RootRouteChildren = {
   SetupRoute: SetupRoute,
   ShortcutRoute: ShortcutRoute,
   ShareSlugRoute: ShareSlugRoute,
+  ApiAdminAnalyticsRoute: ApiAdminAnalyticsRoute,
   ApiMeSaveTokenRoute: ApiMeSaveTokenRoute,
   ApiMeShortcutRoute: ApiMeShortcutRoute,
   ApiPublicUrlMetadataRoute: ApiPublicUrlMetadataRoute,

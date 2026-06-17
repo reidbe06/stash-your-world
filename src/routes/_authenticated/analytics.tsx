@@ -79,19 +79,21 @@ function AnalyticsPage() {
   if (!isAdmin) return null;
 
   const { data: items = [], isLoading } = useQuery<AnalyticsItem[]>({
-    queryKey: ["analytics-items", user?.id],
-    enabled: !!user,
+    queryKey: ["analytics-items-all"],
+    enabled: !!user && isAdmin,
     staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("items")
-        .select("id,title,type,category,product_name,product_brand,affiliate_url,product_url,is_shoppable,affiliate_click_count")
-        .eq("user_id", user!.id);
-      if (error) throw error;
-      return (data ?? []).map((r) => ({
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
+      const res = await fetch("/api/admin/analytics", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) throw new Error(`Analytics fetch failed: ${res.status}`);
+      const json = await res.json();
+      return (json.items ?? []).map((r: any) => ({
         ...r,
-        is_shoppable: !!(r as any).is_shoppable,
-        affiliate_click_count: (r as any).affiliate_click_count ?? 0,
+        is_shoppable: !!r.is_shoppable,
+        affiliate_click_count: r.affiliate_click_count ?? 0,
       }));
     },
   });
