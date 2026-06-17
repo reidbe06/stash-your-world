@@ -27,6 +27,7 @@ import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenti
 import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as ApiPublicUrlMetadataRouteImport } from './routes/api/public/url-metadata'
+import { Route as ApiMeShortcutUploadRouteImport } from './routes/api/me.shortcut-upload'
 import { Route as ApiMeShortcutRouteImport } from './routes/api/me.shortcut'
 import { Route as ApiMeSaveTokenRouteImport } from './routes/api/me.save-token'
 import { Route as ApiAdminAnalyticsRouteImport } from './routes/api/admin/analytics'
@@ -131,6 +132,11 @@ const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
 const ApiPublicUrlMetadataRoute = ApiPublicUrlMetadataRouteImport.update({
   id: '/api/public/url-metadata',
   path: '/api/public/url-metadata',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeShortcutUploadRoute = ApiMeShortcutUploadRouteImport.update({
+  id: '/api/me/shortcut-upload',
+  path: '/api/me/shortcut-upload',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMeShortcutRoute = ApiMeShortcutRouteImport.update({
@@ -240,6 +246,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/analytics': typeof ApiAdminAnalyticsRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
+  '/api/me/shortcut-upload': typeof ApiMeShortcutUploadRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -274,6 +281,7 @@ export interface FileRoutesByTo {
   '/api/admin/analytics': typeof ApiAdminAnalyticsRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
+  '/api/me/shortcut-upload': typeof ApiMeShortcutUploadRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -310,6 +318,7 @@ export interface FileRoutesById {
   '/api/admin/analytics': typeof ApiAdminAnalyticsRoute
   '/api/me/save-token': typeof ApiMeSaveTokenRoute
   '/api/me/shortcut': typeof ApiMeShortcutRoute
+  '/api/me/shortcut-upload': typeof ApiMeShortcutUploadRoute
   '/api/public/url-metadata': typeof ApiPublicUrlMetadataRoute
   '/_authenticated/collection/$type/$sub': typeof AuthenticatedCollectionTypeSubRoute
   '/api/public/extension/collections': typeof ApiPublicExtensionCollectionsRoute
@@ -346,6 +355,7 @@ export interface FileRouteTypes {
     | '/api/admin/analytics'
     | '/api/me/save-token'
     | '/api/me/shortcut'
+    | '/api/me/shortcut-upload'
     | '/api/public/url-metadata'
     | '/collection/$type/$sub'
     | '/api/public/extension/collections'
@@ -380,6 +390,7 @@ export interface FileRouteTypes {
     | '/api/admin/analytics'
     | '/api/me/save-token'
     | '/api/me/shortcut'
+    | '/api/me/shortcut-upload'
     | '/api/public/url-metadata'
     | '/collection/$type/$sub'
     | '/api/public/extension/collections'
@@ -415,6 +426,7 @@ export interface FileRouteTypes {
     | '/api/admin/analytics'
     | '/api/me/save-token'
     | '/api/me/shortcut'
+    | '/api/me/shortcut-upload'
     | '/api/public/url-metadata'
     | '/_authenticated/collection/$type/$sub'
     | '/api/public/extension/collections'
@@ -437,6 +449,7 @@ export interface RootRouteChildren {
   ApiAdminAnalyticsRoute: typeof ApiAdminAnalyticsRoute
   ApiMeSaveTokenRoute: typeof ApiMeSaveTokenRoute
   ApiMeShortcutRoute: typeof ApiMeShortcutRoute
+  ApiMeShortcutUploadRoute: typeof ApiMeShortcutUploadRoute
   ApiPublicUrlMetadataRoute: typeof ApiPublicUrlMetadataRoute
   ApiPublicExtensionCollectionsRoute: typeof ApiPublicExtensionCollectionsRoute
   ApiPublicExtensionSaveRoute: typeof ApiPublicExtensionSaveRoute
@@ -573,6 +586,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/url-metadata'
       fullPath: '/api/public/url-metadata'
       preLoaderRoute: typeof ApiPublicUrlMetadataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/shortcut-upload': {
+      id: '/api/me/shortcut-upload'
+      path: '/api/me/shortcut-upload'
+      fullPath: '/api/me/shortcut-upload'
+      preLoaderRoute: typeof ApiMeShortcutUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/me/shortcut': {
@@ -746,6 +766,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminAnalyticsRoute: ApiAdminAnalyticsRoute,
   ApiMeSaveTokenRoute: ApiMeSaveTokenRoute,
   ApiMeShortcutRoute: ApiMeShortcutRoute,
+  ApiMeShortcutUploadRoute: ApiMeShortcutUploadRoute,
   ApiPublicUrlMetadataRoute: ApiPublicUrlMetadataRoute,
   ApiPublicExtensionCollectionsRoute: ApiPublicExtensionCollectionsRoute,
   ApiPublicExtensionSaveRoute: ApiPublicExtensionSaveRoute,
