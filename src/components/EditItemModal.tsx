@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Check, Loader2, Plus, FolderOpen, ShoppingBag, ChevronDown, ChevronUp, Link2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -85,13 +85,15 @@ interface Props {
   item: Item;
   open: boolean;
   onClose: () => void;
+  focusProductUrl?: boolean;
 }
 
-export function EditItemModal({ item, open, onClose }: Props) {
+export function EditItemModal({ item, open, onClose, focusProductUrl }: Props) {
   const { user } = useAuth();
   const qc = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [productOpen, setProductOpen] = useState(false);
+  const productUrlRef = useRef<HTMLInputElement>(null);
 
   // When the user has manually moved a save, show the effective location —
   // not the original AI-assigned category that may still sit in item.category.
@@ -192,6 +194,16 @@ export function EditItemModal({ item, open, onClose }: Props) {
       setSelectedCollectionIds(new Set(currentMemberships));
     }
   }, [open, currentMemberships]);
+
+  useEffect(() => {
+    if (open && focusProductUrl) {
+      const timer = setTimeout(() => {
+        productUrlRef.current?.focus();
+        productUrlRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [open, focusProductUrl]);
 
   const toggleCollection = (colId: string) => {
     setSelectedCollectionIds((prev) => {
@@ -490,6 +502,7 @@ export function EditItemModal({ item, open, onClose }: Props) {
                 Product URL
               </label>
               <input
+                ref={productUrlRef}
                 type="url"
                 value={fields.product_url}
                 onChange={(e) => setFields((f) => ({ ...f, product_url: e.target.value }))}

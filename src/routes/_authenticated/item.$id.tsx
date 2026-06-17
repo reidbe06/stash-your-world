@@ -93,6 +93,7 @@ function ItemDetailPage() {
   };
 
   const [editOpen, setEditOpen] = useState(false);
+  const [editFocusProductUrl, setEditFocusProductUrl] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [ingredientsOpen, setIngredientsOpen] = useState(false);
@@ -385,11 +386,6 @@ function ItemDetailPage() {
             {buyingNow ? "Opening…" : "Buy Now"}
           </button>
         )}
-        {showProductUI && item.is_shoppable && !hasBuyNowUrl && (
-          <p className="mt-1 text-sm text-muted-foreground italic">
-            Product link not found yet.
-          </p>
-        )}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground pt-0.5">
           {host && <span className="font-medium">{host}</span>}
           {host && <span aria-hidden>·</span>}
@@ -498,6 +494,31 @@ function ItemDetailPage() {
           <p className="text-sm text-muted-foreground">
             We couldn't identify a specific product from this video yet.
           </p>
+        </div>
+      )}
+
+      {/* ── No product link empty state ── */}
+      {showProductUI && item.is_shoppable && !hasBuyNowUrl && !hasDetectedProducts && (
+        <div className="rounded-2xl border border-border/40 bg-white p-4 shadow-sm space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
+              <ShoppingBag className="h-3.5 w-3.5 text-primary" />
+            </span>
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Shopping Link
+            </p>
+          </div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            We found product inspiration in this save, but not a direct shopping link yet.
+          </p>
+          <button
+            type="button"
+            onClick={() => { setEditFocusProductUrl(true); setEditOpen(true); }}
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 transition"
+          >
+            <Pencil className="h-3 w-3" />
+            Add product link
+          </button>
         </div>
       )}
 
@@ -770,8 +791,10 @@ function ItemDetailPage() {
       <EditItemModal
         item={item}
         open={editOpen}
+        focusProductUrl={editFocusProductUrl}
         onClose={() => {
           setEditOpen(false);
+          setEditFocusProductUrl(false);
           qc.invalidateQueries({ queryKey: ["item-detail", id] });
         }}
       />
