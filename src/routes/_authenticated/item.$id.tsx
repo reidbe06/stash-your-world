@@ -149,9 +149,18 @@ function ItemDetailPage() {
     }
   };
 
+  const SOCIAL_HOSTS = new Set([
+    "instagram.com", "tiktok.com", "twitter.com", "x.com",
+    "facebook.com", "youtube.com", "pinterest.com", "threads.net",
+  ]);
+  function isSocialUrl(url: string | null | undefined): boolean {
+    if (!url) return false;
+    try { return SOCIAL_HOSTS.has(new URL(url).hostname.replace("www.", "")); } catch { return false; }
+  }
+
   const handleBuyNow = async () => {
     if (!item) return;
-    const targetUrl = item.affiliate_url || item.product_url || item.url;
+    const targetUrl = item.affiliate_url || item.product_url;
     if (!targetUrl) return;
     setBuyingNow(true);
     try {
@@ -278,6 +287,11 @@ function ItemDetailPage() {
     item.product_url
   );
   const showProductUI = isProduct || isFashion || hasProductData || item.is_shoppable === true;
+  // Only offer Buy Now when there's a real product/affiliate link — never fall back to the original social URL
+  const hasBuyNowUrl = !!(
+    item.affiliate_url ||
+    (item.product_url && item.product_url !== item.url && !isSocialUrl(item.product_url))
+  );
   const hasIngredients = Array.isArray(item.recipe_ingredients) && item.recipe_ingredients.length > 0;
   const hasSteps = Array.isArray(item.recipe_steps) && item.recipe_steps.length > 0;
   const hasRecipeContent = hasIngredients || hasSteps;
@@ -360,7 +374,7 @@ function ItemDetailPage() {
             {item.product_description}
           </p>
         )}
-        {showProductUI && (item.affiliate_url || item.product_url || item.url) && (
+        {showProductUI && hasBuyNowUrl && (
           <button
             type="button"
             onClick={handleBuyNow}
@@ -370,6 +384,11 @@ function ItemDetailPage() {
             <ShoppingBag className="h-5 w-5" />
             {buyingNow ? "Opening…" : "Buy Now"}
           </button>
+        )}
+        {showProductUI && item.is_shoppable && !hasBuyNowUrl && (
+          <p className="mt-1 text-sm text-muted-foreground italic">
+            Product link not found yet.
+          </p>
         )}
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground pt-0.5">
           {host && <span className="font-medium">{host}</span>}

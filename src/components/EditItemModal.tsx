@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Check, Loader2, Plus, FolderOpen, ShoppingBag, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Check, Loader2, Plus, FolderOpen, ShoppingBag, ChevronDown, ChevronUp, Link2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -479,6 +479,38 @@ export function EditItemModal({ item, open, onClose }: Props) {
             />
           </div>
 
+          {/* ── Product Links (always visible) ── */}
+          <div className="rounded-xl border border-border bg-background px-4 py-4 space-y-3">
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <Link2 className="h-3.5 w-3.5" />
+              Product Links
+            </p>
+            <div>
+              <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
+                Product URL
+              </label>
+              <input
+                type="url"
+                value={fields.product_url}
+                onChange={(e) => setFields((f) => ({ ...f, product_url: e.target.value }))}
+                placeholder="https://shop.example.com/product"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
+                Affiliate URL
+              </label>
+              <input
+                type="url"
+                value={fields.affiliate_url}
+                onChange={(e) => setFields((f) => ({ ...f, affiliate_url: e.target.value }))}
+                placeholder="https://go.affiliate.com/…"
+                className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </div>
+
           {/* ── Product Details ── */}
           <div className="rounded-xl border border-border overflow-hidden">
             <button
@@ -552,32 +584,6 @@ export function EditItemModal({ item, open, onClose }: Props) {
                     value={fields.product_price}
                     onChange={(e) => setFields((f) => ({ ...f, product_price: e.target.value }))}
                     placeholder="e.g. $24.99"
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Product URL
-                  </label>
-                  <input
-                    type="url"
-                    value={fields.product_url}
-                    onChange={(e) => setFields((f) => ({ ...f, product_url: e.target.value }))}
-                    placeholder="https://…"
-                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Affiliate URL
-                  </label>
-                  <input
-                    type="url"
-                    value={fields.affiliate_url}
-                    onChange={(e) => setFields((f) => ({ ...f, affiliate_url: e.target.value }))}
-                    placeholder="https://…"
                     className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-1 focus:ring-primary"
                   />
                 </div>
