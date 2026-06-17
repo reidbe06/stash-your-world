@@ -1,18 +1,15 @@
 // Public Shortcut download/install landing page — no auth required.
-// Designed for iPhone: tapping "Add to Shortcuts" downloads the .shortcut
-// file which iOS automatically opens in the Shortcuts app.
+// On iPhone: tapping "Add to Shortcuts" opens the shortcuts:// URL scheme
+// which launches the Shortcuts app directly with the import dialog.
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Logo } from "@/components/Logo";
 import {
   Download,
-  Share2,
   Sparkles,
   BellRing,
   ShieldCheck,
-  ChevronRight,
-  Instagram,
-  Youtube,
+  ExternalLink,
 } from "lucide-react";
 
 export const Route = createFileRoute("/shortcut")({
@@ -69,6 +66,59 @@ const works = [
   { icon: "🛍️", label: "Shopping" },
 ];
 
+function DownloadButton({ isIOS, label }: { isIOS: boolean; label: string }) {
+  const [triggered, setTriggered] = useState(false);
+  const [shortcutsLink, setShortcutsLink] = useState<string | null>(null);
+
+  const handleClick = useCallback(() => {
+    if (isIOS) {
+      // shortcuts:// scheme is the only reliable way to trigger import on iOS.
+      // Direct <a download> is silently ignored by iOS Safari.
+      const fileUrl = `${window.location.origin}/STASHd.shortcut`;
+      const sLink = `shortcuts://import-shortcut?url=${encodeURIComponent(fileUrl)}`;
+      setShortcutsLink(sLink);
+      setTriggered(true);
+      window.location.href = sLink;
+    } else {
+      // Desktop: direct download
+      window.location.href = "/STASHd.shortcut";
+    }
+  }, [isIOS]);
+
+  return (
+    <div className="space-y-3">
+      <button
+        onClick={handleClick}
+        className="mt-7 flex w-full items-center justify-center gap-2.5 rounded-full bg-brand-gradient py-4 text-base font-bold text-primary-foreground shadow-brand transition active:scale-95"
+      >
+        {isIOS ? <ExternalLink className="h-5 w-5 shrink-0" /> : <Download className="h-5 w-5 shrink-0" />}
+        {label}
+      </button>
+
+      {/* Fallback for iOS if Shortcuts didn't open */}
+      {isIOS && triggered && shortcutsLink && (
+        <div className="rounded-xl border border-dashed border-amber-400/60 bg-amber-50 px-4 py-3 text-xs text-amber-800 text-left space-y-1.5">
+          <p className="font-semibold">Shortcuts didn't open automatically?</p>
+          <p>Tap below — it will open the Shortcuts app directly:</p>
+          <a
+            href={shortcutsLink}
+            className="inline-flex items-center gap-1 font-semibold underline underline-offset-2"
+          >
+            <ExternalLink className="h-3 w-3 shrink-0" />
+            Open in Shortcuts
+          </a>
+        </div>
+      )}
+
+      {!isIOS && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Open this page on your iPhone for the best experience.
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ShortcutPage() {
   const isIOS = useIsIOS();
 
@@ -107,20 +157,7 @@ function ShortcutPage() {
         </p>
 
         {/* Download CTA */}
-        <a
-          href="/STASHd.shortcut"
-          download="STASHd.shortcut"
-          className="mt-7 flex w-full items-center justify-center gap-2.5 rounded-full bg-brand-gradient py-4 text-base font-bold text-primary-foreground shadow-brand transition active:scale-95"
-        >
-          <Download className="h-5 w-5 shrink-0" />
-          {isIOS ? "Add to Shortcuts" : "Download Shortcut"}
-        </a>
-
-        {!isIOS && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            Open this page on your iPhone for the best experience.
-          </p>
-        )}
+        <DownloadButton isIOS={isIOS} label={isIOS ? "Add to Shortcuts" : "Download Shortcut"} />
 
         {/* Works with */}
         <div className="mt-10">
@@ -197,14 +234,7 @@ function ShortcutPage() {
         </div>
 
         {/* Second CTA */}
-        <a
-          href="/STASHd.shortcut"
-          download="STASHd.shortcut"
-          className="mt-10 flex w-full items-center justify-center gap-2.5 rounded-full bg-brand-gradient py-4 text-base font-bold text-primary-foreground shadow-brand transition active:scale-95"
-        >
-          <Download className="h-5 w-5 shrink-0" />
-          {isIOS ? "Add to Shortcuts" : "Download Shortcut"}
-        </a>
+        <DownloadButton isIOS={isIOS} label={isIOS ? "Add to Shortcuts" : "Download Shortcut"} />
 
         <p className="mt-4 text-xs text-muted-foreground">
           Need an account?{" "}

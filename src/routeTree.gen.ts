@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShareSlugRouteImport } from './routes/share.$slug'
+import { Route as ApiShortcutRouteImport } from './routes/api/shortcut'
 import { Route as AuthenticatedShareRouteImport } from './routes/_authenticated/share'
 import { Route as AuthenticatedSearchRouteImport } from './routes/_authenticated/search'
 import { Route as AuthenticatedSaveRouteImport } from './routes/_authenticated/save'
@@ -69,6 +70,11 @@ const IndexRoute = IndexRouteImport.update({
 const ShareSlugRoute = ShareSlugRouteImport.update({
   id: '/share/$slug',
   path: '/share/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiShortcutRoute = ApiShortcutRouteImport.update({
+  id: '/api/shortcut',
+  path: '/api/shortcut',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedShareRoute = AuthenticatedShareRouteImport.update({
@@ -225,6 +231,7 @@ export interface FileRoutesByFullPath {
   '/save': typeof AuthenticatedSaveRoute
   '/search': typeof AuthenticatedSearchRoute
   '/share': typeof AuthenticatedShareRoute
+  '/api/shortcut': typeof ApiShortcutRoute
   '/share/$slug': typeof ShareSlugRoute
   '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
@@ -258,6 +265,7 @@ export interface FileRoutesByTo {
   '/save': typeof AuthenticatedSaveRoute
   '/search': typeof AuthenticatedSearchRoute
   '/share': typeof AuthenticatedShareRoute
+  '/api/shortcut': typeof ApiShortcutRoute
   '/share/$slug': typeof ShareSlugRoute
   '/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/collections/$id': typeof AuthenticatedCollectionsIdRoute
@@ -293,6 +301,7 @@ export interface FileRoutesById {
   '/_authenticated/save': typeof AuthenticatedSaveRoute
   '/_authenticated/search': typeof AuthenticatedSearchRoute
   '/_authenticated/share': typeof AuthenticatedShareRoute
+  '/api/shortcut': typeof ApiShortcutRoute
   '/share/$slug': typeof ShareSlugRoute
   '/_authenticated/category/$type': typeof AuthenticatedCategoryTypeRoute
   '/_authenticated/collections/$id': typeof AuthenticatedCollectionsIdRoute
@@ -328,6 +337,7 @@ export interface FileRouteTypes {
     | '/save'
     | '/search'
     | '/share'
+    | '/api/shortcut'
     | '/share/$slug'
     | '/category/$type'
     | '/collections/$id'
@@ -361,6 +371,7 @@ export interface FileRouteTypes {
     | '/save'
     | '/search'
     | '/share'
+    | '/api/shortcut'
     | '/share/$slug'
     | '/category/$type'
     | '/collections/$id'
@@ -395,6 +406,7 @@ export interface FileRouteTypes {
     | '/_authenticated/save'
     | '/_authenticated/search'
     | '/_authenticated/share'
+    | '/api/shortcut'
     | '/share/$slug'
     | '/_authenticated/category/$type'
     | '/_authenticated/collections/$id'
@@ -420,6 +432,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   SetupRoute: typeof SetupRoute
   ShortcutRoute: typeof ShortcutRoute
+  ApiShortcutRoute: typeof ApiShortcutRoute
   ShareSlugRoute: typeof ShareSlugRoute
   ApiAdminAnalyticsRoute: typeof ApiAdminAnalyticsRoute
   ApiMeSaveTokenRoute: typeof ApiMeSaveTokenRoute
@@ -476,6 +489,13 @@ declare module '@tanstack/react-router' {
       path: '/share/$slug'
       fullPath: '/share/$slug'
       preLoaderRoute: typeof ShareSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/shortcut': {
+      id: '/api/shortcut'
+      path: '/api/shortcut'
+      fullPath: '/api/shortcut'
+      preLoaderRoute: typeof ApiShortcutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/share': {
@@ -721,6 +741,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   SetupRoute: SetupRoute,
   ShortcutRoute: ShortcutRoute,
+  ApiShortcutRoute: ApiShortcutRoute,
   ShareSlugRoute: ShareSlugRoute,
   ApiAdminAnalyticsRoute: ApiAdminAnalyticsRoute,
   ApiMeSaveTokenRoute: ApiMeSaveTokenRoute,

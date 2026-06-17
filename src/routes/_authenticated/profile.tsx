@@ -3,10 +3,10 @@ import { useQuery } from "@tanstack/react-query";
 import {
   LogOut, Mail, Bell, Lock, HelpCircle, ChevronRight,
   Sparkles, FolderOpen, Smartphone, Copy, Check,
-  Download, Loader2,
+  Download, Loader2, ExternalLink,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { AvatarUploader } from "@/components/AvatarUploader";
@@ -36,11 +36,21 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function useIsIOS() {
+  const [isIOS, setIsIOS] = useState(false);
+  useEffect(() => {
+    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent));
+  }, []);
+  return isIOS;
+}
+
 function IOSShortcutSection() {
   const { user } = useAuth();
+  const isIOS = useIsIOS();
   const [revealed, setRevealed] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
+  const [status, setStatus] = useState<"idle" | "opening" | "downloaded" | "error">("idle");
+  const [shortcutsLink, setShortcutsLink] = useState<string | null>(null);
 
   const { data: tokenData, isLoading: tokenLoading } = useQuery({
     queryKey: ["save-token", user?.id],
@@ -61,34 +71,53 @@ function IOSShortcutSection() {
   const token = tokenData?.token ?? "";
 
   async function downloadPersonalised() {
-    setDownloading(true);
-    try {
-      const { data: sess } = await supabase.auth.getSession();
-      const bearer = sess.session?.access_token;
-      if (!bearer) throw new Error("Not signed in");
+    if (isIOS) {
+      // iOS: use shortcuts:// URL scheme — the only reliable way to import
+      // on iOS. The Shortcuts app fetches the file from our public endpoint.
+      if (!token) return;
+      const downloadUrl = `${window.location.origin}/api/shortcut?token=${encodeURIComponent(token)}`;
+      const sLink = `shortcuts://import-shortcut?url=${encodeURIComponent(downloadUrl)}`;
+      setShortcutsLink(sLink);
+      setStatus("opening");
+      window.location.href = sLink;
+      // After 3s if the user is still on the page, show the fallback link
+      setTimeout(() => setStatus("opening"), 3000);
+    } else {
+      // Desktop / non-iOS: fetch binary and trigger browser download
+      setDownloading(true);
+      setStatus("idle");
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        const bearer = sess.session?.access_token;
+        if (!bearer) throw new Error("Not signed in");
 
-      const res = await fetch("/api/me/shortcut", {
-        headers: { Authorization: `Bearer ${bearer}` },
-      });
-      if (!res.ok) throw new Error(await res.text());
+        const res = await fetch("/api/me/shortcut", {
+          headers: { Authorization: `Bearer ${bearer}` },
+        });
+        if (!res.ok) throw new Error(await res.text());
 
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "STASHd.shortcut";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setDownloaded(true);
-      setTimeout(() => setDownloaded(false), 4000);
-    } catch (err) {
-      console.error("Download failed", err);
-    } finally {
-      setDownloading(false);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "STASHd.shortcut";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setStatus("downloaded");
+        setTimeout(() => setStatus("idle"), 4000);
+      } catch (err) {
+        console.error("Download failed", err);
+        setStatus("error");
+        setTimeout(() => setStatus("idle"), 4000);
+      } finally {
+        setDownloading(false);
+      }
     }
   }
+
+  const buttonDisabled = downloading || (isIOS && tokenLoading);
 
   return (
     <div className="rounded-2xl border bg-card shadow-card overflow-hidden">
@@ -127,17 +156,36 @@ function IOSShortcutSection() {
         {/* Personalised download */}
         <button
           onClick={downloadPersonalised}
-          disabled={downloading}
+          disabled={buttonDisabled}
           className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-gradient py-3 text-sm font-semibold text-primary-foreground shadow-brand disabled:opacity-70"
         >
           {downloading ? (
             <><Loader2 className="h-4 w-4 animate-spin" /> Generating…</>
-          ) : downloaded ? (
+          ) : status === "opening" ? (
+            <><ExternalLink className="h-4 w-4" /> Opening Shortcuts…</>
+          ) : status === "downloaded" ? (
             <><Check className="h-4 w-4" /> Downloaded!</>
+          ) : status === "error" ? (
+            <><Download className="h-4 w-4" /> Try Again</>
           ) : (
             <><Download className="h-4 w-4" /> Download My Shortcut</>
           )}
         </button>
+
+        {/* iOS fallback: if Shortcuts didn't open, show a tappable link */}
+        {isIOS && status === "opening" && shortcutsLink && (
+          <div className="rounded-xl border border-dashed border-amber-400/60 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:bg-amber-950/30 dark:text-amber-300 space-y-2">
+            <p className="font-semibold">Shortcuts didn't open automatically?</p>
+            <p>Tap the link below — it will open the Shortcuts app and import your shortcut:</p>
+            <a
+              href={shortcutsLink}
+              className="flex items-center gap-1.5 font-semibold underline underline-offset-2"
+            >
+              <ExternalLink className="h-3 w-3 shrink-0" />
+              Open in Shortcuts
+            </a>
+          </div>
+        )}
 
         {/* Token (advanced / backup) */}
         <details className="group">
