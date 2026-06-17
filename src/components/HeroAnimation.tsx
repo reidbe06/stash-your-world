@@ -280,10 +280,7 @@ export function HeroAnimation() {
           {/* header */}
           <div className="flex items-center justify-between mb-2 shrink-0">
             <div className="flex items-center gap-1">
-              <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
-                <rect width="32" height="32" rx="8" fill={PINK} />
-                <text x="8" y="23" fontSize="18" fontWeight="900" fill="white" fontFamily="system-ui">S</text>
-              </svg>
+              <img src="/stashd-mark.png" alt="STASHd" className="object-contain" style={{ width: 18, height: 18 }} />
               <span className="font-extrabold text-[13px] tracking-tight text-gray-900">STASHd</span>
             </div>
             <motion.div
