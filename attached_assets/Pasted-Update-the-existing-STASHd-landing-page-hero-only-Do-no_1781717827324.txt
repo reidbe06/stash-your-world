@@ -1,0 +1,51 @@
+Update the existing STASHd landing page hero only.
+
+Do not create a new app, route, project, or separate landing page. Do not change auth, dashboard, Supabase, waitlist logic, APIs, or routing.
+
+The current hero animation looks too placeholder/wireframe. Replace it with a more premium, emotional visual using real-looking save thumbnails instead of icons.
+
+Goal:
+Show real saves from Instagram, TikTok, Pinterest, YouTube, and Web flowing into STASHd, then becoming organized, useful outcomes.
+
+Hero visual requirements:
+1. Use real-looking image cards, not emoji/icons:
+   - Instagram: dress/outfit reel thumbnail
+   - TikTok: pasta recipe thumbnail
+   - Pinterest: travel/Santorini inspiration image
+   - YouTube: workout thumbnail
+   - Web: skincare or home product image
+
+2. Use recognizable platform logos/icons for Instagram, TikTok, Pinterest, YouTube, and Web instead of text circles like “IG” or “TT”.
+
+3. Animate the save cards flowing into the STASHd phone/dashboard with soft curved motion lines.
+
+4. Inside the phone, show a beautiful STASHd dashboard with actual image thumbnails:
+   - Pink Linen Dress — Fashion — Buy Now
+   - Creamy Tuscan Pasta — Recipes — Cook Tonight
+   - Santorini Hotel List — Travel — Plan Trip
+   - 15 Min Full Body Workout — Workouts — Start Workout
+   - Glow Serum — Products — Buy Now
+
+5. The phone should feel premium and realistic:
+   - cream/white background
+   - rounded image cards
+   - soft shadows
+   - pink/coral gradient accents
+   - STASHd logo at top
+   - search bar: “Search your saves...”
+
+6. Replace the hero headline with:
+   “Stop saving things. Start using them.”
+
+7. Subheadline:
+   “STASHd pulls your saves from Instagram, TikTok, Pinterest, YouTube and the web, then organizes them into a beautiful library you can actually use.”
+
+8. Keep current CTAs:
+   - Join the Waitlist
+   - See how it works
+
+9. Must be mobile-first and responsive. On mobile, stack the headline first, then the animated phone visual.
+
+10. Add Framer Motion if needed. If already installed, use the existing package. Keep animations smooth but not distracting.
+
+Use existing STASHd brand colors and style. Make it feel like Pinterest + Apple + soft feminine premium, not a SaaS dashboard.

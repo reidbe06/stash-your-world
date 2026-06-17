@@ -156,13 +156,12 @@ function Landing() {
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold tracking-widest text-primary">
               <Sparkles className="h-3.5 w-3.5" /> COMING SOON
             </div>
-            <h1 className="mt-6 text-5xl font-extrabold leading-[1.05] tracking-tight md:text-7xl">
-              <span className="text-brand-gradient">STOP LOSING</span><br />
-              <span className="text-brand-gradient">THE THINGS</span><br />
-              <span className="text-brand-gradient">YOU SAVE.</span>
+            <h1 className="mt-6 text-5xl font-extrabold leading-[1.05] tracking-tight md:text-6xl">
+              <span className="text-brand-gradient">Stop saving things.</span><br />
+              <span className="text-brand-gradient">Start using them.</span>
             </h1>
             <p className="mt-6 max-w-md text-lg text-muted-foreground">
-              STASHd organizes your saved recipes, products, places, workouts, and ideas — then helps you actually use them when the time is right.
+              STASHd pulls your saves from Instagram, TikTok, Pinterest, YouTube and the web, then organizes them into a beautiful library you can actually use.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <a href="#waitlist" className="inline-flex items-center gap-2 rounded-full bg-brand-gradient px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-brand transition hover:translate-y-[-1px]">
