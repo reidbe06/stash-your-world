@@ -4,8 +4,7 @@
 // can fetch the personalised file directly (it cannot send auth headers).
 import { createFileRoute } from "@tanstack/react-router";
 import { validateSaveToken } from "@/lib/save-token.server";
-import { spawnSync } from "node:child_process";
-import { join } from "node:path";
+import { buildShortcut } from "@/lib/shortcut-builder.server";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -18,25 +17,6 @@ const APP_URL =
   (process.env.REPLIT_DEPLOYMENT === "1"
     ? "https://stashd.replit.app"
     : `https://${process.env.REPLIT_DEV_DOMAIN || "stashd.replit.app"}`);
-
-function buildShortcutBytes(saveToken: string): Buffer | null {
-  try {
-    const scriptPath = join(process.cwd(), "scripts", "generate_shortcut.py");
-    const result = spawnSync(
-      "python3",
-      [scriptPath, APP_URL, "--token", saveToken, "--stdout"],
-      { maxBuffer: 64 * 1024, timeout: 10_000 }
-    );
-    if (result.status !== 0 || !result.stdout?.length) {
-      console.error("[shortcut] python3 error:", result.stderr?.toString());
-      return null;
-    }
-    return result.stdout as Buffer;
-  } catch (err) {
-    console.error("[shortcut] spawnSync failed:", err);
-    return null;
-  }
-}
 
 export const Route = createFileRoute("/api/shortcut")({
   server: {
@@ -54,13 +34,12 @@ export const Route = createFileRoute("/api/shortcut")({
           });
         }
 
-        const bytes = buildShortcutBytes(token);
-        if (!bytes) {
-          return new Response(JSON.stringify({ error: "Shortcut generation failed" }), {
-            status: 500,
-            headers: { "Content-Type": "application/json", ...CORS },
-          });
-        }
+        const bytes = buildShortcut({
+          saveEndpoint: `${APP_URL}/api/public/share/save`,
+          tokenValue: token,
+          personal: true,
+          version: "v2",
+        });
 
         return new Response(bytes, {
           status: 200,

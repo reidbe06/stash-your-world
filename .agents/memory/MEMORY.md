@@ -2,3 +2,4 @@
 - [TanStack Router search param sync](search-param-sync.md) — useState(initialParam) doesn't update on same-route navigation; must useEffect([param]) to sync
 - [Supabase DDL from Replit](supabase-ddl-blocked.md) — direct postgres + Management API all blocked from Replit network; only way is Supabase dashboard SQL editor
 - [Lovable vite config migration](lovable-vite-migration.md) — replaced @lovable.dev/vite-tanstack-config with standard Vite; tanstackStart from @tanstack/react-start/plugin/vite, no nitro plugin needed on Replit
+- [iOS Shortcut TS builder](shortcut-ts-builder.md) — replaced Python subprocess; plain-string WFURL breaks iOS 15+; TS builder runs in <5ms
