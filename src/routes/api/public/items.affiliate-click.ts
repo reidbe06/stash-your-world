@@ -5,7 +5,8 @@
 // immediately and calls this endpoint in the background.
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { getUserIdFromBearer, supabaseAdmin } from "@/lib/share-ingest.server";
+import { getUserIdFromBearer } from "@/lib/share-ingest.server";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",

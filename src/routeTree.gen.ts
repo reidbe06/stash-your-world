@@ -24,6 +24,7 @@ import { Route as AuthenticatedDevNotesRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCollectionsRouteImport } from './routes/_authenticated/collections'
 import { Route as AuthenticatedAskRouteImport } from './routes/_authenticated/ask'
+import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as ApiPublicUrlMetadataRouteImport } from './routes/api/public/url-metadata'
 import { Route as ApiMeShortcutRouteImport } from './routes/api/me.shortcut'
 import { Route as ApiMeSaveTokenRouteImport } from './routes/api/me.save-token'
@@ -115,6 +116,11 @@ const AuthenticatedAskRoute = AuthenticatedAskRouteImport.update({
   path: '/ask',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const ApiPublicUrlMetadataRoute = ApiPublicUrlMetadataRouteImport.update({
   id: '/api/public/url-metadata',
   path: '/api/public/url-metadata',
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
+  '/analytics': typeof AuthenticatedAnalyticsRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -234,6 +241,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
+  '/analytics': typeof AuthenticatedAnalyticsRoute
   '/ask': typeof AuthenticatedAskRoute
   '/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -267,6 +275,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/setup': typeof SetupRoute
   '/shortcut': typeof ShortcutRoute
+  '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/ask': typeof AuthenticatedAskRoute
   '/_authenticated/collections': typeof AuthenticatedCollectionsRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -300,6 +309,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
+    | '/analytics'
     | '/ask'
     | '/collections'
     | '/dashboard'
@@ -331,6 +341,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
+    | '/analytics'
     | '/ask'
     | '/collections'
     | '/dashboard'
@@ -363,6 +374,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/setup'
     | '/shortcut'
+    | '/_authenticated/analytics'
     | '/_authenticated/ask'
     | '/_authenticated/collections'
     | '/_authenticated/dashboard'
@@ -516,6 +528,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAskRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/analytics': {
+      id: '/_authenticated/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/api/public/url-metadata': {
       id: '/api/public/url-metadata'
       path: '/api/public/url-metadata'
@@ -639,6 +658,7 @@ const AuthenticatedCollectionsRouteWithChildren =
   )
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedAskRoute: typeof AuthenticatedAskRoute
   AuthenticatedCollectionsRoute: typeof AuthenticatedCollectionsRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -655,6 +675,7 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedAskRoute: AuthenticatedAskRoute,
   AuthenticatedCollectionsRoute: AuthenticatedCollectionsRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,

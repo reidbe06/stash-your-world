@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, useNavigate, Link, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Home, Search, Plus, LogOut, Sparkles, Bell } from "lucide-react";
+import { Home, Search, Plus, LogOut, Sparkles, Bell, BarChart2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Logo } from "@/components/Logo";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,6 +59,15 @@ function AuthedLayout() {
                 </Link>
               );
             })}
+            <Link
+              to="/analytics"
+              className={cn(
+                "rounded-full px-4 py-2 text-sm font-medium transition",
+                pathname.startsWith("/analytics") ? "bg-accent text-accent-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Analytics
+            </Link>
           </div>
           <div className="flex items-center gap-2">
             <FeedbackButton />
