@@ -150,18 +150,9 @@ function ItemDetailPage() {
     }
   };
 
-  const SOCIAL_HOSTS = new Set([
-    "instagram.com", "tiktok.com", "twitter.com", "x.com",
-    "facebook.com", "youtube.com", "pinterest.com", "threads.net",
-  ]);
-  function isSocialUrl(url: string | null | undefined): boolean {
-    if (!url) return false;
-    try { return SOCIAL_HOSTS.has(new URL(url).hostname.replace("www.", "")); } catch { return false; }
-  }
-
   const handleBuyNow = async () => {
     if (!item) return;
-    const targetUrl = item.affiliate_url || item.product_url;
+    const targetUrl = buyNowTarget;
     if (!targetUrl) return;
     setBuyingNow(true);
     try {
@@ -274,6 +265,29 @@ function ItemDetailPage() {
     );
   }
 
+  // Social/content platforms — never a shopping destination on their own
+  const SOCIAL_CONTENT_HOSTS = new Set([
+    "instagram.com", "tiktok.com", "youtube.com", "youtu.be",
+    "pinterest.com", "pin.it", "facebook.com", "fb.com",
+    "twitter.com", "x.com", "threads.net", "vimeo.com",
+    "reddit.com", "snapchat.com", "lemon8-app.com",
+  ]);
+  function isSocialContentUrl(url: string | null | undefined): boolean {
+    if (!url) return false;
+    try { return SOCIAL_CONTENT_HOSTS.has(new URL(url).hostname.replace("www.", "")); } catch { return false; }
+  }
+  function isRetailOrProductUrl(url: string | null | undefined): boolean {
+    if (!url) return false;
+    try { new URL(url); } catch { return false; }
+    return !isSocialContentUrl(url);
+  }
+
+  // Priority: affiliate_url → product_url (if non-social) → item.url (if retail/product page)
+  const buyNowTarget: string | null =
+    item.affiliate_url ||
+    (item.product_url && isRetailOrProductUrl(item.product_url) ? item.product_url : null) ||
+    (isRetailOrProductUrl(item.url) ? item.url : null);
+
   const isProduct = item.category === "Products" || item.category === "Product";
   const isFashion = item.category === "Fashion";
   const isRecipe = item.category === "Recipes" || item.category === "Recipe";
@@ -288,11 +302,8 @@ function ItemDetailPage() {
     item.product_url
   );
   const showProductUI = isProduct || isFashion || hasProductData || item.is_shoppable === true;
-  // Only offer Buy Now when there's a real product/affiliate link — never fall back to the original social URL
-  const hasBuyNowUrl = !!(
-    item.affiliate_url ||
-    (item.product_url && item.product_url !== item.url && !isSocialUrl(item.product_url))
-  );
+  // Show Buy Now whenever we have a real shopping destination
+  const hasBuyNowUrl = !!buyNowTarget;
   const hasIngredients = Array.isArray(item.recipe_ingredients) && item.recipe_ingredients.length > 0;
   const hasSteps = Array.isArray(item.recipe_steps) && item.recipe_steps.length > 0;
   const hasRecipeContent = hasIngredients || hasSteps;
