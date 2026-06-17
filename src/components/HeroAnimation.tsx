@@ -1,8 +1,15 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 
+// ── hero image URLs (served from public/) ─────────────────────────────────────
+const imgDress    = "/hero-dress.webp";
+const imgPasta    = "/hero-pasta.jpg";
+const imgTravel   = "/hero-travel.jpg";
+const imgWorkout  = "/hero-workout.jpg";
+const imgSkincare = "/hero-skincare.jpg";
+
 // ── brand ─────────────────────────────────────────────────────────────────────
-const PINK = "#FD5897";
+const PINK   = "#FD5897";
 const SPRING = { type: "spring" as const, stiffness: 200, damping: 26 };
 
 // ── platform logo SVGs ────────────────────────────────────────────────────────
@@ -11,10 +18,8 @@ function IgLogo({ size = 18 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
       <defs>
         <linearGradient id="ig-g" x1="0" y1="32" x2="32" y2="0" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#f09433" />
-          <stop offset=".25" stopColor="#e6683c" />
-          <stop offset=".5" stopColor="#dc2743" />
-          <stop offset=".75" stopColor="#cc2366" />
+          <stop stopColor="#f09433" /><stop offset=".25" stopColor="#e6683c" />
+          <stop offset=".5" stopColor="#dc2743" /><stop offset=".75" stopColor="#cc2366" />
           <stop offset="1" stopColor="#bc1888" />
         </linearGradient>
       </defs>
@@ -25,7 +30,6 @@ function IgLogo({ size = 18 }: { size?: number }) {
     </svg>
   );
 }
-
 function TtLogo({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
@@ -35,7 +39,6 @@ function TtLogo({ size = 18 }: { size?: number }) {
     </svg>
   );
 }
-
 function PinLogo({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
@@ -44,7 +47,6 @@ function PinLogo({ size = 18 }: { size?: number }) {
     </svg>
   );
 }
-
 function YtLogo({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
@@ -54,7 +56,6 @@ function YtLogo({ size = 18 }: { size?: number }) {
     </svg>
   );
 }
-
 function WebLogo({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" fill="none">
@@ -66,101 +67,48 @@ function WebLogo({ size = 18 }: { size?: number }) {
   );
 }
 
-// ── source card data ──────────────────────────────────────────────────────────
+// ── source cards ──────────────────────────────────────────────────────────────
 const SOURCES = [
-  {
-    id: "ig",
-    Logo: IgLogo,
-    handle: "@style_inspo",
-    title: "Pink Linen Dress",
-    emoji: "👗",
-    bg: "linear-gradient(135deg,#fce7f3 0%,#fda4af 100%)",
-    color: PINK,
-  },
-  {
-    id: "tt",
-    Logo: TtLogo,
-    handle: "@foodtok",
-    title: "Creamy Tuscan Pasta",
-    emoji: "🍝",
-    bg: "linear-gradient(135deg,#fef3c7 0%,#fbbf24 100%)",
-    color: "#f59e0b",
-  },
-  {
-    id: "pin",
-    Logo: PinLogo,
-    handle: "Travel Inspo",
-    title: "Santorini Hotel List",
-    emoji: "🏛️",
-    bg: "linear-gradient(135deg,#dbeafe 0%,#60a5fa 100%)",
-    color: "#3b82f6",
-  },
-  {
-    id: "yt",
-    Logo: YtLogo,
-    handle: "FitWith Sara",
-    title: "15 Min Full Body",
-    emoji: "💪",
-    bg: "linear-gradient(135deg,#ede9fe 0%,#a78bfa 100%)",
-    color: "#7c3aed",
-  },
-  {
-    id: "web",
-    Logo: WebLogo,
-    handle: "sephora.com",
-    title: "Glow Serum",
-    emoji: "✨",
-    bg: "linear-gradient(135deg,#d1fae5 0%,#34d399 100%)",
-    color: "#059669",
-  },
+  { id: "ig",  Logo: IgLogo,  handle: "@style_inspo",  title: "Floral Midi Dress",      img: imgDress,    color: PINK       },
+  { id: "tt",  Logo: TtLogo,  handle: "@foodtok",      title: "Creamy Tuscan Pasta",     img: imgPasta,    color: "#f59e0b"  },
+  { id: "pin", Logo: PinLogo, handle: "Travel Inspo",  title: "Santorini Hotel List",    img: imgTravel,   color: "#3b82f6"  },
+  { id: "yt",  Logo: YtLogo,  handle: "FitWith Sara",  title: "15 Min Full Body",        img: imgWorkout,  color: "#7c3aed"  },
+  { id: "web", Logo: WebLogo, handle: "sephora.com",   title: "Strawberry Peel Mask",    img: imgSkincare, color: "#059669"  },
 ] as const;
 
 // ── phone dashboard items ─────────────────────────────────────────────────────
 const DASH_ITEMS = [
-  { emoji: "👗", title: "Pink Linen Dress",       category: "Fashion",  cta: "Buy Now",      catColor: PINK,      bg: "linear-gradient(135deg,#fce7f3,#fda4af)" },
-  { emoji: "🍝", title: "Creamy Tuscan Pasta",    category: "Recipes",  cta: "Cook Tonight", catColor: "#f59e0b", bg: "linear-gradient(135deg,#fef3c7,#fbbf24)" },
-  { emoji: "🏛️", title: "Santorini Hotel List",   category: "Travel",   cta: "Plan Trip",    catColor: "#3b82f6", bg: "linear-gradient(135deg,#dbeafe,#60a5fa)" },
-  { emoji: "💪", title: "15 Min Full Body",       category: "Workouts", cta: "Start Now",    catColor: "#7c3aed", bg: "linear-gradient(135deg,#ede9fe,#a78bfa)" },
-  { emoji: "✨", title: "Glow Serum",             category: "Products", cta: "Buy Now",      catColor: "#059669", bg: "linear-gradient(135deg,#d1fae5,#34d399)" },
+  { img: imgDress,    title: "Floral Midi Dress",      category: "Fashion",  cta: "Buy Now",      catColor: PINK,      src: "Instagram" },
+  { img: imgPasta,    title: "Creamy Tuscan Pasta",    category: "Recipes",  cta: "Cook Tonight", catColor: "#f59e0b", src: "TikTok"    },
+  { img: imgTravel,   title: "Santorini Hotel List",   category: "Travel",   cta: "Plan Trip",    catColor: "#3b82f6", src: "Pinterest" },
+  { img: imgWorkout,  title: "15 Min Full Body",       category: "Workouts", cta: "Start Now",    catColor: "#7c3aed", src: "YouTube"   },
+  { img: imgSkincare, title: "Strawberry Peel Mask",   category: "Products", cta: "Buy Now",      catColor: "#059669", src: "Web"       },
 ] as const;
 
-// ── layout ────────────────────────────────────────────────────────────────────
+// ── layout constants (container = 380 × 490 px) ───────────────────────────────
 const W          = 380;
 const H          = 490;
 
-// source cards
 const CARD_W     = 120;
 const CARD_H     = 68;
 const CARD_TOPS  = [10, 88, 166, 244, 322] as const;
 const CARD_CYS   = CARD_TOPS.map((t) => t + CARD_H / 2) as unknown as readonly number[];
 
-// phone
 const PHONE_L    = 166;
 const PHONE_T    = 14;
 const PHONE_W    = 204;
 const PHONE_H    = 452;
-const PHONE_CX   = PHONE_L + PHONE_W / 2;   // 268
-const PHONE_CY   = PHONE_T + PHONE_H / 2;   // 240
+const PHONE_CX   = PHONE_L + PHONE_W / 2;
+const PHONE_CY   = PHONE_T + PHONE_H / 2;
 
-// flying chip
 const CHIP_W     = 100;
 const CHIP_H     = 30;
-// chip starts at right edge of source card, centered vertically on the card
-const CHIP_START_X = (i: number) => CARD_W;                        // 120
-const CHIP_START_Y = (i: number) => CARD_CYS[i] - CHIP_H / 2;
-// chip ends near the phone entry point (phone left - chip width, phone center Y)
-const CHIP_END_DX  = PHONE_L - CHIP_W - 8;                         // 58
+const CHIP_END_DX  = PHONE_L - CHIP_W - 8;
 const CHIP_END_DY  = (i: number) => PHONE_CY - CARD_CYS[i];
 
-// ── curved SVG path helpers ───────────────────────────────────────────────────
-function curvePath(
-  x1: number, y1: number,
-  x2: number, y2: number,
-  curvature: number = 40
-) {
-  const mx = (x1 + x2) / 2 + curvature;
-  const my = (y1 + y2) / 2;
-  return `M ${x1} ${y1} Q ${mx} ${my} ${x2} ${y2}`;
+function curvePath(x1: number, y1: number, x2: number, y2: number, c = 24) {
+  const mx = (x1 + x2) / 2 + c;
+  return `M ${x1} ${y1} Q ${mx} ${(y1 + y2) / 2} ${x2} ${y2}`;
 }
 
 // ── component ─────────────────────────────────────────────────────────────────
@@ -180,56 +128,32 @@ export function HeroAnimation() {
     const T: ReturnType<typeof setTimeout>[] = [];
     const at = (ms: number, fn: () => void) => T.push(setTimeout(fn, ms));
 
-    // fly in 5 cards, 500 ms apart, starting at 1 s
-    SOURCES.forEach((_, i) => at(1000 + i * 500, () => setFlyIdx(i)));
-
-    // populate dashboard items
-    DASH_ITEMS.forEach((_, i) => at(4000 + i * 300, () => setDashCount(i + 1)));
-
-    // highlight first item + show outcome
-    at(6200, () => setHighlight(0));
-    at(6600, () => setShowOutcome(true));
-
-    // next loop
+    SOURCES.forEach((_, i) => at(900 + i * 480, () => setFlyIdx(i)));
+    DASH_ITEMS.forEach((_, i) => at(3800 + i * 290, () => setDashCount(i + 1)));
+    at(6100, () => setHighlight(0));
+    at(6500, () => setShowOutcome(true));
     at(10000, () => setCycle((c) => c + 1));
 
     return () => T.forEach(clearTimeout);
   }, [cycle]);
 
   return (
-    <div
-      className="relative mx-auto"
-      style={{ width: W, height: H, maxWidth: "100%" }}
-    >
-      {/* ── ambient glow ── */}
-      <div
-        className="absolute pointer-events-none"
-        style={{
-          width: 280, height: 240,
-          left: 60, top: 110,
-          background: "radial-gradient(circle,#FD589740 0%,#a855f715 60%,transparent 100%)",
-          filter: "blur(32px)",
-        }}
-      />
+    <div className="relative mx-auto" style={{ width: W, height: H, maxWidth: "100%" }}>
 
-      {/* ── SVG curved connector paths ── */}
-      <svg
-        className="absolute inset-0 pointer-events-none"
-        width={W} height={H}
-        style={{ overflow: "visible" }}
-      >
+      {/* ── ambient glow ── */}
+      <div className="absolute pointer-events-none" style={{
+        width: 280, height: 240, left: 60, top: 110,
+        background: "radial-gradient(circle,#FD589738 0%,#a855f710 60%,transparent 100%)",
+        filter: "blur(32px)",
+      }} />
+
+      {/* ── curved connector lines ── */}
+      <svg className="absolute inset-0 pointer-events-none" width={W} height={H} style={{ overflow: "visible" }}>
         {SOURCES.map((src, i) => (
           <motion.path
             key={src.id}
-            d={curvePath(
-              CARD_W + 2, CARD_CYS[i],
-              PHONE_L - 2, PHONE_CY,
-              24,
-            )}
-            fill="none"
-            stroke={src.color + "40"}
-            strokeWidth="1.5"
-            strokeDasharray="5 5"
+            d={curvePath(CARD_W + 2, CARD_CYS[i], PHONE_L - 2, PHONE_CY)}
+            fill="none" stroke={`${src.color}45`} strokeWidth="1.5" strokeDasharray="5 5"
             initial={{ opacity: 0, pathLength: 0 }}
             animate={{ opacity: 1, pathLength: 1 }}
             transition={{ delay: 0.3 + i * 0.12, duration: 0.9, ease: "easeOut" }}
@@ -237,7 +161,7 @@ export function HeroAnimation() {
         ))}
       </svg>
 
-      {/* ── source cards (left column) ── */}
+      {/* ── source cards ── */}
       {SOURCES.map((src, i) => {
         const Logo = src.Logo;
         return (
@@ -245,57 +169,44 @@ export function HeroAnimation() {
             key={src.id}
             className="absolute overflow-hidden rounded-2xl bg-white"
             style={{
-              left: 0,
-              top: CARD_TOPS[i],
-              width: CARD_W,
-              height: CARD_H,
-              boxShadow: "0 4px 20px -4px rgba(0,0,0,0.13)",
+              left: 0, top: CARD_TOPS[i], width: CARD_W, height: CARD_H,
+              boxShadow: "0 4px 20px -4px rgba(0,0,0,0.14)",
               border: "1.5px solid rgba(255,255,255,0.9)",
               zIndex: 4,
             }}
             initial={{ opacity: 0, x: -24, scale: 0.88 }}
-            animate={{
-              opacity: 1,
-              x: 0,
-              scale: 1,
-              y: [0, -5, 0],
-            }}
+            animate={{ opacity: 1, x: 0, scale: 1, y: [0, -5, 0] }}
             transition={{
               opacity: { delay: i * 0.1, duration: 0.4 },
               x:       { delay: i * 0.1, duration: 0.4, type: "spring", stiffness: 220, damping: 22 },
               scale:   { delay: i * 0.1, duration: 0.4 },
-              y:       { delay: i * 0.4 + 0.5, duration: 2.4 + i * 0.2, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" },
+              y:       { delay: i * 0.3 + 0.5, duration: 2.4 + i * 0.2, repeat: Infinity, repeatType: "mirror", ease: "easeInOut" },
             }}
           >
-            {/* thumbnail area */}
-            <div
-              className="absolute left-0 top-0 bottom-0 flex items-center justify-center"
-              style={{ width: 52, background: src.bg }}
-            >
-              <span style={{ fontSize: 24, lineHeight: 1 }}>{src.emoji}</span>
+            {/* photo thumbnail */}
+            <div className="absolute left-0 top-0 bottom-0 overflow-hidden" style={{ width: 52 }}>
+              <img
+                src={src.img}
+                alt={src.title}
+                className="w-full h-full object-cover"
+                style={{ display: "block" }}
+              />
             </div>
 
-            {/* content area */}
-            <div
-              className="absolute right-0 top-0 bottom-0 flex flex-col justify-between"
-              style={{ left: 52, padding: "7px 8px 7px 8px" }}
-            >
+            {/* content */}
+            <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-between"
+              style={{ left: 52, padding: "7px 8px" }}>
               <div className="flex items-center justify-between">
-                <span
-                  className="text-[8px] font-semibold truncate"
-                  style={{ color: src.color, maxWidth: 44 }}
-                >
+                <span className="text-[8px] font-semibold truncate" style={{ color: src.color, maxWidth: 44 }}>
                   {src.handle}
                 </span>
                 <Logo size={14} />
               </div>
-              <p className="text-[10px] font-bold text-gray-800 leading-snug line-clamp-2">
-                {src.title}
-              </p>
+              <p className="text-[10px] font-bold text-gray-800 leading-snug line-clamp-2">{src.title}</p>
               <motion.span
                 className="self-start rounded-full text-white text-[7px] font-bold px-1.5 py-0.5"
                 style={{ background: src.color }}
-                animate={{ scale: flyIdx === i ? [1, 1.08, 1] : 1 }}
+                animate={{ scale: flyIdx === i ? [1, 1.1, 1] : 1 }}
                 transition={{ duration: 0.3 }}
               >
                 Save ✦
@@ -305,23 +216,19 @@ export function HeroAnimation() {
         );
       })}
 
-      {/* ── flying save chips ── */}
+      {/* ── flying chips ── */}
       <AnimatePresence>
         {SOURCES.map((src, i) => {
           const Logo = src.Logo;
+          const startTop = CARD_CYS[i] - CHIP_H / 2;
           return flyIdx >= i ? (
             <motion.div
               key={`${cycle}-chip-${i}`}
-              className="absolute flex items-center gap-1.5 rounded-xl bg-white pointer-events-none"
+              className="absolute flex items-center gap-1.5 rounded-xl bg-white pointer-events-none overflow-hidden"
               style={{
-                left: CHIP_START_X(i),
-                top: CHIP_START_Y(i),
-                width: CHIP_W,
-                height: CHIP_H,
+                left: CARD_W, top: startTop, width: CHIP_W, height: CHIP_H,
                 boxShadow: `0 4px 16px ${src.color}35`,
                 border: `1.5px solid ${src.color}30`,
-                paddingLeft: 7,
-                paddingRight: 7,
                 zIndex: 20,
               }}
               initial={{ opacity: 0, x: 0, y: 0, scale: 0.75 }}
@@ -331,23 +238,20 @@ export function HeroAnimation() {
                 y: [0, CHIP_END_DY(i) * 0.45, CHIP_END_DY(i)],
                 scale: [0.75, 1, 0.8, 0.5],
               }}
-              transition={{
-                duration: 1.2,
-                ease: [0.25, 0.46, 0.45, 0.94],
-                times: [0, 0.18, 0.72, 1],
-              }}
+              transition={{ duration: 1.2, ease: [0.25, 0.46, 0.45, 0.94], times: [0, 0.18, 0.72, 1] }}
             >
-              <Logo size={14} />
-              <div className="min-w-0">
-                <p className="text-[8px] font-bold text-gray-800 truncate leading-tight">
-                  {src.title}
-                </p>
-                <p
-                  className="text-[7px] font-semibold leading-tight truncate"
-                  style={{ color: src.color }}
-                >
-                  {src.handle}
-                </p>
+              {/* mini photo */}
+              <div className="shrink-0 overflow-hidden" style={{ width: 30, height: CHIP_H }}>
+                <img src={src.img} alt="" className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 min-w-0 pr-1">
+                <p className="text-[8px] font-bold text-gray-800 truncate leading-tight">{src.title}</p>
+                <div className="flex items-center gap-0.5 mt-0.5">
+                  <Logo size={9} />
+                  <p className="text-[7px] font-semibold leading-tight truncate" style={{ color: src.color }}>
+                    {src.handle}
+                  </p>
+                </div>
               </div>
             </motion.div>
           ) : null;
@@ -358,13 +262,10 @@ export function HeroAnimation() {
       <div
         className="absolute bg-white overflow-hidden"
         style={{
-          left: PHONE_L,
-          top: PHONE_T,
-          width: PHONE_W,
-          height: PHONE_H,
+          left: PHONE_L, top: PHONE_T, width: PHONE_W, height: PHONE_H,
           borderRadius: "2.4rem",
           border: "9px solid #111",
-          boxShadow: "0 32px 80px -12px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.15) inset",
+          boxShadow: "0 32px 80px -12px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.15)",
           zIndex: 10,
         }}
       >
@@ -374,14 +275,11 @@ export function HeroAnimation() {
         </div>
 
         {/* screen */}
-        <div
-          className="flex flex-col overflow-hidden"
-          style={{ height: PHONE_H - 9 * 2 - 12, padding: "6px 10px 8px" }}
-        >
-          {/* logo bar */}
+        <div className="flex flex-col overflow-hidden" style={{ height: PHONE_H - 24, padding: "6px 10px 8px" }}>
+
+          {/* header */}
           <div className="flex items-center justify-between mb-2 shrink-0">
             <div className="flex items-center gap-1">
-              {/* S mark inline */}
               <svg width="18" height="18" viewBox="0 0 32 32" fill="none">
                 <rect width="32" height="32" rx="8" fill={PINK} />
                 <text x="8" y="23" fontSize="18" fontWeight="900" fill="white" fontFamily="system-ui">S</text>
@@ -410,9 +308,7 @@ export function HeroAnimation() {
           {/* section label */}
           <div className="flex items-center justify-between mb-1.5 shrink-0">
             <span className="text-[9px] font-bold text-gray-500 tracking-wider">YOUR LIBRARY</span>
-            <span className="text-[8px] font-semibold" style={{ color: PINK }}>
-              {dashCount} saved
-            </span>
+            <span className="text-[8px] font-semibold" style={{ color: PINK }}>{dashCount} saved</span>
           </div>
 
           {/* saved items */}
@@ -426,28 +322,27 @@ export function HeroAnimation() {
                     className="flex items-center gap-2 rounded-2xl overflow-hidden"
                     style={{
                       background: isHighlighted ? `${item.catColor}12` : "#fafafa",
-                      border: isHighlighted ? `1.5px solid ${item.catColor}35` : "1.5px solid #f3f4f6",
+                      border: `1.5px solid ${isHighlighted ? item.catColor + "35" : "#f3f4f6"}`,
                       padding: "5px 8px 5px 5px",
                       boxShadow: isHighlighted ? `0 4px 16px ${item.catColor}20` : "none",
                       transition: "all 0.4s ease",
                     }}
-                    initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                    initial={{ opacity: 0, x: 18, scale: 0.95 }}
                     animate={{ opacity: 1, x: 0, scale: 1 }}
                     transition={{ ...SPRING, delay: 0.04 * i }}
                   >
-                    {/* thumbnail */}
-                    <div
-                      className="shrink-0 rounded-xl flex items-center justify-center"
-                      style={{ width: 36, height: 36, background: item.bg }}
-                    >
-                      <span style={{ fontSize: 18, lineHeight: 1 }}>{item.emoji}</span>
+                    {/* real photo thumbnail */}
+                    <div className="shrink-0 overflow-hidden rounded-xl" style={{ width: 36, height: 36 }}>
+                      <img
+                        src={item.img}
+                        alt={item.title}
+                        className="w-full h-full object-cover"
+                        style={{ display: "block" }}
+                      />
                     </div>
 
-                    {/* details */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-[9px] font-bold text-gray-900 truncate leading-tight">
-                        {item.title}
-                      </p>
+                      <p className="text-[9px] font-bold text-gray-900 truncate leading-tight">{item.title}</p>
                       <span
                         className="inline-block rounded-full text-[7px] font-bold px-1.5 py-0.5 leading-tight mt-0.5"
                         style={{ background: item.catColor + "20", color: item.catColor }}
@@ -456,13 +351,10 @@ export function HeroAnimation() {
                       </span>
                     </div>
 
-                    {/* CTA */}
                     <motion.button
-                      className="shrink-0 rounded-full text-white text-[7px] font-bold whitespace-nowrap"
+                      className="shrink-0 rounded-full text-[7px] font-bold whitespace-nowrap"
                       style={{
-                        background: isHighlighted
-                          ? `linear-gradient(90deg,${item.catColor},${item.catColor}cc)`
-                          : "#e5e7eb",
+                        background: isHighlighted ? `linear-gradient(90deg,${item.catColor},${item.catColor}cc)` : "#e5e7eb",
                         color: isHighlighted ? "white" : "#9ca3af",
                         padding: "3px 7px",
                         transition: "all 0.4s ease",
@@ -477,15 +369,11 @@ export function HeroAnimation() {
               })}
             </AnimatePresence>
 
-            {/* skeleton placeholders while loading */}
+            {/* skeletons while loading */}
             {dashCount < DASH_ITEMS.length && (
               <div className="space-y-1.5">
                 {Array.from({ length: Math.min(3, DASH_ITEMS.length - dashCount) }).map((_, k) => (
-                  <div
-                    key={k}
-                    className="h-[46px] rounded-2xl bg-gray-100"
-                    style={{ opacity: 0.7 - k * 0.2 }}
-                  />
+                  <div key={k} className="h-[46px] rounded-2xl bg-gray-100" style={{ opacity: 0.7 - k * 0.2 }} />
                 ))}
               </div>
             )}
@@ -506,19 +394,16 @@ export function HeroAnimation() {
                 exit={{ opacity: 0 }}
                 transition={SPRING}
               >
-                <p className="text-[8px] font-extrabold tracking-widest mb-1" style={{ color: PINK }}>
+                <p className="text-[8px] font-extrabold tracking-widest mb-1.5" style={{ color: PINK }}>
                   ✨ FOUND FOR YOU
                 </p>
                 <div className="flex items-center gap-2">
-                  <div
-                    className="shrink-0 rounded-xl flex items-center justify-center"
-                    style={{ width: 32, height: 32, background: "linear-gradient(135deg,#fce7f3,#fda4af)" }}
-                  >
-                    <span style={{ fontSize: 16, lineHeight: 1 }}>👗</span>
+                  <div className="shrink-0 overflow-hidden rounded-xl" style={{ width: 36, height: 36 }}>
+                    <img src={imgDress} alt="Floral Midi Dress" className="w-full h-full object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[9px] font-extrabold text-gray-900 leading-tight">Pink Linen Dress</p>
-                    <p className="text-[7px] text-gray-400 leading-tight">From @style_inspo</p>
+                    <p className="text-[9px] font-extrabold text-gray-900 leading-tight">Floral Midi Dress</p>
+                    <p className="text-[7px] text-gray-400 leading-tight">Saved from @style_inspo</p>
                   </div>
                   <motion.button
                     className="shrink-0 rounded-full text-white text-[7px] font-bold"
@@ -533,7 +418,7 @@ export function HeroAnimation() {
             )}
           </AnimatePresence>
 
-          {/* bottom save button */}
+          {/* bottom CTA */}
           <motion.button
             className="mt-2 w-full shrink-0 rounded-full py-2.5 text-[10px] font-bold text-white"
             style={{ background: `linear-gradient(90deg,${PINK},#f472b6)` }}
